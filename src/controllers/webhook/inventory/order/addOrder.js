@@ -36,6 +36,7 @@ export const addOrder = async (req, res, next) => {
       const updatePayload = {
         order_status: status,
         updated_at: new Date(),
+        total_items: items.length,
       };
       await Order.updateOne(
         { _id: existingOrder._id },
