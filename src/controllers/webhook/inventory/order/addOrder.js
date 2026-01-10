@@ -42,7 +42,35 @@ export const addOrder = async (req, res, next) => {
         { _id: existingOrder._id },
         { $set: updatePayload }
       );
-
+      const countryDoc = await Country.findOne({
+        $or: [
+          { iso2: billing_address.country },
+          { name: billing_address.country },
+        ],
+      });
+      const stateDoc = await State.findOne({
+        country_id: countryDoc.id,
+        $or: [
+          { code: billing_address.state_code },
+          { name: billing_address.state },
+        ],
+      });
+      const cityDoc = await City.findOne({
+        state_id: stateDoc.id,
+        $or: [
+          { slug: slugify(billing_address.city) },
+          { name: billing_address.city },
+        ],
+      });
+      const updateBillingAddress = await Address.findOneAndUpdate(
+        { _id: existingOrder.billing_address },
+        {
+          country: countryDoc.id || 101,
+        }
+      );
+      console.log(
+        `✅ Order Billing address updated: ${updateBillingAddress?.country}`
+      );
       return res.status(200).json({
         status: "success",
         message: "Order already exists, status updated",
@@ -123,7 +151,7 @@ export const addOrder = async (req, res, next) => {
     if (billing_address?.address_1) {
       const countryDoc = await Country.findOne({
         $or: [
-          { iso2: billing_address.country_code },
+          { iso2: billing_address.country },
           { name: billing_address.country },
         ],
       });
