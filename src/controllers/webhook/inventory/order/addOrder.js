@@ -294,23 +294,42 @@ export const addOrder = async (req, res, next) => {
   }
 };
 const findCountryStateCity = async (address) => {
+  if (!address) {
+    return { country: null, state: null, city: null };
+  }
+
+  // COUNTRY
   const country = await Country.findOne({
     $or: [{ iso2: address.country }, { name: address.country }],
-  });
+  }).select("id");
 
-  if (!country) return {};
+  if (!country) {
+    return { country: null, state: null, city: null };
+  }
 
+  // STATE
   const state = await State.findOne({
     country_id: country.id,
-    $or: [{ iso2: address.state }, { name: address.state }],
-  });
+    $or: [{ code: address.state }, { name: address.state }],
+  }).select("id");
 
-  if (!state) return { country };
+  if (!state) {
+    return {
+      country: country.id,
+      state: null,
+      city: null,
+    };
+  }
 
+  // CITY (case-insensitive match)
   const city = await City.findOne({
     state_id: state.id,
     name: { $regex: `^${address.city}$`, $options: "i" },
-  });
+  }).select("id");
 
-  return { country, state, city };
+  return {
+    country: country.id,
+    state: state.id,
+    city: city?.id || null,
+  };
 };
