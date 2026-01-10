@@ -33,7 +33,23 @@ export const addOrder = async (req, res, next) => {
     const existingOrder = await Order.findOne({ id: order_id });
     if (existingOrder) {
       console.warn(`⚠️ Duplicate order attempt: ${order_id}`);
-      throw new StatusError(409, `Order with ID ${order_id} already exists`);
+      const updatePayload = {
+        order_status: status,
+        updated_at: new Date(),
+      };
+      await Order.updateOne(
+        { _id: existingOrder._id },
+        { $set: updatePayload }
+      );
+
+      return res.status(200).json({
+        status: "success",
+        message: "Order already exists, status updated",
+        data: {
+          order_id: existingOrder.id,
+          order_status: updatePayload.order_status,
+        },
+      });
     }
 
     // 👤 2. Find or create user
