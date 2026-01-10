@@ -295,21 +295,21 @@ export const addOrder = async (req, res, next) => {
 };
 const findCountryStateCity = async (address) => {
   const country = await Country.findOne({
-    $or: [{ iso2: address.country_code }, { name: address.country }],
+    $or: [{ iso2: address.country }, { name: address.country }],
   });
 
   if (!country) return {};
 
   const state = await State.findOne({
     country_id: country.id,
-    $or: [{ code: address.state_code }, { name: address.state }],
+    $or: [{ iso2: address.state }, { name: address.state }],
   });
 
   if (!state) return { country };
 
   const city = await City.findOne({
     state_id: state.id,
-    $or: [{ name: address.city }],
+    name: { $regex: `^${address.city}$`, $options: "i" },
   });
 
   return { country, state, city };
