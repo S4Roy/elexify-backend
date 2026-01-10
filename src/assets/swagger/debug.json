@@ -1,0 +1,94 @@
+{
+  "openapi": "3.0.1",
+  "info": {
+    "title": "Elexify Online Debug",
+    "termsOfService": "",
+    "version": "1.0.0"
+  },
+  "tags": [
+    {
+      "name": "Debug"
+    }
+  ],
+  "paths": {
+    "/debug/db-seeding": {
+      "get": {
+        "tags": ["Debug"],
+        "summary": "DB Seed",
+        "description": "",
+        "requestBody": {
+          "description": "An object defining our schema for this request",
+          "content": {
+            "application/x-www-form-urlencoded": {},
+            "application/json": {}
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/successResponseObject"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/badRequestResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/serverErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-codegen-request-body-name": "body"
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "serverErrorResponse": {
+        "title": "Server Error Response",
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "string"
+          }
+        },
+        "example": {
+          "error": "Something Went Wrong"
+        }
+      },
+      "badRequestResponse": {
+        "title": "Bad Request Response",
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "string"
+          }
+        },
+        "example": {
+          "error": "Bad request"
+        }
+      },
+      "successResponseObject": {
+        "title": "Success Response",
+        "type": "object"
+      }
+    }
+  }
+}

@@ -1,0 +1,67 @@
+{
+  "description": "Schema for editing a category using form-data",
+  "content": {
+    "multipart/form-data": {
+      "schema": {
+        "type": "object",
+        "required": ["_id"],
+        "properties": {
+          "_id": {
+            "type": "string",
+            "pattern": "^[0-9a-fA-F]{24}$",
+            "description": "Product ID (MongoDB ObjectId)"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 100,
+            "description": "Product name (optional for partial update)"
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 10000,
+            "nullable": true,
+            "format": "html",
+            "description": "Product description (supports HTML content for long-form text)"
+          },
+          "category": {
+            "type": "string",
+            "pattern": "^[0-9a-fA-F]{24}$",
+            "nullable": true,
+            "description": "Category ID (optional, must be a valid MongoDB ObjectId)"
+          },
+          "images": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "binary"
+            },
+            "description": "Upload multiple images"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["active", "inactive"],
+            "description": "Product status (optional, defaults to active)"
+          },
+          "meta_title": {
+            "type": "string",
+            "maxLength": 255,
+            "nullable": true,
+            "description": "SEO title for the product (optional)"
+          },
+          "meta_description": {
+            "type": "string",
+            "maxLength": 1000,
+            "nullable": true,
+            "description": "SEO meta description for the product (optional)"
+          },
+          "meta_keywords": {
+            "type": "string",
+            "nullable": true,
+            "description": "Comma-separated SEO keywords for the product (optional)"
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,36 @@
+{
+    "description": "An object defining our schema for this request",
+    "content": {
+      "application/x-www-form-urlencoded": {
+        "schema": {
+          "required": ["email","verification_code"],
+          "type": "object",
+          "properties": {
+            "email": {
+              "type": "string",
+              "format":"email"
+            },
+            "verification_code": {
+              "type": "string",
+              "format":"email"
+            }
+          }
+        }
+      },
+      "application/json": {
+        "schema": {
+          "required": ["email","verification_code"],
+          "type": "object",
+          "properties": {
+            "email": {
+              "type": "string"
+            },
+            "verification_code": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "required": true
+}

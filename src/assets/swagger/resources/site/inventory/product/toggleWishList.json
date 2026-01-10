@@ -1,0 +1,18 @@
+{
+  "description": "Schema for editing a category using form-data",
+  "content": {
+    "multipart/form-data": {
+      "schema": {
+        "type": "object",
+        "required": ["product_id"],
+        "properties": {
+          "product_id": {
+            "type": "string",
+            "pattern": "^[0-9a-fA-F]{24}$",
+            "description": "Product ID (MongoDB ObjectId)"
+          }
+        }
+      }
+    }
+  }
+}

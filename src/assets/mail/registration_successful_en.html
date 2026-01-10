@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{pageTitle}}</title>
+    <style type="text/css">
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: Arial, Helvetica, sans-serif;
+            background-color: #E5E5E5;
+        }
+
+        p {
+            padding: 0;
+            margin: 0;
+        }
+    </style>
+</head>
+
+<body>
+    <table width="600" cell-padding="0" cell-spacing="0"
+        style="margin: 60px auto; background-color: #fff; padding: 30px;">
+        <thead>
+            <tr>
+                <td style="border-bottom: 1px solid #E0E0E0; padding-bottom: 16px;"><img src="cid:logoImage"></td>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td style="padding: 40px 0;">
+                    <p style="margin-bottom: 10px;font-size: 16px;color: #333;font-weight: 400;line-height: 140%;">Dear
+                        {{firstName}},</p>
+                    <p style="margin-bottom: 24px;font-size: 16px;color: #4c4c4c;font-weight: 400;line-height: 140%;">We
+                        are thrilled to welcome you to AirIndia ! Your registration was successful, and we are excited
+                        to have you as part of our community.</p>
+                    <p style="margin-bottom: 24px;font-size: 16px;color: #333;font-weight: 400;line-height: 140%;">Here
+                        are a few things you can look forward to as a registered member:</p>
+                    <ol style="margin: 0 0 0 26px;padding: 0;">
+                        <li
+                            style="margin-bottom: 16px;color: #4c4c4c;line-height: 140%;font-weight: 400;font-size: 16px;">
+                            Access to Exclusive Content: As a registered member, you now have access to our exclusive
+                            content, features, and services. Explore our website to discover all the exciting resources
+                            we have to offer.</li>
+                        <li
+                            style="margin-bottom: 16px;color: #4c4c4c;line-height: 140%;font-weight: 400;font-size: 16px;">
+                            Personalized Experience: We are committed to tailoring your experience to meet your needs.
+                            Expect personalized recommendations, updates, and relevant information based on your
+                            preferences and interests.</li>
+                        <li
+                            style="margin-bottom: 16px;color: #4c4c4c;line-height: 140%;font-weight: 400;font-size: 16px;">
+                            Community Engagement: Join our vibrant community of like-minded individuals. Share your
+                            thoughts, ideas, and experiences with others who share your passion.</li>
+                        <li
+                            style="margin-bottom: 24px;color: #4c4c4c;line-height: 140%;font-weight: 400;font-size: 16px;">
+                            Support and Assistance: Our customer support team is here to assist you with any questions
+                            or concerns you may have. Feel free to reach out to us anytime at <a
+                                href="mailto:{{supportMail}}"
+                                style="display: inline-block;color: #4c4c4c;font-size: 16px;text-decoration: underline;">{{supportMail}}</a>.
+                        </li>
+                    </ol>
+                    <p style="margin-bottom: 32px;font-size: 16px;color: #4c4c4c;font-weight: 400;line-height: 140%;">
+                        Thank you for choosing AirIndia. We look forward to serving you and providing you with an
+                        exceptional experience.</p>
+                    <p style="font-size: 16px; line-height: 130%;color: #4c4c4c;margin-bottom: 10px;">Warm regards,</p>
+                    <p style="font-size: 16px; line-height: 130%;color: #4c4c4c;">{{thanksFrom}}</p>
+
+                </td>
+            </tr>
+        </tbody>
+        <tfoot>
+            <tr>
+                <td style="border-top: 1px solid #E0E0E0; padding-top: 30px;">
+                    <p style="font-size: 12px; font-weight: 400; color: #828282; line-height: 160%;"> COPYRIGHT©2024
+                        AirIndia</p>
+                </td>
+            </tr>
+        </tfoot>
+    </table>
+</body>
+
+</html>

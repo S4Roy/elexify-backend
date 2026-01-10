@@ -1,0 +1,58 @@
+{
+  "description": "Schema for adding a new product using form-data",
+  "content": {
+    "multipart/form-data": {
+      "schema": {
+        "required": ["name"],
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 100
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 500,
+            "nullable": true
+          },
+          "category": {
+            "type": "string",
+            "nullable": true
+          },
+          "images": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "binary"
+            },
+            "description": "Upload multiple images"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["active", "inactive"],
+            "default": "active"
+          },
+          "meta_title": {
+            "type": "string",
+            "maxLength": 255,
+            "nullable": true,
+            "description": "SEO title for the product (optional)"
+          },
+          "meta_description": {
+            "type": "string",
+            "maxLength": 1000,
+            "nullable": true,
+            "description": "SEO meta description for the product (optional)"
+          },
+          "meta_keywords": {
+            "type": "string",
+            "nullable": true,
+            "description": "Comma-separated SEO keywords for the product (optional)"
+          }
+        }
+      }
+    }
+  },
+  "required": true
+}

@@ -1,0 +1,46 @@
+{
+  "description": "An object defining our schema for this request",
+  "content": {
+    "application/json": {
+      "schema": {
+        "required": ["site_email", "site_name", "site_mobile", "gse_fleet_count"],
+        "type": "object",
+        "properties": {
+          "site_email": {
+            "type": "string"
+          },
+          "site_name": {
+            "type": "string"
+          },
+          "site_mobile": {
+            "type": "string"
+          },
+          "gse_fleet_count": {
+            "type": "integer"
+          }
+        }
+      }
+    },
+    "application/x-www-form-urlencoded": {
+      "schema": {
+        "required": ["site_email", "site_name", "site_mobile", "gse_fleet_count"],
+        "type": "object",
+        "properties": {
+          "site_email": {
+            "type": "string"
+          },
+          "site_name": {
+            "type": "string"
+          },
+          "site_mobile": {
+            "type": "string"
+          },
+          "gse_fleet_count": {
+            "type": "integer"
+          }
+        }
+      }
+    }
+  },
+  "required": true
+}

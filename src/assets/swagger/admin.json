@@ -1,0 +1,1368 @@
+{
+  "openapi": "3.0.1",
+  "info": {
+    "title": "ADMIN API",
+    "termsOfService": "",
+    "version": "1.0.0",
+    "description": "Elexify Admin Service"
+  },
+  "servers": [
+    {
+      "url": "/api/v1/admin",
+      "description": "Base API Server"
+    }
+  ],
+  "tags": [
+    {
+      "name": "Category"
+    },
+    {
+      "name": "Product"
+    },
+    {
+      "name": "Stock"
+    }
+  ],
+  "paths": {
+    "/inventory/category/list": {
+      "get": {
+        "tags": ["Category"],
+        "summary": "List all categories",
+        "description": "Fetches a list of all product categories available in the system.",
+        "parameters": [
+          {
+            "name": "parent_category",
+            "in": "query",
+            "description": "Search categories by parent_category",
+            "schema": {
+              "type": "string",
+              "nullable": true
+            }
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "description": "Search categories by name",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "description": "Page number for pagination",
+            "schema": {
+              "type": "integer",
+              "default": 1
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Number of categories per page",
+            "schema": {
+              "type": "integer",
+              "default": 10
+            }
+          },
+          {
+            "name": "sort_by",
+            "in": "query",
+            "description": "Sort categories by name or created date",
+            "schema": {
+              "type": "string",
+              "enum": ["name", "created_at"],
+              "default": "created_at"
+            }
+          },
+          {
+            "name": "sort_order",
+            "in": "query",
+            "description": "Sort order (asc or desc)",
+            "schema": {
+              "type": "integer",
+              "enum": [-1, 1],
+              "default": -1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "example": "success"
+                    },
+                    "message": {
+                      "type": "string",
+                      "example": "List fetched successfully"
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "docs": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "_id": {
+                                "type": "string",
+                                "description": "_id of category"
+                              },
+                              "name": {
+                                "type": "string",
+                                "description": "_id of category"
+                              },
+                              "slug": {
+                                "type": "string",
+                                "description": "_id of category"
+                              },
+                              "status": {
+                                "type": "string",
+                                "description": "_id of category"
+                              },
+                              "image_path": {
+                                "type": "string",
+                                "description": "_id of category"
+                              }
+                            }
+                          }
+                        },
+                        "totalDocs": {
+                          "type": "integer",
+                          "description": "Total number of categories"
+                        },
+                        "limit": {
+                          "type": "integer",
+                          "description": "Number of items per page"
+                        },
+                        "page": {
+                          "type": "integer",
+                          "description": "Current page number"
+                        },
+                        "totalPages": {
+                          "type": "integer",
+                          "description": "Total pages available"
+                        },
+                        "hasPrevPage": {
+                          "type": "boolean",
+                          "description": "Indicates if there is a previous page"
+                        },
+                        "hasNextPage": {
+                          "type": "boolean",
+                          "description": "Indicates if there is a next page"
+                        },
+                        "prevPage": {
+                          "type": ["integer", "null"],
+                          "description": "Previous page number (if any)"
+                        },
+                        "nextPage": {
+                          "type": ["integer", "null"],
+                          "description": "Next page number (if any)"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/badRequestResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized Access",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/unauthorizedResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/forbiddenResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/serverErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "ApiKeyAuth": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/inventory/category/details/{slug}": {
+      "get": {
+        "tags": ["Category"],
+        "summary": "Category Details",
+        "description": "Category Details",
+        "parameters": [
+          {
+            "$ref": "./resources/admin/inventory/category/details.json#slug"
+          }
+        ],
+        "requestBody": {
+          "description": "An object defining our schema for this request",
+          "content": {
+            "application/x-www-form-urlencoded": {},
+            "application/json": {}
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/successResponseObject"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/badRequestResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized Access",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/unauthorizedResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/forbiddenResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/serverErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "ApiKeyAuth": [], "bearerAuth": [] }],
+        "x-codegen-request-body-name": "body"
+      }
+    },
+    "/inventory/category/add": {
+      "post": {
+        "tags": ["Category"],
+        "summary": "Add a new category",
+        "description": "Creates a new product category in the system",
+        "requestBody": {
+          "$ref": "./resources/admin/inventory/category/add.json"
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/successResponseObject"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/badRequestResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized Access",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/unauthorizedResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/forbiddenResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/serverErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "ApiKeyAuth": [], "bearerAuth": [] }]
+      }
+    },
+    "/inventory/category/edit": {
+      "put": {
+        "tags": ["Category"],
+        "summary": "Update category",
+        "description": "Update category in the system",
+        "requestBody": {
+          "$ref": "./resources/admin/inventory/category/edit.json"
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/successResponseObject"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/badRequestResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized Access",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/unauthorizedResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/forbiddenResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/serverErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "ApiKeyAuth": [], "bearerAuth": [] }]
+      }
+    },
+    "/inventory/category/delete": {
+      "delete": {
+        "tags": ["Category"],
+        "summary": "Delete category",
+        "description": "Update category from the system",
+        "requestBody": {
+          "$ref": "./resources/admin/inventory/category/delete.json"
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/successResponseObject"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/badRequestResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized Access",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/unauthorizedResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/forbiddenResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/serverErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "ApiKeyAuth": [], "bearerAuth": [] }]
+      }
+    },
+    "/inventory/product/list": {
+      "get": {
+        "tags": ["Product"],
+        "summary": "List all products",
+        "description": "Fetches a list of all products available in the system.",
+        "parameters": [
+          {
+            "name": "category",
+            "in": "query",
+            "description": "Search products by category",
+            "schema": {
+              "type": "string",
+              "nullable": true
+            }
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "description": "Search products by name",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "description": "Page number for pagination",
+            "schema": {
+              "type": "integer",
+              "default": 1
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Number of categories per page",
+            "schema": {
+              "type": "integer",
+              "default": 10
+            }
+          },
+          {
+            "name": "sort_by",
+            "in": "query",
+            "description": "Sort categories by name or created date",
+            "schema": {
+              "type": "string",
+              "enum": ["name", "created_at"],
+              "default": "created_at"
+            }
+          },
+          {
+            "name": "sort_order",
+            "in": "query",
+            "description": "Sort order (asc or desc)",
+            "schema": {
+              "type": "integer",
+              "enum": [-1, 1],
+              "default": -1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "example": "success"
+                    },
+                    "message": {
+                      "type": "string",
+                      "example": "List fetched successfully"
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "docs": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "_id": {
+                                "type": "string",
+                                "description": "_id of product"
+                              },
+                              "name": {
+                                "type": "string",
+                                "description": "name of product"
+                              },
+                              "slug": {
+                                "type": "string",
+                                "description": "slug of product"
+                              },
+                              "status": {
+                                "type": "string",
+                                "description": "status of producct"
+                              },
+                              "image_path": {
+                                "type": "array",
+                                "description": "images of category"
+                              }
+                            }
+                          }
+                        },
+                        "totalDocs": {
+                          "type": "integer",
+                          "description": "Total number of categories"
+                        },
+                        "limit": {
+                          "type": "integer",
+                          "description": "Number of items per page"
+                        },
+                        "page": {
+                          "type": "integer",
+                          "description": "Current page number"
+                        },
+                        "totalPages": {
+                          "type": "integer",
+                          "description": "Total pages available"
+                        },
+                        "hasPrevPage": {
+                          "type": "boolean",
+                          "description": "Indicates if there is a previous page"
+                        },
+                        "hasNextPage": {
+                          "type": "boolean",
+                          "description": "Indicates if there is a next page"
+                        },
+                        "prevPage": {
+                          "type": ["integer", "null"],
+                          "description": "Previous page number (if any)"
+                        },
+                        "nextPage": {
+                          "type": ["integer", "null"],
+                          "description": "Next page number (if any)"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/badRequestResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized Access",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/unauthorizedResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/forbiddenResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/serverErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "ApiKeyAuth": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/inventory/product/details/{slug}": {
+      "get": {
+        "tags": ["Product"],
+        "summary": "Product Details",
+        "description": "Product Details",
+        "parameters": [
+          {
+            "$ref": "./resources/admin/inventory/product/details.json#slug"
+          }
+        ],
+        "requestBody": {
+          "description": "An object defining our schema for this request",
+          "content": {
+            "application/x-www-form-urlencoded": {},
+            "application/json": {}
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/successResponseObject"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/badRequestResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized Access",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/unauthorizedResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/forbiddenResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/serverErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "ApiKeyAuth": [], "bearerAuth": [] }],
+        "x-codegen-request-body-name": "body"
+      }
+    },
+    "/inventory/product/add": {
+      "post": {
+        "tags": ["Product"],
+        "summary": "Add a new product",
+        "description": "Creates a new product in the system",
+        "requestBody": {
+          "$ref": "./resources/admin/inventory/product/add.json"
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/successResponseObject"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/badRequestResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized Access",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/unauthorizedResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/forbiddenResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/serverErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "ApiKeyAuth": [], "bearerAuth": [] }]
+      }
+    },
+    "/inventory/product/edit": {
+      "put": {
+        "tags": ["Product"],
+        "summary": "Update product",
+        "description": "Update product in the system",
+        "requestBody": {
+          "$ref": "./resources/admin/inventory/product/edit.json"
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/successResponseObject"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/badRequestResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized Access",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/unauthorizedResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/forbiddenResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/serverErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "ApiKeyAuth": [], "bearerAuth": [] }]
+      }
+    },
+    "/inventory/product/delete": {
+      "delete": {
+        "tags": ["Product"],
+        "summary": "Delete product",
+        "description": "Update product from the system",
+        "requestBody": {
+          "$ref": "./resources/admin/inventory/product/delete.json"
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/successResponseObject"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/badRequestResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized Access",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/unauthorizedResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/forbiddenResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/serverErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "ApiKeyAuth": [], "bearerAuth": [] }]
+      }
+    },
+    "/inventory/stock/transactions": {
+      "get": {
+        "tags": ["Stock"],
+        "summary": "List all stock transactions",
+        "description": "Fetches a list of all transactions available in the system.",
+        "parameters": [
+          {
+            "name": "product",
+            "in": "query",
+            "description": "Search transactions by product",
+            "schema": {
+              "type": "string",
+              "nullable": true
+            }
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "description": "Search products by name",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "description": "Page number for pagination",
+            "schema": {
+              "type": "integer",
+              "default": 1
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Number of categories per page",
+            "schema": {
+              "type": "integer",
+              "default": 10
+            }
+          },
+          {
+            "name": "sort_by",
+            "in": "query",
+            "description": "Sort categories by name or created date",
+            "schema": {
+              "type": "string",
+              "enum": ["name", "created_at"],
+              "default": "created_at"
+            }
+          },
+          {
+            "name": "sort_order",
+            "in": "query",
+            "description": "Sort order (asc or desc)",
+            "schema": {
+              "type": "integer",
+              "enum": [-1, 1],
+              "default": -1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "example": "success"
+                    },
+                    "message": {
+                      "type": "string",
+                      "example": "List fetched successfully"
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "docs": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "_id": {
+                                "type": "string",
+                                "description": "_id of product"
+                              },
+                              "name": {
+                                "type": "string",
+                                "description": "name of product"
+                              },
+                              "slug": {
+                                "type": "string",
+                                "description": "slug of product"
+                              },
+                              "status": {
+                                "type": "string",
+                                "description": "status of producct"
+                              },
+                              "image_path": {
+                                "type": "array",
+                                "description": "images of category"
+                              }
+                            }
+                          }
+                        },
+                        "totalDocs": {
+                          "type": "integer",
+                          "description": "Total number of categories"
+                        },
+                        "limit": {
+                          "type": "integer",
+                          "description": "Number of items per page"
+                        },
+                        "page": {
+                          "type": "integer",
+                          "description": "Current page number"
+                        },
+                        "totalPages": {
+                          "type": "integer",
+                          "description": "Total pages available"
+                        },
+                        "hasPrevPage": {
+                          "type": "boolean",
+                          "description": "Indicates if there is a previous page"
+                        },
+                        "hasNextPage": {
+                          "type": "boolean",
+                          "description": "Indicates if there is a next page"
+                        },
+                        "prevPage": {
+                          "type": ["integer", "null"],
+                          "description": "Previous page number (if any)"
+                        },
+                        "nextPage": {
+                          "type": ["integer", "null"],
+                          "description": "Next page number (if any)"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/badRequestResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized Access",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/unauthorizedResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/forbiddenResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/serverErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "ApiKeyAuth": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/inventory/stock/add": {
+      "post": {
+        "tags": ["Stock"],
+        "summary": "Add a new Stock",
+        "description": "Creates a new Stock in the system",
+        "requestBody": {
+          "$ref": "./resources/admin/inventory/stock/add.json"
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/successResponseObject"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/badRequestResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized Access",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/unauthorizedResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/forbiddenResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/serverErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "ApiKeyAuth": [], "bearerAuth": [] }]
+      }
+    },
+    "/inventory/product/import": {
+      "post": {
+        "tags": ["Product"],
+        "summary": "import product",
+        "description": "Creates a new product in the system",
+        "requestBody": {
+          "$ref": "./resources/admin/inventory/product/import.json"
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/successResponseObject"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/badRequestResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized Access",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/unauthorizedResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/forbiddenResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/serverErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "ApiKeyAuth": [], "bearerAuth": [] }]
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "serverErrorResponse": {
+        "title": "Server Error Response",
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "string"
+          }
+        },
+        "example": {
+          "error": "Something Went Wrong"
+        }
+      },
+      "badRequestResponse": {
+        "title": "Bad Request Response",
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "string"
+          }
+        },
+        "example": {
+          "error": "Bad request"
+        }
+      },
+      "forbiddenResponse": {
+        "title": "Forbidden Response",
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "string"
+          }
+        },
+        "example": {
+          "error": "Forbidden access"
+        }
+      },
+      "unauthorizedResponse": {
+        "title": "Unauthorized Response",
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "string"
+          }
+        },
+        "example": {
+          "error": "Unauthorized Access"
+        }
+      },
+      "successResponseObject": {
+        "title": "Success Response",
+        "type": "object"
+      }
+    },
+    "requestBodies": {
+      "loginRequest": {
+        "required": true,
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "properties": {
+                "email": {
+                  "type": "string",
+                  "format": "email",
+                  "example": "user@example.com"
+                },
+                "password": {
+                  "type": "string",
+                  "format": "password",
+                  "example": "password123"
+                }
+              },
+              "required": ["email", "password"]
+            }
+          }
+        }
+      }
+    },
+    "securitySchemes": {
+      "ApiKeyAuth": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "x-api-key"
+      },
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    }
+  }
+}

@@ -1,0 +1,54 @@
+{
+  "description": "Schema for adding stock entries to a product (single or bulk)",
+  "content": {
+    "multipart/form-data": {
+      "schema": {
+        "type": "object",
+        "required": [
+          "product",
+          "quantity",
+          "type",
+          "cost_price",
+          "selling_price"
+        ],
+        "properties": {
+          "product": {
+            "type": "string",
+            "description": "Product ID"
+          },
+          "type": {
+            "type": "string",
+            "enum": ["in", "out"],
+            "description": "Stock type"
+          },
+          "quantity": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000,
+            "description": "Quantity must be between 1 and 1000"
+          },
+          "cost_price": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1000,
+            "nullable": true,
+            "description": "Cost price must be between 0 and 1000"
+          },
+          "selling_price": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1000,
+            "nullable": true,
+            "description": "Selling price must be between 0 and 1000"
+          },
+          "note": {
+            "type": "string",
+            "maxLength": 500,
+            "nullable": true
+          }
+        }
+      }
+    }
+  },
+  "required": true
+}

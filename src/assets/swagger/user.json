@@ -1,0 +1,1199 @@
+{
+  "openapi": "3.0.1",
+  "info": {
+    "title": "USER API",
+    "termsOfService": "",
+    "version": "1.0.0",
+    "description": "Elexify Site Service"
+  },
+  "servers": [
+    {
+      "url": "/api/v1/user",
+      "description": "Base API Server"
+    }
+  ],
+  "tags": [
+    {
+      "name": "Wishlist"
+    },
+    {
+      "name": "Cart"
+    },
+    {
+      "name": "Address"
+    },
+    {
+      "name": "Order"
+    }
+  ],
+  "paths": {
+    "/wishlist": {
+      "get": {
+        "tags": ["Wishlist"],
+        "summary": "List all wishlist products",
+        "description": "Fetches a list of all wishlist products available in the system.",
+        "parameters": [
+          {
+            "name": "search",
+            "in": "query",
+            "description": "Search products by name",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "description": "Page number for pagination",
+            "schema": {
+              "type": "integer",
+              "default": 1
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Number of categories per page",
+            "schema": {
+              "type": "integer",
+              "default": 10
+            }
+          },
+          {
+            "name": "sort_by",
+            "in": "query",
+            "description": "Sort categories by name or created date",
+            "schema": {
+              "type": "string",
+              "enum": ["name", "created_at"],
+              "default": "created_at"
+            }
+          },
+          {
+            "name": "sort_order",
+            "in": "query",
+            "description": "Sort order (asc or desc)",
+            "schema": {
+              "type": "integer",
+              "enum": [-1, 1],
+              "default": -1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "example": "success"
+                    },
+                    "message": {
+                      "type": "string",
+                      "example": "List fetched successfully"
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "docs": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "_id": {
+                                "type": "string",
+                                "description": "_id of product"
+                              },
+                              "name": {
+                                "type": "string",
+                                "description": "name of product"
+                              },
+                              "slug": {
+                                "type": "string",
+                                "description": "slug of product"
+                              },
+                              "status": {
+                                "type": "string",
+                                "description": "status of producct"
+                              },
+                              "image_path": {
+                                "type": "array",
+                                "description": "images of category"
+                              }
+                            }
+                          }
+                        },
+                        "totalDocs": {
+                          "type": "integer",
+                          "description": "Total number of categories"
+                        },
+                        "limit": {
+                          "type": "integer",
+                          "description": "Number of items per page"
+                        },
+                        "page": {
+                          "type": "integer",
+                          "description": "Current page number"
+                        },
+                        "totalPages": {
+                          "type": "integer",
+                          "description": "Total pages available"
+                        },
+                        "hasPrevPage": {
+                          "type": "boolean",
+                          "description": "Indicates if there is a previous page"
+                        },
+                        "hasNextPage": {
+                          "type": "boolean",
+                          "description": "Indicates if there is a next page"
+                        },
+                        "prevPage": {
+                          "type": ["integer", "null"],
+                          "description": "Previous page number (if any)"
+                        },
+                        "nextPage": {
+                          "type": ["integer", "null"],
+                          "description": "Next page number (if any)"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/badRequestResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized Access",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/unauthorizedResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/forbiddenResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/serverErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "ApiKeyAuth": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/wishlist/toggle": {
+      "put": {
+        "tags": ["Wishlist"],
+        "summary": "Wishlist product",
+        "description": "Wishlist product in the system",
+        "requestBody": {
+          "$ref": "./resources/user/wishlist/toggleWishList.json"
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/successResponseObject"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/badRequestResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized Access",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/unauthorizedResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/forbiddenResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/serverErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "ApiKeyAuth": [], "bearerAuth": [] }]
+      }
+    },
+    "/cart/list": {
+      "get": {
+        "tags": ["Cart"],
+        "summary": "List all cart items",
+        "description": "Fetches a list of all cart items.",
+        "parameters": [
+          {
+            "name": "search",
+            "in": "query",
+            "description": "Search products by name",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "description": "Page number for pagination",
+            "schema": {
+              "type": "integer",
+              "default": 1
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Number of categories per page",
+            "schema": {
+              "type": "integer",
+              "default": 10
+            }
+          },
+          {
+            "name": "sort_by",
+            "in": "query",
+            "description": "Sort categories by name or created date",
+            "schema": {
+              "type": "string",
+              "enum": ["name", "created_at"],
+              "default": "created_at"
+            }
+          },
+          {
+            "name": "sort_order",
+            "in": "query",
+            "description": "Sort order (asc or desc)",
+            "schema": {
+              "type": "integer",
+              "enum": [-1, 1],
+              "default": -1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "example": "success"
+                    },
+                    "message": {
+                      "type": "string",
+                      "example": "List fetched successfully"
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "docs": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "_id": {
+                                "type": "string",
+                                "description": "_id of product"
+                              },
+                              "name": {
+                                "type": "string",
+                                "description": "name of product"
+                              },
+                              "slug": {
+                                "type": "string",
+                                "description": "slug of product"
+                              },
+                              "status": {
+                                "type": "string",
+                                "description": "status of producct"
+                              },
+                              "image_path": {
+                                "type": "array",
+                                "description": "images of category"
+                              }
+                            }
+                          }
+                        },
+                        "totalDocs": {
+                          "type": "integer",
+                          "description": "Total number of categories"
+                        },
+                        "limit": {
+                          "type": "integer",
+                          "description": "Number of items per page"
+                        },
+                        "page": {
+                          "type": "integer",
+                          "description": "Current page number"
+                        },
+                        "totalPages": {
+                          "type": "integer",
+                          "description": "Total pages available"
+                        },
+                        "hasPrevPage": {
+                          "type": "boolean",
+                          "description": "Indicates if there is a previous page"
+                        },
+                        "hasNextPage": {
+                          "type": "boolean",
+                          "description": "Indicates if there is a next page"
+                        },
+                        "prevPage": {
+                          "type": ["integer", "null"],
+                          "description": "Previous page number (if any)"
+                        },
+                        "nextPage": {
+                          "type": ["integer", "null"],
+                          "description": "Next page number (if any)"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/badRequestResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized Access",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/unauthorizedResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/forbiddenResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/serverErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "ApiKeyAuth": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/cart/manage": {
+      "put": {
+        "tags": ["Cart"],
+        "summary": "Cart product",
+        "description": "Cart product in the system",
+        "requestBody": {
+          "$ref": "./resources/user/cart/cartManage.json"
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/successResponseObject"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/badRequestResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized Access",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/unauthorizedResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/forbiddenResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/serverErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "ApiKeyAuth": [], "bearerAuth": [] }]
+      }
+    },
+    "/address/list": {
+      "get": {
+        "tags": ["Address"],
+        "summary": "List all address",
+        "description": "Fetches a list of all  address available in the system.",
+        "parameters": [
+          {
+            "name": "search",
+            "in": "query",
+            "description": "Search address",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "description": "Page number for pagination",
+            "schema": {
+              "type": "integer",
+              "default": 1
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Number of categories per page",
+            "schema": {
+              "type": "integer",
+              "default": 10
+            }
+          },
+          {
+            "name": "sort_by",
+            "in": "query",
+            "description": "Sort categories by name or created date",
+            "schema": {
+              "type": "string",
+              "enum": ["name", "created_at"],
+              "default": "created_at"
+            }
+          },
+          {
+            "name": "sort_order",
+            "in": "query",
+            "description": "Sort order (asc or desc)",
+            "schema": {
+              "type": "integer",
+              "enum": [-1, 1],
+              "default": -1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "example": "success"
+                    },
+                    "message": {
+                      "type": "string",
+                      "example": "List fetched successfully"
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "docs": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "_id": {
+                                "type": "string",
+                                "description": "_id of product"
+                              },
+                              "name": {
+                                "type": "string",
+                                "description": "name of product"
+                              },
+                              "slug": {
+                                "type": "string",
+                                "description": "slug of product"
+                              },
+                              "status": {
+                                "type": "string",
+                                "description": "status of producct"
+                              },
+                              "image_path": {
+                                "type": "array",
+                                "description": "images of category"
+                              }
+                            }
+                          }
+                        },
+                        "totalDocs": {
+                          "type": "integer",
+                          "description": "Total number of categories"
+                        },
+                        "limit": {
+                          "type": "integer",
+                          "description": "Number of items per page"
+                        },
+                        "page": {
+                          "type": "integer",
+                          "description": "Current page number"
+                        },
+                        "totalPages": {
+                          "type": "integer",
+                          "description": "Total pages available"
+                        },
+                        "hasPrevPage": {
+                          "type": "boolean",
+                          "description": "Indicates if there is a previous page"
+                        },
+                        "hasNextPage": {
+                          "type": "boolean",
+                          "description": "Indicates if there is a next page"
+                        },
+                        "prevPage": {
+                          "type": ["integer", "null"],
+                          "description": "Previous page number (if any)"
+                        },
+                        "nextPage": {
+                          "type": ["integer", "null"],
+                          "description": "Next page number (if any)"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/badRequestResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized Access",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/unauthorizedResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/forbiddenResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/serverErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "ApiKeyAuth": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/address/add": {
+      "post": {
+        "tags": ["Address"],
+        "summary": "Wishlist product",
+        "description": "Wishlist product in the system",
+        "requestBody": {
+          "$ref": "./resources/user/address/add.json"
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/successResponseObject"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/badRequestResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized Access",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/unauthorizedResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/forbiddenResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/serverErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "ApiKeyAuth": [], "bearerAuth": [] }]
+      }
+    },
+    "/address/edit": {
+      "put": {
+        "tags": ["Address"],
+        "summary": "Wishlist product",
+        "description": "Wishlist product in the system",
+        "requestBody": {
+          "$ref": "./resources/user/address/edit.json"
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/successResponseObject"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/badRequestResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized Access",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/unauthorizedResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/forbiddenResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/serverErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "ApiKeyAuth": [], "bearerAuth": [] }]
+      }
+    },
+    "/address/delete": {
+      "delete": {
+        "tags": ["Address"],
+        "summary": "Wishlist product",
+        "description": "Wishlist product in the system",
+        "requestBody": {
+          "$ref": "./resources/user/address/delete.json"
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/successResponseObject"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/badRequestResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized Access",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/unauthorizedResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/forbiddenResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/serverErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "ApiKeyAuth": [], "bearerAuth": [] }]
+      }
+    },
+    "/order/list": {
+      "get": {
+        "tags": ["Order"],
+        "summary": "List all cart items",
+        "description": "Fetches a list of all cart items.",
+        "parameters": [
+          {
+            "name": "search",
+            "in": "query",
+            "description": "Search products by name",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "description": "Page number for pagination",
+            "schema": {
+              "type": "integer",
+              "default": 1
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Number of categories per page",
+            "schema": {
+              "type": "integer",
+              "default": 10
+            }
+          },
+          {
+            "name": "sort_by",
+            "in": "query",
+            "description": "Sort categories by name or created date",
+            "schema": {
+              "type": "string",
+              "enum": ["name", "created_at"],
+              "default": "created_at"
+            }
+          },
+          {
+            "name": "sort_order",
+            "in": "query",
+            "description": "Sort order (asc or desc)",
+            "schema": {
+              "type": "integer",
+              "enum": [-1, 1],
+              "default": -1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "example": "success"
+                    },
+                    "message": {
+                      "type": "string",
+                      "example": "List fetched successfully"
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "docs": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "_id": {
+                                "type": "string",
+                                "description": "_id of product"
+                              },
+                              "name": {
+                                "type": "string",
+                                "description": "name of product"
+                              },
+                              "slug": {
+                                "type": "string",
+                                "description": "slug of product"
+                              },
+                              "status": {
+                                "type": "string",
+                                "description": "status of producct"
+                              },
+                              "image_path": {
+                                "type": "array",
+                                "description": "images of category"
+                              }
+                            }
+                          }
+                        },
+                        "totalDocs": {
+                          "type": "integer",
+                          "description": "Total number of categories"
+                        },
+                        "limit": {
+                          "type": "integer",
+                          "description": "Number of items per page"
+                        },
+                        "page": {
+                          "type": "integer",
+                          "description": "Current page number"
+                        },
+                        "totalPages": {
+                          "type": "integer",
+                          "description": "Total pages available"
+                        },
+                        "hasPrevPage": {
+                          "type": "boolean",
+                          "description": "Indicates if there is a previous page"
+                        },
+                        "hasNextPage": {
+                          "type": "boolean",
+                          "description": "Indicates if there is a next page"
+                        },
+                        "prevPage": {
+                          "type": ["integer", "null"],
+                          "description": "Previous page number (if any)"
+                        },
+                        "nextPage": {
+                          "type": ["integer", "null"],
+                          "description": "Next page number (if any)"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/badRequestResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized Access",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/unauthorizedResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/forbiddenResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/serverErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "ApiKeyAuth": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "serverErrorResponse": {
+        "title": "Server Error Response",
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "string"
+          }
+        },
+        "example": {
+          "error": "Something Went Wrong"
+        }
+      },
+      "badRequestResponse": {
+        "title": "Bad Request Response",
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "string"
+          }
+        },
+        "example": {
+          "error": "Bad request"
+        }
+      },
+      "forbiddenResponse": {
+        "title": "Forbidden Response",
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "string"
+          }
+        },
+        "example": {
+          "error": "Forbidden access"
+        }
+      },
+      "unauthorizedResponse": {
+        "title": "Unauthorized Response",
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "string"
+          }
+        },
+        "example": {
+          "error": "Unauthorized Access"
+        }
+      },
+      "successResponseObject": {
+        "title": "Success Response",
+        "type": "object"
+      }
+    },
+    "requestBodies": {
+      "loginRequest": {
+        "required": true,
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "properties": {
+                "email": {
+                  "type": "string",
+                  "format": "email",
+                  "example": "user@example.com"
+                },
+                "password": {
+                  "type": "string",
+                  "format": "password",
+                  "example": "password123"
+                }
+              },
+              "required": ["email", "password"]
+            }
+          }
+        }
+      }
+    },
+    "securitySchemes": {
+      "ApiKeyAuth": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "x-api-key"
+      },
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    }
+  }
+}

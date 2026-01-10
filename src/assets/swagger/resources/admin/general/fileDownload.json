@@ -1,0 +1,22 @@
+{
+    "url":{
+        "name": "url",
+        "in":"query",
+        "required":true,
+        "description": "url which details you want to download",
+        "schema": {
+          "type": "string",
+          "example":"hex code format url"
+        }
+    },
+    "ul":{
+        "name": "ul",
+        "in":"query",
+        "required":false,
+        "description": "if you want to delete or not the file after download the set it false, default is true means after download it will delete the file",
+        "schema": {
+          "type": "string",
+          "example":"true/false"
+        }
+    }
+}

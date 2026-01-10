@@ -1,0 +1,56 @@
+{
+  "description": "An object defining our schema for this request",
+  "content": {
+    "application/x-www-form-urlencoded": {
+      "schema": {
+        "required": ["name", "description"],
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "issue_date": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+
+          "order_no": {
+            "type": "integer"
+          },
+          "icon": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      }
+    },
+    "application/json": {
+      "schema": {
+        "required": ["name", "description"],
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "issue_date": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+
+          "order_no": {
+            "type": "integer"
+          },
+          "icon": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      }
+    }
+  },
+  "required": true
+}

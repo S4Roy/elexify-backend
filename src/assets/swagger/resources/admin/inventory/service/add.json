@@ -1,0 +1,70 @@
+{
+  "description": "An object defining our schema for this request",
+  "content": {
+    "application/x-www-form-urlencoded": {
+      "schema": {
+        "required": ["name", "caption", "description"],
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "caption": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "cta_button_text": {
+            "type": "string",
+            "nullable": true
+          },
+          "cta_button_url": {
+            "type": "string",
+            "nullable": true
+          },
+          "order_no": {
+            "type": "integer"
+          },
+          "icon": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      }
+    },
+    "application/json": {
+      "schema": {
+        "required": ["name", "caption", "description"],
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "caption": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "cta_button_text": {
+            "type": "string",
+            "nullable": true
+          },
+          "cta_button_url": {
+            "type": "string",
+            "nullable": true
+          },
+          "order_no": {
+            "type": "integer"
+          },
+          "icon": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      }
+    }
+  },
+  "required": true
+}

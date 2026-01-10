@@ -1,0 +1,46 @@
+import { celebrate, Joi } from "celebrate";
+
+export const add = celebrate({
+  body: Joi.object({
+    name: Joi.string().min(2).max(100).required().messages({
+      "string.empty": "Category name is required",
+      "string.min": "Category name must be at least 2 characters",
+      "string.max": "Category name cannot exceed 100 characters",
+    }),
+
+    // slug: Joi.string()
+    //   .pattern(/^[a-z0-9]+(?:-[a-z0-9]+)*$/)
+    //   .min(2)
+    //   .max(100)
+    //   .required()
+    //   .messages({
+    //     "string.empty": "Slug is required",
+    //     "string.pattern.base":
+    //       "Slug must contain only lowercase letters, numbers, and hyphens",
+    //     "string.min": "Slug must be at least 2 characters",
+    //     "string.max": "Slug cannot exceed 100 characters",
+    //   }),
+
+    description: Joi.string().max(500).optional().allow("").messages({
+      "string.max": "Description cannot exceed 500 characters",
+    }),
+    banner_tag_line: Joi.string().max(150).optional().allow(null, "").messages({
+      "string.max": "Banner tag line cannot exceed 150 characters",
+    }),
+
+    parent_category: Joi.string().optional().allow(null, "").messages({
+      "string.base": "Parent category must be a valid ID",
+    }),
+
+    image: Joi.string().optional().allow(null),
+    banner: Joi.string().optional().allow(null),
+
+    status: Joi.string()
+      .valid("active", "inactive")
+      .default("active")
+      .messages({
+        "any.only": "Status must be either 'active' or 'inactive'",
+      }),
+    details: Joi.object().optional().allow(null),
+  }),
+});

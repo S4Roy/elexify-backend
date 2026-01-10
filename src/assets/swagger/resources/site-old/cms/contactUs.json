@@ -1,0 +1,50 @@
+{
+    "description": "An object defining our schema for this request",
+    "content": {
+      "application/x-www-form-urlencoded": {
+        "schema": {
+          "required": ["email", "name","type","message"],
+          "type": "object",
+          "properties": {
+            "email": {
+              "type": "string",
+              "format":"email"
+            },
+            "name": {
+              "type": "string",
+              "example":"valid input are key of above api result list"
+            },
+            "type": {
+              "type": "string"
+            },
+            "message": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "application/json": {
+        "schema": {
+          "required": ["email", "name","type","message"],
+          "type": "object",
+          "properties": {
+            "email": {
+              "type": "string",
+              "format":"email"
+            },
+            "name": {
+              "type": "string",
+              "example":"valid input are key of above api result list"
+            },
+            "type": {
+              "type": "string"
+            },
+            "message": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "required": true
+}

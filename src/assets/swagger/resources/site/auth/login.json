@@ -1,0 +1,51 @@
+{
+  "description": "An object defining our schema for this request",
+  "content": {
+    "application/x-www-form-urlencoded": {
+      "schema": {
+        "required": ["email", "password"],
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email"
+          },
+          "password": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "application/json": {
+      "schema": {
+        "required": ["email", "password"],
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email"
+          },
+          "password": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "multipart/form-data": {
+      "schema": {
+        "required": ["email", "password"],
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email"
+          },
+          "password": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  },
+  "required": true
+}
