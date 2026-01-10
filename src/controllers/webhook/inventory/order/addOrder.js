@@ -4,7 +4,9 @@ import OrderItem from "../../../../models/OrderItem.js";
 import User from "../../../../models/User.js";
 import Address from "../../../../models/Address.js";
 import Product from "../../../../models/Product.js";
-import StockTransaction from "../../../../models/StockTransaction.js";
+import Country from "../../../../models/Country.js";
+import State from "../../../../models/State.js";
+import City from "../../../../models/City.js";
 import { StatusError } from "../../../../config/index.js";
 import { zohoService } from "../../../../services/index.js";
 
@@ -102,15 +104,36 @@ export const addOrder = async (req, res, next) => {
     // 🏠 3. Billing address
     let billingAddress = null;
     if (billing_address?.address_1) {
+      const countryDoc = await Country.findOne({
+        $or: [
+          { iso2: billing_address.country_code },
+          { name: billing_address.country },
+        ],
+      });
+      const stateDoc = await State.findOne({
+        country_id: countryDoc.id,
+        $or: [
+          { code: billing_address.state_code },
+          { name: billing_address.state },
+        ],
+      });
+      const cityDoc = await City.findOne({
+        state_id: stateDoc.id,
+        $or: [
+          { slug: slugify(billing_address.city) },
+          { name: billing_address.city },
+        ],
+      });
+
       const billingFilter = {
         user: user._id,
         full_name: `${customer.first_name} ${customer.last_name}`.trim(),
         phone: customer.phone || null,
         email: customer.email,
         address_line1: billing_address.address_1,
-        city: billing_address.city || "",
-        state: billing_address.state || "",
-        country: billing_address.country || "",
+        city: cityDoc.id || 1,
+        state: stateDoc.id || 1,
+        country: countryDoc.id || 101,
         pincode: billing_address.postcode || "",
       };
 
@@ -120,7 +143,6 @@ export const addOrder = async (req, res, next) => {
           ...billingFilter,
           address_line2: billing_address.address_2 || "",
           landmark: "",
-          address_type: "home",
           purpose: "billing",
           is_default: true,
           created_by: user._id,
@@ -131,15 +153,35 @@ export const addOrder = async (req, res, next) => {
     // 📬 4. Shipping address
     let shippingAddress = null;
     if (shipping_address?.address_1) {
+      const countryDoc = await Country.findOne({
+        $or: [
+          { iso2: shipping_address.country },
+          { name: shipping_address.country },
+        ],
+      });
+      const stateDoc = await State.findOne({
+        country_id: countryDoc.id,
+        $or: [
+          { code: shipping_address.state },
+          { name: shipping_address.state },
+        ],
+      });
+      const cityDoc = await City.findOne({
+        state_id: stateDoc.id,
+        $or: [
+          { slug: slugify(shipping_address.city) },
+          { name: shipping_address.city },
+        ],
+      });
       const shippingFilter = {
         user: user._id,
         full_name: `${customer.first_name} ${customer.last_name}`.trim(),
         phone: customer.phone || null,
         email: customer.email,
         address_line1: shipping_address.address_1,
-        city: shipping_address.city || "",
-        state: shipping_address.state || "",
-        country: shipping_address.country || "",
+        city: cityDoc.id || 1,
+        state: stateDoc.id || 1,
+        country: countryDoc.id || 101,
         pincode: shipping_address.postcode || "",
       };
 
@@ -149,7 +191,6 @@ export const addOrder = async (req, res, next) => {
           ...shippingFilter,
           address_line2: shipping_address.address_2 || "",
           landmark: "",
-          address_type: "home",
           purpose: "shipping",
           is_default: false,
           created_by: user._id,
@@ -176,6 +217,8 @@ export const addOrder = async (req, res, next) => {
       grand_total: totalAmount,
       payment_method,
       transaction_id: `EXT-${order_id}`,
+      total_items: items.length,
+
       note: "Imported from external source",
     });
 
@@ -214,6 +257,8 @@ export const addOrder = async (req, res, next) => {
         total_price,
         regular_price,
         sale_price,
+        currency: "INR",
+        exchnage_rate: 1,
       });
 
       // 📊 Prepare stock transaction
