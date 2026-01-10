@@ -310,7 +310,7 @@ const findCountryStateCity = async (address) => {
   // STATE
   const state = await State.findOne({
     country_id: country.id,
-    $or: [{ code: address.state }, { name: address.state }],
+    $or: [{ iso2: address.state }, { name: address.state }],
   }).select("id");
 
   if (!state) {
