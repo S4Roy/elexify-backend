@@ -42,36 +42,19 @@ export const addOrder = async (req, res, next) => {
         { _id: existingOrder._id },
         { $set: updatePayload }
       );
-      const countryDoc = await Country.findOne({
-        $or: [
-          { iso2: billing_address.country },
-          { name: billing_address.country },
-        ],
-      });
-      console.log(`Billing country found: ${countryDoc?.name}`);
-      const stateDoc = await State.findOne({
-        country_id: countryDoc?.id,
-        $or: [{ iso2: billing_address.state }, { name: billing_address.state }],
-      });
-      console.log(
-        `Billing state found: ${stateDoc?.name} ${billing_address.state}`
-      );
-      const cityDoc = await City.findOne({
-        state_id: stateDoc?.id,
-        $or: [{ name: billing_address.city }],
-      });
-      console.log(
-        `Billing city found: ${cityDoc?.name}, ${billing_address.city}`
-      );
-      const updateBillingAddress = await Address.findOneAndUpdate(
-        { _id: existingOrder.billing_address },
-        {
-          country: countryDoc?.id || 101,
-        }
-      );
-      console.log(
-        `✅ Order Billing address updated: ${updateBillingAddress?.country}`
-      );
+      if (billing_address?.address_1) {
+        const { country, state, city } = await findCountryStateCity(
+          billing_address
+        );
+        console.log("billing_address", country, state, city);
+      }
+      if (shipping_address?.address_1) {
+        const { country, state, city } = await findCountryStateCity(
+          shipping_address
+        );
+        console.log("shipping_address ", country, state, city);
+      }
+
       return res.status(200).json({
         status: "success",
         message: "Order already exists, status updated",
@@ -150,26 +133,9 @@ export const addOrder = async (req, res, next) => {
     // 🏠 3. Billing address
     let billingAddress = null;
     if (billing_address?.address_1) {
-      const countryDoc = await Country.findOne({
-        $or: [
-          { iso2: billing_address.country },
-          { name: billing_address.country },
-        ],
-      });
-      const stateDoc = await State.findOne({
-        country_id: countryDoc.id,
-        $or: [
-          { code: billing_address.state_code },
-          { name: billing_address.state },
-        ],
-      });
-      const cityDoc = await City.findOne({
-        state_id: stateDoc.id,
-        $or: [
-          { slug: slugify(billing_address.city) },
-          { name: billing_address.city },
-        ],
-      });
+      const { country, state, city } = await findCountryStateCity(
+        billing_address
+      );
 
       const billingFilter = {
         user: user._id,
@@ -177,9 +143,9 @@ export const addOrder = async (req, res, next) => {
         phone: customer.phone || null,
         email: customer.email,
         address_line1: billing_address.address_1,
-        city: cityDoc.id || 1,
-        state: stateDoc.id || 1,
-        country: countryDoc.id || 101,
+        city: city,
+        state: state,
+        country: country,
         pincode: billing_address.postcode || "",
       };
 
@@ -199,35 +165,19 @@ export const addOrder = async (req, res, next) => {
     // 📬 4. Shipping address
     let shippingAddress = null;
     if (shipping_address?.address_1) {
-      const countryDoc = await Country.findOne({
-        $or: [
-          { iso2: shipping_address.country },
-          { name: shipping_address.country },
-        ],
-      });
-      const stateDoc = await State.findOne({
-        country_id: countryDoc.id,
-        $or: [
-          { code: shipping_address.state },
-          { name: shipping_address.state },
-        ],
-      });
-      const cityDoc = await City.findOne({
-        state_id: stateDoc.id,
-        $or: [
-          { slug: slugify(shipping_address.city) },
-          { name: shipping_address.city },
-        ],
-      });
+      const { country, state, city } = await findCountryStateCity(
+        shipping_address
+      );
+
       const shippingFilter = {
         user: user._id,
         full_name: `${customer.first_name} ${customer.last_name}`.trim(),
         phone: customer.phone || null,
         email: customer.email,
         address_line1: shipping_address.address_1,
-        city: cityDoc.id || 1,
-        state: stateDoc.id || 1,
-        country: countryDoc.id || 101,
+        city: city,
+        state: state,
+        country: country,
         pincode: shipping_address.postcode || "",
       };
 
@@ -342,4 +292,25 @@ export const addOrder = async (req, res, next) => {
     console.error("❌ Order sync failed:", error.message);
     next(error);
   }
+};
+const findCountryStateCity = async (address) => {
+  const country = await Country.findOne({
+    $or: [{ iso2: address.country_code }, { name: address.country }],
+  });
+
+  if (!country) return {};
+
+  const state = await State.findOne({
+    country_id: country.id,
+    $or: [{ code: address.state_code }, { name: address.state }],
+  });
+
+  if (!state) return { country };
+
+  const city = await City.findOne({
+    state_id: state.id,
+    $or: [{ name: address.city }],
+  });
+
+  return { country, state, city };
 };
