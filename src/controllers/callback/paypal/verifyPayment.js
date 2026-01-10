@@ -1,8 +1,4 @@
-import Blog from "../../../models/Blog.js";
-import { StatusError } from "../../../config/index.js";
 import { envs } from "../../../config/index.js";
-import BlogResource from "../../../resources/BlogResource.js";
-import mongoose from "mongoose";
 import { paymentService } from "../../../services/index.js"; // <-- ensure this exports capturePayPalOrder
 
 /**

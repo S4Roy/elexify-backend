@@ -24,6 +24,8 @@ import { v1CallBackRouter } from "./routes/callback/index.js";
 import { v1UserRouter } from "./routes/user/index.js";
 import { v1AdminRouter } from "./routes/admin/index.js";
 import { v1SiteRouter } from "./routes/site/index.js";
+import { v1WebhookRouter } from "./routes/webhook/index.js";
+
 // import indexRoutes from "./routes/index.js";
 import { fileURLToPath } from "url";
 import { envs } from "./config/index.js";
@@ -124,6 +126,13 @@ app.use(
   middleware.validateApiKey,
   v1SiteRouter
 );
+app.use(
+  `${envs.basePath}/api/v1/webhook`,
+  middleware.accessTokenIfAny,
+  middleware.validateApiKey,
+  v1WebhookRouter
+);
+// app.use(`${envs.basePath}/api/v1/callback`, v1CallbackRouter);
 
 app.use(`${envs.basePath}/public`, express.static("./public"));
 

@@ -66,6 +66,10 @@ const UserSchema = new Schema(
       type: Date,
       default: null,
     },
+    zoho_customer_id: {
+      type: String,
+      default: null,
+    },
     created_at: {
       type: Date,
       default: Date.now,
