@@ -47,12 +47,32 @@ export const addOrder = async (req, res, next) => {
           billing_address
         );
         console.log("billing_address", country, state, city);
+        const updateBilling = await Address.findByIdAndUpdate(
+          existingOrder.billing_address,
+          {
+            country: country,
+            state: state,
+            city: city,
+          },
+          { new: true }
+        );
+        console.log("updateBilling", updateBilling?.type, updateBilling?._id);
       }
       if (shipping_address?.address_1) {
         const { country, state, city } = await findCountryStateCity(
           shipping_address
         );
         console.log("shipping_address ", country, state, city);
+        const updateBilling = await Address.findByIdAndUpdate(
+          existingOrder.shipping_address,
+          {
+            country: country,
+            state: state,
+            city: city,
+          },
+          { new: true }
+        );
+        console.log("updateShipping", updateBilling?.type, updateBilling?._id);
       }
 
       return res.status(200).json({
