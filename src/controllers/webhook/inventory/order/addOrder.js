@@ -53,12 +53,16 @@ export const addOrder = async (req, res, next) => {
         country_id: countryDoc?.id,
         $or: [{ iso2: billing_address.state }, { name: billing_address.state }],
       });
-      console.log(`Billing state found: ${stateDoc?.name}`);
+      console.log(
+        `Billing state found: ${stateDoc?.name} ${billing_address.state}`
+      );
       const cityDoc = await City.findOne({
         state_id: stateDoc?.id,
         $or: [{ name: billing_address.city }],
       });
-      console.log(`Billing city found: ${cityDoc?.name}`);
+      console.log(
+        `Billing city found: ${cityDoc?.name}, ${billing_address.city}`
+      );
       const updateBillingAddress = await Address.findOneAndUpdate(
         { _id: existingOrder.billing_address },
         {
