@@ -162,7 +162,7 @@ export const addOrder = async (req, res, next) => {
         full_name: `${customer.first_name} ${customer.last_name}`.trim(),
         phone: customer.phone || null,
         email: customer.email,
-        address_line1: billing_address.address_1,
+        address_line_1: billing_address.address_1,
         city: city,
         state: state,
         country: country,
@@ -173,7 +173,7 @@ export const addOrder = async (req, res, next) => {
       if (!billingAddress) {
         billingAddress = await Address.create({
           ...billingFilter,
-          address_line2: billing_address.address_2 || "",
+          address_line_2: billing_address.address_2 || "",
           landmark: "",
           purpose: "billing",
           is_default: true,
@@ -194,7 +194,7 @@ export const addOrder = async (req, res, next) => {
         full_name: `${customer.first_name} ${customer.last_name}`.trim(),
         phone: customer.phone || null,
         email: customer.email,
-        address_line1: shipping_address.address_1,
+        address_line_1: shipping_address.address_1,
         city: city,
         state: state,
         country: country,
@@ -205,7 +205,7 @@ export const addOrder = async (req, res, next) => {
       if (!shippingAddress) {
         shippingAddress = await Address.create({
           ...shippingFilter,
-          address_line2: shipping_address.address_2 || "",
+          address_line_2: shipping_address.address_2 || "",
           landmark: "",
           purpose: "shipping",
           is_default: false,
