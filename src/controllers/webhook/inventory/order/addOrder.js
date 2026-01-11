@@ -50,9 +50,9 @@ export const addOrder = async (req, res, next) => {
         const updateBilling = await Address.findByIdAndUpdate(
           existingOrder.billing_address,
           {
-            country: country,
-            state: state,
-            city: city,
+            country: country || 0,
+            state: state || 0,
+            city: city || 0,
           },
           { new: true }
         );
@@ -66,9 +66,9 @@ export const addOrder = async (req, res, next) => {
         const updateBilling = await Address.findByIdAndUpdate(
           existingOrder.shipping_address,
           {
-            country: country,
-            state: state,
-            city: city,
+            country: country || 0,
+            state: state || 0,
+            city: city || 0,
           },
           { new: true }
         );
