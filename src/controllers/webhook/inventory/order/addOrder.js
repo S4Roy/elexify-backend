@@ -166,7 +166,7 @@ export const addOrder = async (req, res, next) => {
         city: city,
         state: state,
         country: country,
-        pincode: billing_address.postcode || "",
+        postcode: billing_address.postcode || "",
       };
 
       billingAddress = await Address.findOne(billingFilter);
@@ -198,7 +198,7 @@ export const addOrder = async (req, res, next) => {
         city: city,
         state: state,
         country: country,
-        pincode: shipping_address.postcode || "",
+        postcode: shipping_address.postcode || "",
       };
 
       shippingAddress = await Address.findOne(shippingFilter);
