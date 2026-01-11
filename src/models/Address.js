@@ -15,13 +15,17 @@ const AddressSchema = new Schema(
     land_mark: { type: String },
 
     city: { type: Number, required: true, ref: "cities" },
+    city_name: { type: String },
+
     state: { type: Number, required: true, ref: "states" },
+    state_name: { type: String },
     country: {
       type: Number,
       required: true,
       default: 101,
       ref: "countries",
     },
+    country_name: { type: String },
     postcode: { type: String, required: true },
 
     address_type: {

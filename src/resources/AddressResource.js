@@ -15,8 +15,11 @@ class AddressResource extends Resource {
       land_mark: this.land_mark || null,
 
       city: this.city || null,
+      city_name: this.city_name || null,
       state: this.state || null,
+      state_name: this.state_name || null,
       country: this.country || null,
+      country_name: this.country_name || null,
       postcode: this.postcode || null,
 
       address_type: this.address_type || "residential",

@@ -51,13 +51,20 @@ export const addOrder = async (req, res, next) => {
           existingOrder.billing_address,
           {
             country: country || 0,
+            country_name: billing_address.country || "",
             state: state || 0,
+            state_name: billing_address.state || "",
             city: city || 0,
+            city_name: billing_address.city || "",
             land_mark: billing_address.landmark || "",
           },
           { new: true }
         );
-        console.log("updateBilling", updateBilling?.type, updateBilling?._id);
+        console.log(
+          "updateBilling",
+          updateBilling?.address_type,
+          updateBilling?._id
+        );
       }
       if (shipping_address?.address_1) {
         const { country, state, city } = await findCountryStateCity(
@@ -68,13 +75,20 @@ export const addOrder = async (req, res, next) => {
           existingOrder.shipping_address,
           {
             country: country || 0,
+            country_name: shipping_address.country || "",
             state: state || 0,
+            state_name: shipping_address.state || "",
             city: city || 0,
+            city_name: shipping_address.city || "",
             land_mark: shipping_address.landmark || "",
           },
           { new: true }
         );
-        console.log("updateShipping", updateBilling?.type, updateBilling?._id);
+        console.log(
+          "updateShipping",
+          updateBilling?.address_type,
+          updateBilling?._id
+        );
       }
 
       return res.status(200).json({
@@ -177,6 +191,9 @@ export const addOrder = async (req, res, next) => {
           ...billingFilter,
           address_line_2: billing_address.address_2 || "",
           land_mark: billing_address.landmark || "",
+          country_name: billing_address.country || "",
+          state_name: billing_address.state || "",
+          city_name: billing_address.city || "",
           purpose: "billing",
           is_default: true,
           created_by: user._id,
@@ -209,6 +226,9 @@ export const addOrder = async (req, res, next) => {
           ...shippingFilter,
           address_line_2: shipping_address.address_2 || "",
           land_mark: shipping_address.landmark || "",
+          country_name: shipping_address.country || "",
+          state_name: shipping_address.state || "",
+          city_name: shipping_address.city || "",
           purpose: "shipping",
           is_default: false,
           created_by: user._id,
