@@ -46,7 +46,13 @@ export const addOrder = async (req, res, next) => {
         const { country, state, city } = await findCountryStateCity(
           billing_address
         );
-        console.log("billing_address", country, state, city);
+        console.log(
+          "billing_address",
+          country,
+          state,
+          city,
+          billing_address?.postcode
+        );
         const updateBilling = await Address.findByIdAndUpdate(
           existingOrder.billing_address,
           {
@@ -57,6 +63,7 @@ export const addOrder = async (req, res, next) => {
             city: city || 0,
             city_name: billing_address.city || "",
             land_mark: billing_address.landmark || "",
+            postcode: billing_address.postcode || "",
           },
           { new: true }
         );
@@ -70,7 +77,13 @@ export const addOrder = async (req, res, next) => {
         const { country, state, city } = await findCountryStateCity(
           shipping_address
         );
-        console.log("shipping_address ", country, state, city);
+        console.log(
+          "shipping_address ",
+          country,
+          state,
+          city,
+          shipping_address?.postcode
+        );
         const updateBilling = await Address.findByIdAndUpdate(
           existingOrder.shipping_address,
           {
@@ -81,6 +94,7 @@ export const addOrder = async (req, res, next) => {
             city: city || 0,
             city_name: shipping_address.city || "",
             land_mark: shipping_address.landmark || "",
+            postcode: shipping_address.postcode || "",
           },
           { new: true }
         );
