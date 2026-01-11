@@ -53,6 +53,7 @@ export const addOrder = async (req, res, next) => {
             country: country || 0,
             state: state || 0,
             city: city || 0,
+            land_mark: billing_address.landmark || "",
           },
           { new: true }
         );
@@ -69,6 +70,7 @@ export const addOrder = async (req, res, next) => {
             country: country || 0,
             state: state || 0,
             city: city || 0,
+            land_mark: shipping_address.landmark || "",
           },
           { new: true }
         );
@@ -163,9 +165,9 @@ export const addOrder = async (req, res, next) => {
         phone: customer.phone || null,
         email: customer.email,
         address_line_1: billing_address.address_1,
-        city: city,
-        state: state,
-        country: country,
+        city: city || 0,
+        state: state || 0,
+        country: country || 0,
         postcode: billing_address.postcode || "",
       };
 
@@ -174,7 +176,7 @@ export const addOrder = async (req, res, next) => {
         billingAddress = await Address.create({
           ...billingFilter,
           address_line_2: billing_address.address_2 || "",
-          landmark: "",
+          land_mark: billing_address.landmark || "",
           purpose: "billing",
           is_default: true,
           created_by: user._id,
@@ -195,9 +197,9 @@ export const addOrder = async (req, res, next) => {
         phone: customer.phone || null,
         email: customer.email,
         address_line_1: shipping_address.address_1,
-        city: city,
-        state: state,
-        country: country,
+        city: city || 0,
+        state: state || 0,
+        country: country || 0,
         postcode: shipping_address.postcode || "",
       };
 
@@ -206,7 +208,7 @@ export const addOrder = async (req, res, next) => {
         shippingAddress = await Address.create({
           ...shippingFilter,
           address_line_2: shipping_address.address_2 || "",
-          landmark: "",
+          land_mark: shipping_address.landmark || "",
           purpose: "shipping",
           is_default: false,
           created_by: user._id,
