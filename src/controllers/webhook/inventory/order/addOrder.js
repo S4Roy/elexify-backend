@@ -349,24 +349,44 @@ export const addOrder = async (req, res, next) => {
     next(error);
   }
 };
+const normalize = (v) => v?.toString().trim().toLowerCase();
+
 const findCountryStateCity = async (address) => {
   if (!address) {
     return { country: null, state: null, city: null };
   }
 
-  // COUNTRY
+  /* ---------------- COUNTRY ---------------- */
+  const countryInput = normalize(address.country);
+
   const country = await Country.findOne({
-    $or: [{ iso2: address.country }, { name: address.country }],
-  }).select("id");
+    status: "active",
+    $or: [
+      { iso2: address.country?.toUpperCase() },
+      { iso3: address.country?.toUpperCase() },
+      { name: { $regex: `^${countryInput}$`, $options: "i" } },
+      { "translations.en": { $regex: `^${countryInput}$`, $options: "i" } },
+      { "translations.fr": { $regex: `^${countryInput}$`, $options: "i" } },
+      { "translations.de": { $regex: `^${countryInput}$`, $options: "i" } },
+      { "translations.es": { $regex: `^${countryInput}$`, $options: "i" } },
+    ],
+  }).select("id iso2");
 
   if (!country) {
     return { country: null, state: null, city: null };
   }
 
-  // STATE
+  /* ---------------- STATE ---------------- */
+  const stateInput = normalize(address.state);
+
   const state = await State.findOne({
+    status: "active",
     country_id: country.id,
-    $or: [{ iso2: address.state }, { name: address.state }],
+    $or: [
+      { iso2: address.state?.toUpperCase() }, // WB
+      { state_code: address.state?.toUpperCase() }, // FYB
+      { name: { $regex: `^${stateInput}$`, $options: "i" } },
+    ],
   }).select("id");
 
   if (!state) {
@@ -377,10 +397,13 @@ const findCountryStateCity = async (address) => {
     };
   }
 
-  // CITY (case-insensitive match)
+  /* ---------------- CITY ---------------- */
+  const cityInput = normalize(address.city);
+
   const city = await City.findOne({
+    status: "active",
     state_id: state.id,
-    name: { $regex: `^${address.city}$`, $options: "i" },
+    name: { $regex: `^${cityInput}$`, $options: "i" },
   }).select("id");
 
   return {
