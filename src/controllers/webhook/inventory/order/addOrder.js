@@ -269,7 +269,6 @@ export const addOrder = async (req, res, next) => {
       payment_method,
       transaction_id: `EXT-${order_id}`,
       total_items: items.length,
-      created_at: created_at ?? new Date(),
       is_migrated: true,
       note: "Imported from external source",
     });
