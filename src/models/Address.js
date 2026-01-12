@@ -14,10 +14,10 @@ const AddressSchema = new Schema(
     address_line_2: { type: String },
     land_mark: { type: String },
 
-    city: { type: Number, required: true, ref: "cities" },
+    city: { type: Number, required: false, ref: "cities" },
     city_name: { type: String },
 
-    state: { type: Number, required: true, ref: "states" },
+    state: { type: Number, required: false, ref: "states" },
     state_name: { type: String },
     country: {
       type: Number,
