@@ -73,6 +73,7 @@ const OrderSchema = new Schema(
     etd: { type: String },
     courier_name: { type: String },
     delivered_at: { type: Date, default: null },
+    is_migrated: { type: Boolean, default: false },
     created_at: {
       type: Date,
       default: Date.now,

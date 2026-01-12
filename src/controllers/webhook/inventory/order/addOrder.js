@@ -36,10 +36,13 @@ export const addOrder = async (req, res, next) => {
       console.warn(`⚠️ Duplicate order attempt: ${order_id}`);
       const updatePayload = {
         order_status: status,
-        updated_at: updated_at ?? new Date(),
-        created_at: created_at ?? existingOrder.created_at,
+        created_at: created_at
+          ? new Date(created_at)
+          : existingOrder.created_at,
         total_items: items.length,
       };
+      console.log("Updated Log ", created_at, updatePayload);
+
       await Order.updateOne(
         { _id: existingOrder._id },
         { $set: updatePayload }
@@ -48,63 +51,63 @@ export const addOrder = async (req, res, next) => {
         const { country, state, city } = await findCountryStateCity(
           billing_address
         );
-        console.log(
-          "billing_address",
-          country,
-          state,
-          city,
-          billing_address?.postcode
-        );
+        // console.log(
+        //   "billing_address",
+        //   country,
+        //   state,
+        //   city,
+        //   billing_address?.postcode
+        // );
         const updateBilling = await Address.findByIdAndUpdate(
           existingOrder.billing_address,
           {
-            country: country || 0,
+            country: country,
             country_name: billing_address.country || "",
-            state: state || 0,
+            state: state,
             state_name: billing_address.state || "",
-            city: city || 0,
+            city: city,
             city_name: billing_address.city || "",
             land_mark: billing_address.landmark || "",
             postcode: billing_address.postcode || "",
           },
           { new: true }
         );
-        console.log(
-          "updateBilling",
-          updateBilling?.address_type,
-          updateBilling?._id
-        );
+        // console.log(
+        //   "updateBilling",
+        //   updateBilling?.address_type,
+        //   updateBilling?._id
+        // );
       }
       if (shipping_address?.address_1) {
         const { country, state, city } = await findCountryStateCity(
           shipping_address
         );
-        console.log(
-          "shipping_address ",
-          country,
-          state,
-          city,
-          shipping_address?.postcode
-        );
+        // console.log(
+        //   "shipping_address ",
+        //   country,
+        //   state,
+        //   city,
+        //   shipping_address?.postcode
+        // );
         const updateBilling = await Address.findByIdAndUpdate(
           existingOrder.shipping_address,
           {
-            country: country || 0,
+            country: country,
             country_name: shipping_address.country || "",
-            state: state || 0,
+            state: state,
             state_name: shipping_address.state || "",
-            city: city || 0,
+            city: city,
             city_name: shipping_address.city || "",
             land_mark: shipping_address.landmark || "",
             postcode: shipping_address.postcode || "",
           },
           { new: true }
         );
-        console.log(
-          "updateShipping",
-          updateBilling?.address_type,
-          updateBilling?._id
-        );
+        // console.log(
+        //   "updateShipping",
+        //   updateBilling?.address_type,
+        //   updateBilling?._id
+        // );
       }
 
       return res.status(200).json({
@@ -195,9 +198,9 @@ export const addOrder = async (req, res, next) => {
         phone: customer.phone || null,
         email: customer.email,
         address_line_1: billing_address.address_1,
-        city: city || 0,
-        state: state || 0,
-        country: country || 0,
+        city: city,
+        state: state,
+        country: country,
         postcode: billing_address.postcode || "",
       };
 
@@ -230,9 +233,9 @@ export const addOrder = async (req, res, next) => {
         phone: customer.phone || null,
         email: customer.email,
         address_line_1: shipping_address.address_1,
-        city: city || 0,
-        state: state || 0,
-        country: country || 0,
+        city: city,
+        state: state,
+        country: country,
         postcode: shipping_address.postcode || "",
       };
 
@@ -273,6 +276,7 @@ export const addOrder = async (req, res, next) => {
       transaction_id: `EXT-${order_id}`,
       total_items: items.length,
       created_at: created_at ?? new Date(),
+      is_migrated: true,
       note: "Imported from external source",
     });
 
@@ -351,61 +355,55 @@ export const addOrder = async (req, res, next) => {
     next(error);
   }
 };
+const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
 const normalize = (v) => v?.toString().trim().toLowerCase();
 
 const findCountryStateCity = async (address) => {
-  if (!address) {
-    return { country: null, state: null, city: null };
-  }
+  if (!address) return { country: null, state: null, city: null };
 
-  /* ---------------- COUNTRY ---------------- */
   const countryInput = normalize(address.country);
+  const stateInput = normalize(address.state);
+  const cityInput = normalize(address.city);
 
+  /* -------- COUNTRY -------- */
   const country = await Country.findOne({
     status: "active",
     $or: [
       { iso2: address.country?.toUpperCase() },
       { iso3: address.country?.toUpperCase() },
-      { name: { $regex: `^${countryInput}$`, $options: "i" } },
-      { "translations.en": { $regex: `^${countryInput}$`, $options: "i" } },
-      { "translations.fr": { $regex: `^${countryInput}$`, $options: "i" } },
-      { "translations.de": { $regex: `^${countryInput}$`, $options: "i" } },
-      { "translations.es": { $regex: `^${countryInput}$`, $options: "i" } },
+      { name: { $regex: `^${escapeRegex(countryInput)}$`, $options: "i" } },
+      {
+        "translations.en": {
+          $regex: `^${escapeRegex(countryInput)}$`,
+          $options: "i",
+        },
+      },
     ],
-  }).select("id iso2");
+  }).select("id");
 
-  if (!country) {
-    return { country: null, state: null, city: null };
-  }
+  if (!country) return { country: null, state: null, city: null };
 
-  /* ---------------- STATE ---------------- */
-  const stateInput = normalize(address.state);
-
+  /* -------- STATE -------- */
   const state = await State.findOne({
     status: "active",
     country_id: country.id,
     $or: [
-      { iso2: address.state?.toUpperCase() }, // WB
-      { state_code: address.state?.toUpperCase() }, // FYB
-      { name: { $regex: `^${stateInput}$`, $options: "i" } },
+      { iso2: address.state?.toUpperCase() },
+      { state_code: address.state?.toUpperCase() },
+      { name: { $regex: `^${escapeRegex(stateInput)}$`, $options: "i" } },
     ],
   }).select("id");
 
   if (!state) {
-    return {
-      country: country.id,
-      state: null,
-      city: null,
-    };
+    return { country: country.id, state: null, city: null };
   }
 
-  /* ---------------- CITY ---------------- */
-  const cityInput = normalize(address.city);
-
+  /* -------- CITY -------- */
   const city = await City.findOne({
     status: "active",
     state_id: state.id,
-    name: { $regex: `^${cityInput}$`, $options: "i" },
+    name: { $regex: `^${escapeRegex(cityInput)}$`, $options: "i" },
   }).select("id");
 
   return {
