@@ -36,79 +36,73 @@ export const addOrder = async (req, res, next) => {
       console.warn(`⚠️ Duplicate order attempt: ${order_id}`);
       const updatePayload = {
         order_status: status,
-        created_at: created_at
-          ? new Date(created_at)
-          : existingOrder.created_at,
-        total_items: items.length,
       };
-      console.log("Updated Log ", created_at, updatePayload);
-
       await Order.updateOne(
         { _id: existingOrder._id },
         { $set: updatePayload }
       );
-      if (billing_address?.address_1) {
-        const { country, state, city } = await findCountryStateCity(
-          billing_address
-        );
-        // console.log(
-        //   "billing_address",
-        //   country,
-        //   state,
-        //   city,
-        //   billing_address?.postcode
-        // );
-        const updateBilling = await Address.findByIdAndUpdate(
-          existingOrder.billing_address,
-          {
-            country: country,
-            country_name: billing_address.country || "",
-            state: state,
-            state_name: billing_address.state || "",
-            city: city,
-            city_name: billing_address.city || "",
-            land_mark: billing_address.landmark || "",
-            postcode: billing_address.postcode || "",
-          },
-          { new: true }
-        );
-        // console.log(
-        //   "updateBilling",
-        //   updateBilling?.address_type,
-        //   updateBilling?._id
-        // );
-      }
-      if (shipping_address?.address_1) {
-        const { country, state, city } = await findCountryStateCity(
-          shipping_address
-        );
-        // console.log(
-        //   "shipping_address ",
-        //   country,
-        //   state,
-        //   city,
-        //   shipping_address?.postcode
-        // );
-        const updateBilling = await Address.findByIdAndUpdate(
-          existingOrder.shipping_address,
-          {
-            country: country,
-            country_name: shipping_address.country || "",
-            state: state,
-            state_name: shipping_address.state || "",
-            city: city,
-            city_name: shipping_address.city || "",
-            land_mark: shipping_address.landmark || "",
-            postcode: shipping_address.postcode || "",
-          },
-          { new: true }
-        );
-        // console.log(
-        //   "updateShipping",
-        //   updateBilling?.address_type,
-        //   updateBilling?._id
-        // );
-      }
+      // if (billing_address?.address_1) {
+      //   const { country, state, city } = await findCountryStateCity(
+      //     billing_address
+      //   );
+      //   console.log(
+      //     "billing_address",
+      //     country,
+      //     state,
+      //     city,
+      //     billing_address?.postcode
+      //   );
+      //   const updateBilling = await Address.findByIdAndUpdate(
+      //     existingOrder.billing_address,
+      //     {
+      //       country: country ,
+      //       country_name: billing_address.country || "",
+      //       state: state ,
+      //       state_name: billing_address.state || "",
+      //       city: city ,
+      //       city_name: billing_address.city || "",
+      //       land_mark: billing_address.landmark || "",
+      //       postcode: billing_address.postcode || "",
+      //     },
+      //     { new: true }
+      //   );
+      //   console.log(
+      //     "updateBilling",
+      //     updateBilling?.address_type,
+      //     updateBilling?._id
+      //   );
+      // }
+      // if (shipping_address?.address_1) {
+      //   const { country, state, city } = await findCountryStateCity(
+      //     shipping_address
+      //   );
+      //   console.log(
+      //     "shipping_address ",
+      //     country,
+      //     state,
+      //     city,
+      //     shipping_address?.postcode
+      //   );
+      //   const updateBilling = await Address.findByIdAndUpdate(
+      //     existingOrder.shipping_address,
+      //     {
+      //       country: country ,
+      //       country_name: shipping_address.country || "",
+      //       state: state ,
+      //       state_name: shipping_address.state || "",
+      //       city: city ,
+      //       city_name: shipping_address.city || "",
+      //       land_mark: shipping_address.landmark || "",
+      //       postcode: shipping_address.postcode || "",
+      //     },
+      //     { new: true }
+      //   );
+      //   console.log(
+      //     "updateShipping",
+      //     updateBilling?.address_type,
+      //     updateBilling?._id
+      //   );
+      // }
 
       return res.status(200).json({
         status: "success",
