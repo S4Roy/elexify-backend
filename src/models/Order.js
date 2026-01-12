@@ -73,12 +73,17 @@ const OrderSchema = new Schema(
     etd: { type: String },
     courier_name: { type: String },
     delivered_at: { type: Date, default: null },
+    created_at: {
+      type: Date,
+      default: Date.now,
+      immutable: true, // Prevents modification
+    },
+    updated_at: {
+      type: Date,
+      default: null,
+    },
   },
   {
-    timestamps: {
-      createdAt: "created_at",
-      updatedAt: "updated_at",
-    },
     versionKey: false,
   }
 );
