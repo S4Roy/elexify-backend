@@ -15,6 +15,7 @@ export const addOrder = async (req, res, next) => {
     const {
       order_id,
       created_at,
+      updated_at,
       status,
       total,
       currency,
@@ -35,7 +36,8 @@ export const addOrder = async (req, res, next) => {
       console.warn(`⚠️ Duplicate order attempt: ${order_id}`);
       const updatePayload = {
         order_status: status,
-        updated_at: new Date(),
+        updated_at: updated_at ?? new Date(),
+        created_at: created_at ?? existingOrder.created_at,
         total_items: items.length,
       };
       await Order.updateOne(
@@ -270,7 +272,7 @@ export const addOrder = async (req, res, next) => {
       payment_method,
       transaction_id: `EXT-${order_id}`,
       total_items: items.length,
-
+      created_at: created_at ?? new Date(),
       note: "Imported from external source",
     });
 
