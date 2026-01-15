@@ -190,7 +190,6 @@ export const importItems = async (req, res, next) => {
         weight,
         dimensions: { length, width, height },
         created_by: req.auth.user_id,
-        serial_numbers: [],
       });
 
       await product.save();

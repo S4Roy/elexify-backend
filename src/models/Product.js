@@ -77,8 +77,6 @@ const ProductSchema = new Schema(
       {
         type: Types.ObjectId,
         ref: "serial_numbers", // 🔹 Reference to Serial Numbers Model
-        sparse: true, // Allows null/undefined values,
-        default: null,
       },
     ],
     // Only for 'simple' products
@@ -214,7 +212,7 @@ ProductSchema.index({ meta_title: 1 });
 ProductSchema.index({ meta_keywords: 1 });
 
 // 🔹 Separate unique sparse index on `serial_numbers`
-ProductSchema.index({ serial_numbers: 1 }, { unique: true, sparse: true });
+ProductSchema.index({ serial_numbers: 1 });
 
 // 🔹 Apply pagination plugin
 ProductSchema.plugin(mongooseAggregatePaginate);
