@@ -28,6 +28,11 @@ const UserSchema = new Schema(
       required: true,
       unique: true,
     },
+    phone_code: {
+      type: String,
+      required: false,
+      default: null,
+    },
     mobile: {
       type: String,
       required: false,

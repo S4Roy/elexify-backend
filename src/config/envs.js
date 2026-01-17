@@ -5,7 +5,7 @@ export const envs = {
   FRONTEND_URL: process.env.FRONTEND_URL || "",
   basePath: process.env.SERVER_BASEPATH || "",
   env: process.env.NODE_ENV || "dev",
-  port: Number(process.env.NODE_PORT) || 4000,
+  port: Number(process.env.SERVER_PORT) || 4000,
   db: {
     host: process.env.MYSQL_HOSTNAME || "localhost",
     port: process.env.MYSQL_PORT || 3306,
@@ -32,6 +32,12 @@ export const envs = {
     port: process.env.SMTP_PORT || 465,
     secure: process.env.SMTP_SECURE == "no" ? false : true,
     fromEmail: process.env.SMTP_FROM_EMAIL,
+  },
+  otp: {
+    expiry_minutes: Number(process.env.OTP_EXPIRY_MINUTES) || 10,
+    max_attempts: Number(process.env.OTP_MAX_ATTEMPTS) || 5,
+    resend_interval_seconds:
+      Number(process.env.OTP_RESEND_INTERVAL_SECONDS) || 120,
   },
   aws: {
     accessKeyId: process.env.S3_ACCESS_KEY || "",
@@ -65,6 +71,12 @@ export const envs = {
     REFRESH_TOKEN: process.env.ZOHO_REFRESH_TOKEN || "",
     ACCESS_TOKEN: process.env.ZOHO_ACCESS_TOKEN || "",
     BASE_URL: process.env.ZOHO_BASE_URL || "https://books.zoho.com/api/v3",
+  },
+  FAST2SMS: {
+    authorization: process.env.FAST2SMS_API_KEY || "",
+    URL: "https://www.fast2sms.com/dev/bulkV2",
+    sender_id: "ELXFY",
+    route: "dlt",
   },
   NO_IMAGE: `https://${process.env.S3_BUCKET_NAME}.s3.${process.env.S3_REGION}.amazonaws.com/noimage.svg`,
   DEFAULT_LANGUAGE: process.env.DEFAULT_LANGUAGE || "en",

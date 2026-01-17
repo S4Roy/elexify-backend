@@ -69,4 +69,8 @@ export class StatusError extends Error {
   static databaseError(message) {
     return new StatusError(520, message || "Database Error");
   }
+
+  static tooManyRequests(message) {
+    return new StatusError(429, message || "Too Many Requests");
+  }
 }

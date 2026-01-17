@@ -10,6 +10,7 @@ import * as inventoryService from "./inventory/index.js";
 import * as paymentService from "./paymentService/index.js";
 import * as shiprocket from "./shiprocket/index.js";
 import * as zohoService from "./zoho/index.js";
+import * as smsService from "./sms/index.js";
 
 export {
   userService,
@@ -22,4 +23,5 @@ export {
   paymentService,
   shiprocket,
   zohoService,
+  smsService,
 };

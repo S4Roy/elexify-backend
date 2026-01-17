@@ -1,31 +1,74 @@
-const mongoose = require('mongoose');
-const Schema = mongoose.Schema;
+import mongoose from "mongoose";
+const { Schema, model } = mongoose;
 
-const OtpVerificationSchema = new mongoose.Schema({
-    'email': {
-        type: String, required: false, default: null,
+const OtpVerificationSchema = new Schema(
+  {
+    email: {
+      type: String,
+      lowercase: true,
+      trim: true,
+      default: null,
+      index: true,
     },
-    'mobile': {
-        type: String, required: false, default: null,
-    },
-    'otp': {
-        type: Number, required: true
-    },
-    'type': {
-        type: String, required: true, enum: ["user-register", "user-login", "user-resetpassword"],
-    },
-    'token': {
-        type: String, required: true, unique: true
-    },
-    'data': Schema.Types.Mixed,
-    'created_at': {
-        type: Date, required: true, default: Date.now
-    },
-    'updated_at': {
-        type: Date, required: true, default: Date.now
-    }
-});
 
-const OtpVerification = mongoose.model(global.CONFIG.db.collections.OTP_VERIFICATIONS, OtpVerificationSchema);
+    mobile: {
+      type: String,
+      trim: true,
+      default: null,
+      index: true,
+    },
 
-module.exports = OtpVerification;
+    otp: {
+      type: String, // 🔐 store hashed OTP (not number)
+      required: true,
+    },
+
+    purpose: {
+      type: String,
+      required: true,
+      enum: ["register", "login", "resetpassword"],
+      index: true,
+    },
+
+    token: {
+      type: String,
+      required: false,
+    },
+
+    meta: {
+      type: Schema.Types.Mixed,
+      default: null,
+    },
+
+    attempts: {
+      type: Number,
+      default: 0,
+    },
+
+    verified_at: {
+      type: Date,
+      default: null,
+    },
+
+    expires_at: {
+      type: Date,
+      required: true,
+      index: true,
+    },
+  },
+  {
+    timestamps: { createdAt: "created_at", updatedAt: "updated_at" },
+    versionKey: false,
+  }
+);
+
+/* 🔥 Auto-delete expired OTPs */
+OtpVerificationSchema.index({ expires_at: 1 }, { expireAfterSeconds: 0 });
+
+/* 🔎 Fast lookup */
+OtpVerificationSchema.index({ mobile: 1, type: 1 });
+OtpVerificationSchema.index({ email: 1, type: 1 });
+
+const OtpVerification = model("otp_verifications", OtpVerificationSchema);
+
+export default OtpVerification;

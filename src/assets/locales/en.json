@@ -127,5 +127,14 @@
 	"Country updated successfully": "Country updated successfully",
 	"Coupon added successfully": "Coupon added successfully",
 	"Coupon updated successfully": "Coupon updated successfully",
-	"Coupon code already exists": "Coupon code already exists"
+	"Coupon code already exists": "Coupon code already exists",
+	"User with this phone number not found": "User with this phone number not found",
+	"OTP sent to your phone number": "OTP sent to your phone number",
+	"OTP sent successfully": "OTP sent successfully",
+	"Failed to send OTP. Please try again later.": "Failed to send OTP. Please try again later.",
+	"Please wait before requesting another OTP": "Please wait before requesting another OTP",
+	"Invalid Message ID (or Template, Entity ID)": "Invalid Message ID (or Template, Entity ID)",
+	"Please wait {{seconds}} seconds before requesting another OTP": "Please wait {{seconds}} seconds before requesting another OTP",
+	"Invalid OTP": "Invalid OTP",
+	"OTP verified successfully": "OTP verified successfully"
 }

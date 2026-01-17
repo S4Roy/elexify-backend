@@ -1,0 +1,25 @@
+{
+  "required": true,
+  "content": {
+    "application/json": {
+      "schema": {
+        "type": "object",
+        "properties": {
+          "phone_code": {
+            "type": "string",
+            "pattern": "^[0-9]{1,4}$",
+            "example": "91",
+            "description": "Country calling code without + (e.g. 91 for India)"
+          },
+          "phone_number": {
+            "type": "string",
+            "pattern": "^[0-9]{10}$",
+            "example": "9876543210",
+            "description": "10-digit mobile number"
+          }
+        },
+        "required": ["phone_code", "phone_number"]
+      }
+    }
+  }
+}

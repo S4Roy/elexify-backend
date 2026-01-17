@@ -167,7 +167,7 @@ app.use(
   swaggerUi.setup(null, swaggerOptions)
 );
 
-console.log("Swagger Docs available at http://localhost:3000/api-docs");
+console.log(`Swagger Docs available at http://localhost:${envs.port}/api-docs`);
 
 // Handle 404 Errors
 app.all(`${envs.basePath}/*`, (req, res) =>

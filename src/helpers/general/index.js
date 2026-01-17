@@ -1,7 +1,7 @@
 // import { uuidv4 } from "./generateUuid.js";
 // import { generateRandomAlphanumeric } from "./generateRandomAlphanumeric.js";
 // import { maskString } from "./maskString.js";
-// import { getRandomNumbers } from "./getRandomNumbers.js";
+import { getRandomNumbers } from "./getRandomNumbers.js";
 // import { chartArrayFormat } from "./chartArrayFormat.js";
 // import { genderList } from "./genderList.js";
 import { generateSlugName } from "./generateSlugName.js";
@@ -22,6 +22,7 @@ import { bcryptMake } from "./bcryptMake.js";
 import { bcryptCheck } from "./bcryptCheck.js";
 import { importFileParse } from "./importFileParse.js";
 import { formatMoney } from "./formatMoney.js";
+import { generateOtp } from "./generateOtp.js";
 
 export {
   bcryptCheck,
@@ -29,7 +30,7 @@ export {
   // uuidv4,
   // generateRandomAlphanumeric,
   // maskString,
-  // getRandomNumbers,
+  getRandomNumbers,
   // chartArrayFormat,
   // genderList,
   generateSlugName,
@@ -48,4 +49,5 @@ export {
   sanitizeObjectId,
   importFileParse,
   formatMoney,
+  generateOtp,
 };

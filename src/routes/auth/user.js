@@ -32,4 +32,16 @@ userAuthRouter.post(
   authController.resetPassword
 );
 
+// OTP Based Login
+userAuthRouter.post(
+  "/send-otp",
+  authValidation.loginValidation.sendOtp,
+  authController.sendOtpToUser
+);
+userAuthRouter.post(
+  "/verify-otp",
+  authValidation.loginValidation.verifyOtp,
+  authController.verifyUserOtp
+);
+
 export { userAuthRouter };
