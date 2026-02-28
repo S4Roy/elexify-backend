@@ -1,2 +1,3 @@
 import { syncVariationVisibilityByAttribute } from "./syncVariationVisibilityByAttribute.js";
-export { syncVariationVisibilityByAttribute };
+import { generateGoogleFeedFile } from "./googleFeedService.js";
+export { syncVariationVisibilityByAttribute, generateGoogleFeedFile };

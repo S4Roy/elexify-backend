@@ -80,6 +80,7 @@ app.use(StatusSuccess);
 // Define API Routes
 app.get(`${envs.basePath}/debug/db-seeding`, seed);
 app.get(`${envs.basePath}/debug/currency`, CronJobs.exchangeRate);
+app.get(`${envs.basePath}/debug/google-feed`, CronJobs.generateGoogleFeed);
 cron.schedule("0 */12 * * *", async () => {
   try {
     await CronJobs.fetchAndUpdateExchangeRate(); // ✅ invoke the function
@@ -101,10 +102,20 @@ cron.schedule("*/10 * * * *", async () => {
     console.error("updatePendingPaypalPayments Cron Failed", e);
   }
 });
+
+// Run every 6 hours
+cron.schedule("0 */6 * * *", async () => {
+  try {
+    await CronJobs.generateGoogleFeed(); // ✅ invoke the function
+  } catch (e) {
+    console.error("generateGoogleFeed Cron Failed", e);
+  }
+});
+
 app.use(
   `${envs.basePath}/api/v1/auth`,
   middleware.accessTokenIfAny,
-  v1AuthRouter
+  v1AuthRouter,
 );
 app.use(`${envs.basePath}/callback`, v1CallBackRouter);
 
@@ -112,25 +123,25 @@ app.use(
   `${envs.basePath}/api/v1/admin`,
   middleware.validateApiKey,
   middleware.validateAccessToken,
-  v1AdminRouter
+  v1AdminRouter,
 );
 app.use(
   `${envs.basePath}/api/v1/user`,
   middleware.validateApiKey,
   middleware.validateAccessToken,
-  v1UserRouter
+  v1UserRouter,
 );
 app.use(
   `${envs.basePath}/api/v1/site`,
   middleware.accessTokenIfAny,
   middleware.validateApiKey,
-  v1SiteRouter
+  v1SiteRouter,
 );
 app.use(
   `${envs.basePath}/api/v1/webhook`,
   middleware.accessTokenIfAny,
   middleware.validateApiKey,
-  v1WebhookRouter
+  v1WebhookRouter,
 );
 // app.use(`${envs.basePath}/api/v1/callback`, v1CallbackRouter);
 
@@ -139,7 +150,7 @@ app.use(`${envs.basePath}/public`, express.static("./public"));
 // Initialize Swagger UI
 app.use(
   "/api-docs/assets",
-  express.static(path.join(__dirname, "assets", "swagger"))
+  express.static(path.join(__dirname, "assets", "swagger")),
 );
 
 const swaggerOptions = {
@@ -164,14 +175,14 @@ app.use(
     unauthorizedResponse: "Unauthorized access to API documentation",
   }),
   swaggerUi.serve,
-  swaggerUi.setup(null, swaggerOptions)
+  swaggerUi.setup(null, swaggerOptions),
 );
 
 console.log(`Swagger Docs available at http://localhost:${envs.port}/api-docs`);
 
 // Handle 404 Errors
 app.all(`${envs.basePath}/*`, (req, res) =>
-  res.status(404).json({ message: "404 Not Found!" })
+  res.status(404).json({ message: "404 Not Found!" }),
 );
 app.use(errors());
 app.use(handleError);
