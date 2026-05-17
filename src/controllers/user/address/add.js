@@ -43,7 +43,7 @@ export const add = async (req, res, next) => {
       state,
       country: country || 101,
       postcode,
-      address_type: address_type || "residential",
+      address_type: address_type || "home",
     };
 
     let addressExist = await Address.findOne(addressFilter);
@@ -71,7 +71,7 @@ export const add = async (req, res, next) => {
       state,
       country: country || 101,
       postcode,
-      address_type: address_type || "residential",
+      address_type: address_type || "home",
       purpose: purpose || "shipping",
       is_default: is_default || false,
       created_by: user_id,

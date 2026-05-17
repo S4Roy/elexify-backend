@@ -54,8 +54,8 @@
           },
           "address_type": {
             "type": "string",
-            "enum": ["residential", "business", "other"],
-            "default": "residential"
+            "enum": ["home", "office", "billing", "shipping", "other",],
+            "default": "home"
           },
           "purpose": {
             "type": "string",

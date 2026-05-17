@@ -136,5 +136,6 @@
 	"Invalid Message ID (or Template, Entity ID)": "Invalid Message ID (or Template, Entity ID)",
 	"Please wait {{seconds}} seconds before requesting another OTP": "Please wait {{seconds}} seconds before requesting another OTP",
 	"Invalid OTP": "Invalid OTP",
-	"OTP verified successfully": "OTP verified successfully"
+	"OTP verified successfully": "OTP verified successfully",
+	"Signup successful! Welcome aboard.": "Signup successful! Welcome aboard."
 }

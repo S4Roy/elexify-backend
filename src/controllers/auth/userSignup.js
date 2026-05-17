@@ -9,8 +9,8 @@ import { generalHelper } from "../../helpers/index.js";
  */
 export const userSignup = async (req, res, next) => {
   try {
-    const { email, password, first_name, last_name } = req.body;
-    const name = first_name + " " + last_name;
+    const { email, password, name,phone } = req.body;
+    // const name = first_name + " " + last_name;
     // Check if email already exists
     const existingUser = await User.findOne({
       email,
@@ -20,7 +20,12 @@ export const userSignup = async (req, res, next) => {
     if (existingUser) {
       throw StatusError.conflict(req.__("Email is already registered"));
     }
-
+    const exisUserMobile = await User.findOne({
+      phone,deleted_at: null,
+    }).exec();
+     if (exisUserMobile) {
+      throw StatusError.conflict(req.__("Phone is already registered"));
+    }
     // Hash password
     const hashedPassword = await generalHelper.bcryptMake(password);
 
@@ -28,6 +33,7 @@ export const userSignup = async (req, res, next) => {
     const newUser = await User.create({
       name,
       email,
+      phone,
       password: hashedPassword,
       role: "customer",
       status: "active",
@@ -37,6 +43,7 @@ export const userSignup = async (req, res, next) => {
     const token = await userService.generateTokens({
       user_id: newUser._id,
       email: newUser.email,
+      phone:newUser.email,
       role: newUser.role,
     });
 

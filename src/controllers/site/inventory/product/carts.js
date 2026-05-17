@@ -32,6 +32,7 @@ export const carts = async (req, res, next) => {
     const pipeline = [
       { $match: matchFilter },
 
+      // 🔹 Variation
       {
         $lookup: {
           from: "product_variations",
@@ -42,6 +43,7 @@ export const carts = async (req, res, next) => {
       },
       { $unwind: { path: "$variation", preserveNullAndEmptyArrays: true } },
 
+      // 🔹 Product
       {
         $lookup: {
           from: "products",
@@ -52,6 +54,7 @@ export const carts = async (req, res, next) => {
       },
       { $unwind: "$product" },
 
+      // 🔹 Attributes (for name)
       {
         $lookup: {
           from: "attribute_values",
@@ -102,6 +105,7 @@ export const carts = async (req, res, next) => {
         },
       },
 
+      // 🔹 Images
       {
         $lookup: {
           from: "medias",
@@ -149,6 +153,7 @@ export const carts = async (req, res, next) => {
         },
       },
 
+      // 🔹 Category & SEO
       {
         $lookup: {
           from: "categories",
@@ -167,6 +172,7 @@ export const carts = async (req, res, next) => {
       },
       { $unwind: { path: "$seo", preserveNullAndEmptyArrays: true } },
 
+      // 🔹 Wishlist (only for user)
       ...(user_id
         ? [
             {
@@ -204,43 +210,26 @@ export const carts = async (req, res, next) => {
           ]
         : []),
 
+      // 🔥 FIXED PRICING (IMPORTANT)
       {
         $addFields: {
-          // effective_price: {
-          //   $multiply: [{ $ifNull: ["$discounted_price", "$price"] }, rate],
-          // },
-          // total_price: {
-          //   $multiply: [
-          //     { $ifNull: ["$quantity", 0] },
-          //     {
-          //       $multiply: [
-          //         { $ifNull: ["$discounted_price", "$price", 0] },
-          //         rate,
-          //       ],
-          //     },
-          //   ],
-          // },
-          // cart: {
-          //   _id: "$_id",
-          //   quantity: "$quantity",
-          //   price: { $multiply: [{ $ifNull: ["$price", 0] }, rate] },
-          //   discounted_price: {
-          //     $multiply: [{ $ifNull: ["$discounted_price", "$price"] }, rate],
-          //   },
-          // },
           effective_price: {
-            $multiply: [{ $ifNull: ["$price", 0] }, rate],
+            $multiply: [{ $ifNull: ["$discounted_price", "$price"] }, rate],
           },
           total_price: {
             $multiply: [
               { $ifNull: ["$quantity", 0] },
-              { $multiply: [{ $ifNull: ["$price", 0] }, rate] },
+              {
+                $multiply: [{ $ifNull: ["$discounted_price", "$price"] }, rate],
+              },
             ],
           },
           cart: {
             _id: "$_id",
             quantity: "$quantity",
-            price: { $multiply: [{ $ifNull: ["$price", 0] }, rate] },
+            price: {
+              $multiply: [{ $ifNull: ["$discounted_price", "$price"] }, rate],
+            },
           },
         },
       },
@@ -263,46 +252,36 @@ export const carts = async (req, res, next) => {
       { $sort: { [sort_by]: sort_order } },
     ];
 
-    // const totalPipeline = [
-    //   { $match: matchFilter },
-    //   {
-    //     $addFields: {
-    //       total_price: {
-    //         $multiply: [
-    //           { $ifNull: ["$quantity", 0] },
-    //           {
-    //             $multiply: [
-    //               { $ifNull: ["$discounted_price", "$price", 0] },
-    //               rate,
-    //             ],
-    //           },
-    //         ],
-    //       },
-    //     },
-    //   },
-    //   {
-    //     $group: {
-    //       _id: null,
-    //       grand_total_price: { $sum: "$total_price" },
-    //     },
-    //   },
-    // ];
-    const totalPipeline = [
-      { $match: matchFilter },
-      {
-        $group: {
-          _id: null,
-          subtotal: {
-            $sum: {
-              $multiply: [
-                { $ifNull: ["$quantity", 0] },
-                { $multiply: [{ $ifNull: ["$price", 0] }, rate] },
-              ],
-            },
-          },
+    // 🔥 FIXED SUBTOTAL
+   const totalPipeline = [
+  { $match: matchFilter },
+  {
+    $group: {
+      _id: null,
+      subtotal: {
+        $sum: {
+          $multiply: [
+            { $ifNull: ["$quantity", 0] },
+            { $multiply: [{ $ifNull: ["$discounted_price", "$price"] }, rate] },
+          ],
         },
       },
-    ];
+      total_discount: {
+        $sum: {
+          $multiply: [
+            { $ifNull: ["$quantity", 0] },
+            {
+              $multiply: [
+                { $max: [{ $subtract: ["$price", { $ifNull: ["$discounted_price", "$price"] }] }, 0] },
+                rate,
+              ],
+            },
+          ],
+        },
+      },
+    },
+  },
+];
 
     const [docs, grandTotalResult] = await Promise.all([
       Cart.aggregate(pipeline),
@@ -315,6 +294,7 @@ export const carts = async (req, res, next) => {
       data: {
         docs,
         subtotal: grandTotalResult[0]?.subtotal ?? 0,
+          total_discount: grandTotalResult[0]?.total_discount ?? 0,
         currency,
         exchange_rate: rate,
       },

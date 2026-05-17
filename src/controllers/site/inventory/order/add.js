@@ -5,8 +5,7 @@ import Order from "../../../../models/Order.js";
 import OrderItem from "../../../../models/OrderItem.js";
 import User from "../../../../models/User.js";
 import Address from "../../../../models/Address.js";
-import Product from "../../../../models/Product.js";
-import ExchangeRate from "../../../../models/ExchangeRate.js"; // ✅
+import ExchangeRate from "../../../../models/ExchangeRate.js";
 import { StatusError } from "../../../../config/index.js";
 import {
   paymentService,
@@ -17,9 +16,7 @@ export const add = async (req, res, next) => {
   try {
     const {
       currency = "INR",
-      receipt,
-      shipping_address = {},
-      billing_address = {},
+      address_id,          // ✅ used to fetch the address
       payment_method,
       shipping = 0,
       isDirectCheckout,
@@ -33,343 +30,211 @@ export const add = async (req, res, next) => {
       throw StatusError.unauthorized("Invalid access token.");
     }
 
-    // ✅ Get latest exchange rate
+    if (!address_id) {
+      throw StatusError.badRequest("Delivery address is required.");
+    }
+
+    if (!payment_method) {
+      throw StatusError.badRequest("Payment method is required.");
+    }
+
+    // ── Exchange Rate ────────────────────────────────────────────────────────
     const ratesDoc = await ExchangeRate.findOne().sort({ updated_at: -1 });
     const exchangeRate = ratesDoc?.rates?.get(currency) ?? 1;
-    let carts = [];
-    if (isDirectCheckout) {
-      // Handle direct checkout specific logic
-      carts = await TempCart.find({
+
+    // ── Fetch carts ──────────────────────────────────────────────────────────
+    const carts = await (isDirectCheckout ? TempCart : Cart)
+      .find({
         deleted_at: null,
         ...(user_id ? { user: user_id } : { guest_id }),
-      }).populate("product variation");
-    } else {
-      carts = await Cart.find({
-        deleted_at: null,
-        ...(user_id ? { user: user_id } : { guest_id }),
-      }).populate("product variation");
-    }
+      })
+      .populate("product variation");
 
     if (!carts.length) {
-      throw StatusError.badRequest("No carts found for the user.");
+      throw StatusError.badRequest("No items found in cart.");
     }
 
-    const items = [];
+    // ── Build order items ────────────────────────────────────────────────────
     let total = 0;
 
-    for (const cart of carts) {
-      const product = cart.product;
-      const variation = cart.variation;
+    const items = carts
+      .map((cart) => {
+        const product = cart.product;
+        const variation = cart.variation;
+        if (!product) return null;
 
-      if (!product && !variation) {
-        console.warn(
-          `Skipping cart with missing product/variation: ${cart._id}`
-        );
-        continue;
-      }
+        const quantity = cart.quantity;
+        const base_unit_price = parseFloat(cart.discounted_price ?? cart.price);
+        const base_total_price = base_unit_price * quantity;
+        const unit_price = parseFloat((base_unit_price * exchangeRate).toFixed(2));
+        const total_price = parseFloat((base_total_price * exchangeRate).toFixed(2));
 
-      const quantity = cart.quantity;
-      const base_unit_price = parseFloat(cart.price);
-      const base_total_price = parseFloat(
-        cart.total_price || base_unit_price * quantity
-      );
+        total += total_price;
 
-      const converted_unit_price = parseFloat(
-        (base_unit_price * exchangeRate).toFixed(2)
-      );
-      const converted_total_price = parseFloat(
-        (base_total_price * exchangeRate).toFixed(2)
-      );
-
-      items.push({
-        product_id: product._id,
-        variation_id: variation?._id || null,
-        customization_id: cart?.customization_id || null,
-        quantity,
-        unit_price: converted_unit_price,
-        total_price: converted_total_price,
-        base_unit_price,
-        base_total_price,
-      });
-
-      total += converted_total_price;
-    }
+        return {
+          product_id: product._id,
+          variation_id: variation?._id || null,
+          customization_id: cart?.customization_id || null,
+          quantity,
+          unit_price,
+          total_price,
+          base_unit_price,
+          base_total_price,
+          cart_ref: cart,
+        };
+      })
+      .filter(Boolean);
 
     if (!items.length) {
-      throw StatusError.badRequest("No valid products found in the cart.");
+      throw StatusError.badRequest("No valid products found in cart.");
     }
 
-    const order_id = `ORD-${Date.now()}`;
-    const customer = {
-      first_name: billing_address.first_name || "Guest",
-      last_name: billing_address.last_name || "User",
-      email: billing_address.email || "guest@example.com",
-      phone: billing_address.phone || null,
-    };
-
-    // let user = null;
-    // if (user_id) {
-    //   user = await User.findOne({ _id: new mongoose.Types.ObjectId(user_id) });
-    // } else {
-    //   user = await User.findOne({ email: customer.email });
-    // }
-
-    // if (!user) {
-    //   user = await User.create({
-    //     role: "customer",
-    //     name: `${customer.first_name} ${customer.last_name}`,
-    //     email: customer.email,
-    //     mobile: customer.phone,
-    //     password: "external_order",
-    //     status: "active",
-    //   });
-    // }
-    let user = null;
-
-    // ===============================
-    // CASE 1: LOGGED-IN USER
-    // ===============================
-    if (user_id) {
-      user = await User.findById(user_id);
-
-      if (!user) {
-        throw StatusError.unauthorized("Invalid user session.");
-      }
+    // ── User ─────────────────────────────────────────────────────────────────
+    if (!user_id) {
+      throw StatusError.unauthorized("Login required to place an order.");
     }
 
-    // ===============================
-    // CASE 2: GUEST CHECKOUT
-    // ===============================
-    else {
-      const existingUser = await User.findOne({
-        email: customer.email,
-        status: "active",
-      });
+    const user = await User.findById(user_id);
+    if (!user) throw StatusError.unauthorized("Invalid user session.");
 
-      // 🚫 BLOCK guest checkout with registered email
-      if (existingUser) {
-        throw StatusError.conflict(
-          "This email is already registered. Please login to continue checkout."
-        );
-      }
+    // ── Address — look up by address_id ──────────────────────────────────────
+const address = await Address.findOne({
+  _id: new mongoose.Types.ObjectId(address_id),
+  user: user._id,
+  deleted_at: null,
+});
 
-      // ✅ Create new guest-based user
-      user = await User.create({
-        role: "customer",
-        name: `${customer.first_name} ${customer.last_name}`,
-        email: customer.email,
-        mobile: customer.phone,
-        password: "external_order",
-        status: "active",
-      });
+    if (!address) {
+      throw StatusError.notFound("Address not found. Please select a valid delivery address.");
     }
 
-    // 📦 Create/find billing address
-    let billingAddress = null;
-    if (billing_address?.address_line_1) {
-      const billingFilter = {
-        user: user._id,
-        full_name: `${customer.first_name} ${customer.last_name}`,
-        phone_code: billing_address.phone_code,
-        phone: customer.phone,
-        email: customer.email,
-        address_line_1: billing_address.address_line_1,
-        city: billing_address.city || "",
-        state: billing_address.state || "",
-        country: billing_address.country || "",
-        postcode: billing_address.postcode || "",
-      };
-
-      billingAddress = await Address.findOne(billingFilter);
-      if (!billingAddress) {
-        billingAddress = await Address.create({
-          ...billingFilter,
-          address_line_2: billing_address.address_line_2 || "",
-          land_mark: billing_address.land_mark || "",
-          address_type: "residential",
-          purpose: "billing",
-          is_default: true,
-          created_by: user._id,
-        });
-      }
-    }
-
-    let shippingAddress = null;
-    if (shipping_address?.address_line_1) {
-      const shippingFilter = {
-        user: user._id,
-        full_name: `${shipping_address.first_name} ${shipping_address.last_name}`,
-        phone: shipping_address.phone,
-        phone_code: shipping_address.phone_code,
-        email: shipping_address.email,
-        address_line_1: shipping_address.address_line_1,
-        city: shipping_address.city || "",
-        state: shipping_address.state || "",
-        country: shipping_address.country || "",
-        postcode: shipping_address.postcode || "",
-      };
-
-      shippingAddress = await Address.findOne(shippingFilter);
-      if (!shippingAddress) {
-        shippingAddress = await Address.create({
-          ...shippingFilter,
-          address_line_2: shipping_address.address_line_2 || "",
-          land_mark: shipping_address.land_mark || "",
-          address_type: "residential",
-          purpose: "shipping",
-          is_default: true,
-          created_by: user._id,
-        });
-      }
-    }
+    // ── Coupon ───────────────────────────────────────────────────────────────
     let discount = 0;
-    // ✅ Validate and apply coupon if provided
+
     if (coupon_code) {
       const couponData = await inventoryService.cartService.validateCoupon({
         code: coupon_code,
-        user: user ? { _id: user._id, role: user.role } : null,
+        user: { _id: user._id, role: user.role },
         carts,
         currency,
       });
-      console.log(couponData);
-
       discount = couponData.discount;
     }
+
     const discountAmount = parseFloat(discount.toFixed(2));
     const shippingAmount = parseFloat((shipping * exchangeRate).toFixed(2));
     const sub_total = parseFloat(total.toFixed(2));
-    const grandTotal = parseFloat(
-      (sub_total - discountAmount + shippingAmount).toFixed(2)
-    );
+    const grandTotal = parseFloat((sub_total - discountAmount + shippingAmount).toFixed(2));
+
+    // ── Create order ─────────────────────────────────────────────────────────
+    const order_id = `ORD-${Date.now()}`;
 
     const order = await Order.create({
       id: order_id,
       user: user._id,
-      billing_address: billingAddress?._id ?? null,
-      shipping_address: shippingAddress?._id ?? null,
+      billing_address: address._id,
+      shipping_address: address._id,
       payment_status: "pending",
       order_status: "pending",
       total_amount: sub_total,
       discount: discountAmount,
       shipping: shippingAmount,
       grand_total: grandTotal,
-      currency, // ✅ Save currency
+      currency,
       payment_method,
       transaction_id: `EXT-${order_id}`,
-      note: "Guest Checkout",
-      currency: currency,
-      exchnage_rate: exchangeRate,
+      note: "Checkout",
+      exchange_rate: exchangeRate,
       total_items: items.length,
       coupon_code: coupon_code || null,
     });
 
-    const orderItems = [];
-
-    for (const item of items) {
-      const productDoc = await Product.findOne({ _id: item.product_id });
-      if (!productDoc) {
-        console.warn(`Product not found for ID: ${item.product_id}`);
-        continue;
-      }
-
-      orderItems.push({
+    // ── Order items ──────────────────────────────────────────────────────────
+    const orderItems = items.map((item) => {
+      const cart = item.cart_ref;
+      return {
         order_id: order._id,
-        product_id: productDoc._id,
+        product_id: item.product_id,
         variation_id: item.variation_id,
-        customization_id: item?.customization_id,
+        customization_id: item.customization_id,
         quantity: item.quantity,
         unit_price: item.unit_price,
         total_price: item.total_price,
-        regular_price: item.base_unit_price,
-        sale_price: item.unit_price, // Assume current unit_price is final
-        currency: currency,
-        exchnage_rate: exchangeRate,
-      });
-    }
-
-    if (!orderItems.length) {
-      throw StatusError.badRequest("No valid order items to save.");
-    }
+        regular_price: cart.price,
+        sale_price: cart.discounted_price,
+        currency,
+        exchange_rate: exchangeRate,
+      };
+    });
 
     await OrderItem.insertMany(orderItems);
 
+    // ── Cart cleanup ─────────────────────────────────────────────────────────
     if (isDirectCheckout) {
-      // 🧹 Clear cart
       await TempCart.deleteMany({
         deleted_at: null,
         ...(user_id ? { user: user_id } : { guest_id }),
       });
     } else {
-      if (guest_id) {
-        await inventoryService.cartService.transferGuestCartToUser(
-          guest_id,
-          user._id
-        );
-        await inventoryService.wishlistService.transferGuestWishlistToUser(
-          guest_id,
-          user._id
-        );
-      }
+      await Cart.updateMany(
+        {
+          deleted_at: null,
+          ...(user_id ? { user: user_id } : { guest_id }),
+        },
+        { deleted_at: new Date() }
+      );
     }
 
+    // ── Payment ──────────────────────────────────────────────────────────────
     let providerResponse = null;
 
-    // --- RAZORPAY (existing) ---
     if (payment_method === "razorpay") {
       const razorpayOrder = await paymentService.createRazorpayOrder(
         grandTotal,
         currency,
-        order_id
+        order_id,
       );
+
       await Order.findOneAndUpdate(
         { id: order_id },
         {
           payment_meta: {
             payment_provider: "razorpay",
             razorpay_order_id: razorpayOrder.id,
-            razorpay_payment_id: null,
-            razorpay_signature: null,
           },
-        }
+        },
       );
 
       providerResponse = { provider: "razorpay", data: razorpayOrder };
-    }
-
-    // --- PAYPAL BRANCH ---
-    else if (payment_method === "paypal") {
-      // createPayPalOrder(totalAmount, currency, receipt, items)
-      // returns { paypalOrderId, dbOrderId, raw }
+    } else if (payment_method === "paypal") {
       const paypalResp = await paymentService.createPayPalOrder(
         grandTotal,
         currency,
         order_id,
-        items
+        items,
       );
 
-      // update Order record with PayPal metadata
       await Order.findOneAndUpdate(
         { id: order_id },
         {
           payment_meta: {
             payment_provider: "paypal",
             paypal_order_id: paypalResp.paypalOrderId,
-            paypal_capture_id: null,
-            paypal_payment_status: "CREATED",
           },
-        }
+        },
       );
 
       providerResponse = { provider: "paypal", data: paypalResp };
     }
 
+    // ── Response ─────────────────────────────────────────────────────────────
     return res.status(200).json({
       status: "success",
       message: "Order placed successfully",
       data: {
         order,
-        providerResponse,
         items: orderItems,
+        providerResponse,
       },
     });
   } catch (error) {

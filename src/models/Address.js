@@ -30,8 +30,8 @@ const AddressSchema = new Schema(
 
     address_type: {
       type: String,
-      enum: ["residential", "business", "other"],
-      default: "residential",
+      enum: ["home", "office", "billing", "shipping", "other"],
+      default: "home",
     },
     purpose: {
       type: String,

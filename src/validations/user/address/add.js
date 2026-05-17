@@ -82,10 +82,10 @@ export const add = celebrate({
       }),
 
     address_type: Joi.string()
-      .valid("residential", "business", "other")
+      .valid("home", "office", "billing", "shipping", "other",)
       .optional()
       .messages({
-        "any.only": "Address type must be 'residential', 'business' or 'other'",
+        "any.only": "Address type must be 'home', 'office', 'billing', 'shipping' or 'other'",
       }),
 
     purpose: Joi.string()

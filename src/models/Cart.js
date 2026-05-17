@@ -33,7 +33,7 @@ const CartSchema = new Schema(
 
     deleted_at: { type: Date, default: null }, // ✅ Soft delete flag
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 CartSchema.index(
@@ -41,9 +41,9 @@ CartSchema.index(
   {
     unique: true,
     partialFilterExpression: {
-      user: { $type: "objectId" },
+      user: { $exists: true, $ne: null },
     },
-  }
+  },
 );
 
 CartSchema.index(
@@ -51,9 +51,9 @@ CartSchema.index(
   {
     unique: true,
     partialFilterExpression: {
-      guest_id: { $type: "string" },
+      guest_id: { $exists: true, $ne: null },
     },
-  }
+  },
 );
 
 // Apply pagination plugin

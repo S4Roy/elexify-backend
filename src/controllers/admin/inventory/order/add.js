@@ -135,7 +135,7 @@ export const add = async (req, res, next) => {
           ...billingFilter,
           address_line_2: address.address_line_2 || "",
           land_mark: address.land_mark || "",
-          address_type: "residential",
+          address_type: "home",
           purpose: "billing",
           is_default: true,
           created_by: user._id,

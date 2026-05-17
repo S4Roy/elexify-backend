@@ -22,7 +22,7 @@ class AddressResource extends Resource {
       country_name: this.country_name || null,
       postcode: this.postcode || null,
 
-      address_type: this.address_type || "residential",
+      address_type: this.address_type || "home",
       purpose: this.purpose || "shipping",
       is_default: this.is_default || false,
 
