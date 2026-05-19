@@ -25,8 +25,10 @@ const UserSchema = new Schema(
     },
     email: {
       type: String,
-      required: true,
-      unique: true,
+      required: false,
+      default: null,
+      lowercase: true,
+      trim: true,
     },
     phone_code: {
       type: String,
@@ -42,10 +44,12 @@ const UserSchema = new Schema(
     address: {
       type: String,
       required: false,
+      default: null,
     },
     password: {
       type: String,
-      required: true,
+      required: false,
+      default: null,
     },
     profile_image: {
       type: String,
@@ -105,7 +109,7 @@ const UserSchema = new Schema(
       default: null,
     },
   },
-  { versionKey: false }
+  { versionKey: false },
 );
 
 // Apply Mongoose pagination plugin

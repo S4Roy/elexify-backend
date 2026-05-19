@@ -2,19 +2,41 @@ import { celebrate, Joi, Segments } from "celebrate";
 
 export const sendOtp = celebrate({
   [Segments.BODY]: Joi.object({
+    // ── Email OR mobile — exactly one must be provided ────────────────────────
+    email: Joi.string()
+      .email({ tlds: { allow: false } })
+      .lowercase()
+      .trim()
+      .messages({
+        "string.email": "Enter a valid email address",
+      }),
+
+    mobile: Joi.string()
+      .pattern(/^[0-9]{6,15}$/)
+      .trim()
+      .messages({
+        "string.pattern.base": "Mobile number must be 6–15 digits",
+      }),
+
     phone_code: Joi.string()
       .pattern(/^[0-9]{1,4}$/)
-      .required()
+      .default("91")
       .messages({
-        "string.empty": "Phone code is required",
         "string.pattern.base": "Phone code must be numeric (1–4 digits)",
       }),
-    phone_number: Joi.string()
-      .pattern(/^[0-9]{10}$/)
-      .required()
+
+    purpose: Joi.string()
+      .valid("auth", "signup", "forgot_password", "reset_password")
+      .default("auth")
       .messages({
-        "string.empty": "Phone number is required",
-        "string.pattern.base": "Phone number must be a valid 10-digit number",
+        "any.only":
+          "Purpose must be one of: auth, signup, forgot_password, reset_password",
       }),
-  }),
+
+    is_otp_login: Joi.boolean().default(false),
+  })
+    .or("email", "mobile") // at least one required
+    .messages({
+      "object.missing": "Either email or mobile number is required",
+    }),
 });

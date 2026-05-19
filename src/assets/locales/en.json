@@ -137,5 +137,7 @@
 	"Please wait {{seconds}} seconds before requesting another OTP": "Please wait {{seconds}} seconds before requesting another OTP",
 	"Invalid OTP": "Invalid OTP",
 	"OTP verified successfully": "OTP verified successfully",
-	"Signup successful! Welcome aboard.": "Signup successful! Welcome aboard."
+	"Signup successful! Welcome aboard.": "Signup successful! Welcome aboard.",
+	"Failed to send OTP email. Please try again.": "Failed to send OTP email. Please try again.",
+	"OTP not found or already used": "OTP not found or already used"
 }

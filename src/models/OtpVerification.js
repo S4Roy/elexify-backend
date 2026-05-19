@@ -26,7 +26,14 @@ const OtpVerificationSchema = new Schema(
     purpose: {
       type: String,
       required: true,
-      enum: ["register", "login", "resetpassword"],
+      enum: [
+        "register",
+        "login",
+        "resetpassword",
+        "forgotpassword",
+        "updatecontact",
+        "auth",
+      ],
       index: true,
     },
 
@@ -59,7 +66,7 @@ const OtpVerificationSchema = new Schema(
   {
     timestamps: { createdAt: "created_at", updatedAt: "updated_at" },
     versionKey: false,
-  }
+  },
 );
 
 /* 🔥 Auto-delete expired OTPs */
