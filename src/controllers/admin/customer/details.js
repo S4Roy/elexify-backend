@@ -1,11 +1,10 @@
-import Category from "../../../models/Category.js";
+import User from "../../../models/User.js";
 import { StatusError } from "../../../config/index.js";
 import { envs } from "../../../config/index.js";
-import CategoryResource from "../../../resources/CategoryResource.js";
-import mongoose from "mongoose";
+import UserResource from "../../../resources/UserResource.js";
 
 /**
- * Add Category
+ * Admin — Customer List / Details
  * @param req
  * @param res
  * @param next
@@ -18,82 +17,89 @@ export const details = async (req, res, next) => {
       search_key = "",
       sort_by = "created_at",
       sort_order = -1,
+      status,
+      _id,
     } = req.query;
-    const { slug = null } = req.params;
+
     const options = {
-      page: page,
-      limit: limit,
+      page,
+      limit,
       sort: { [sort_by]: sort_order },
     };
 
-    let matchFilter = { deleted_at: null };
-    // Find the main category by slug
-    const CategoryDetails = await Category.findOne({
-      slug,
+    // ── Single customer detail ─────────────────────────────────────────────────
+    if (_id) {
+      const customer = await User.findOne({
+        _id,
+        role: { $in: ["user", "customer"] },
+        deleted_at: null,
+      });
+
+      if (!customer) {
+        throw StatusError.notFound(req.__("Customer not found"));
+      }
+
+      return res.status(200).json({
+        status: "success",
+        message: req.__("Customer fetched successfully"),
+        data: new UserResource(customer).exec(),
+      });
+    }
+
+    // ── Customer list ─────────────────────────────────────────────────────────
+    const matchFilter = {
+      role: { $in: ["user", "customer"] },
       deleted_at: null,
-    }).exec();
+    };
 
-    if (!CategoryDetails) {
-      throw StatusError.notFound(req.__("Category not found"));
+    if (status) {
+      matchFilter.status = status;
     }
 
-    if (CategoryDetails?.parent_category) {
-      // If the category has a parent, fetch its subcategories
-      matchFilter.parent_category = new mongoose.Types.ObjectId(
-        CategoryDetails._id
-      );
-    } else {
-      // If it's a main category, fetch all its subcategories
-      matchFilter.parent_category = CategoryDetails._id;
-    }
     if (search_key) {
       matchFilter.$or = [
         { name: { $regex: ".*" + search_key + ".*", $options: "i" } },
-        { slug: { $regex: ".*" + search_key + ".*", $options: "i" } },
+        { email: { $regex: ".*" + search_key + ".*", $options: "i" } },
+        { mobile: { $regex: ".*" + search_key + ".*", $options: "i" } },
       ];
     }
+
     const pipeline = [
       { $match: matchFilter },
+      // Join orders count
       {
         $lookup: {
-          from: "categories",
-          localField: "parent_category",
-          foreignField: "_id",
-          as: "parent_category",
+          from: "orders",
+          localField: "_id",
+          foreignField: "user_id",
+          as: "orders",
         },
       },
       {
-        $unwind: {
-          path: "$parent_category",
-          preserveNullAndEmptyArrays: true,
+        $addFields: {
+          total_orders: { $size: "$orders" },
         },
       },
       {
-        $lookup: {
-          from: "medias",
-          localField: "image",
-          foreignField: "_id",
-          as: "image",
-        },
-      },
-      {
-        $unwind: {
-          path: "$image",
-          preserveNullAndEmptyArrays: true,
+        $project: {
+          orders: 0, // remove raw orders array
+          password: 0,
+          reset_token: 0,
         },
       },
     ];
 
-    const data = await Category.aggregatePaginate(
-      Category.aggregate(pipeline),
-      options
+    const data = await User.aggregatePaginate(
+      User.aggregate(pipeline),
+      options,
     );
 
-    data.docs = await CategoryResource.collection(data.docs);
-    res.status(201).json({
+    data.docs = await UserResource.collection(data.docs);
+
+    return res.status(200).json({
       status: "success",
-      message: req.__("List fetched successfully"),
-      data: data,
+      message: req.__("Customers fetched successfully"),
+      data,
     });
   } catch (error) {
     next(error);

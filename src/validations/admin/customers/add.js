@@ -2,29 +2,32 @@ import { celebrate, Joi } from "celebrate";
 
 export const add = celebrate({
   body: Joi.object({
-    file: Joi.string().uri().optional().allow(null, "").messages({
-      "string.uri": "File must be a valid URL",
+    name: Joi.string().min(2).max(100).required().messages({
+      "string.empty": "Name is required",
+      "string.min": "Name must be at least 2 characters",
     }),
-    file_name: Joi.string().optional().allow(null, "").messages({
-      "string.empty": "File name is required",
-      "string.min": "File name must be at least 1 character",
-      "string.max": "File name cannot exceed 255 characters",
+
+    email: Joi.string().email().lowercase().trim().optional().messages({
+      "string.email": "Enter a valid email address",
     }),
-    ref_type: Joi.string()
-      .valid("products", "categories", "attributes", "brands", "users")
-      .required()
-      .messages({
-        "any.only":
-          "Reference type must be one of 'products', 'categories', 'attributes', 'brands', or 'users'",
-        "string.empty": "Reference type is required",
-      }),
-    status: Joi.string()
-      .valid("active", "inactive")
-      .default("active")
+
+    phone_code: Joi.string().max(5).optional().default("91"),
+
+    mobile: Joi.string()
+      .pattern(/^[0-9]{6,15}$/)
       .optional()
-      .allow(null, "")
       .messages({
-        "any.only": "Status must be either 'active' or 'inactive'",
+        "string.pattern.base": "Enter a valid mobile number",
       }),
-  }),
+
+    password: Joi.string().min(6).max(30).optional().messages({
+      "string.min": "Password must be at least 6 characters",
+    }),
+
+    status: Joi.string().valid("active", "inactive").default("active"),
+  })
+    .or("email", "mobile")
+    .messages({
+      "object.missing": "Email or mobile number is required",
+    }),
 });

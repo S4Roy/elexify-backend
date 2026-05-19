@@ -20,14 +20,15 @@ export const verifyUserOtp = async (req, res, next) => {
 
     const guest_id = req.auth?.guest_id || null;
     const isEmailMode = !!email;
+
+    // ── identifier — same logic as sendOtpToUser ──────────────────────────────
     const identifier = isEmailMode
       ? email.trim().toLowerCase()
       : `${phone_code}${mobile.trim()}`;
 
-    // ── Fetch & validate OTP record ───────────────────────────────────────────
+    // ── Fetch OTP record by identifier ────────────────────────────────────────
     const otpRecord = await OtpVerification.findOne({
-      email: isEmailMode ? email.trim().toLowerCase() : null,
-      mobile: isEmailMode ? null : `${phone_code}${mobile.trim()}`,
+      identifier,
       purpose,
       verified_at: null,
       expired_at: null,
@@ -47,7 +48,6 @@ export const verifyUserOtp = async (req, res, next) => {
       throw StatusError.badRequest(req.__("Invalid OTP"));
     }
 
-    // ── Mark OTP as verified ──────────────────────────────────────────────────
     await otpRecord.updateOne({ verified_at: new Date() });
 
     // ── Find or create user ───────────────────────────────────────────────────
@@ -70,7 +70,7 @@ export const verifyUserOtp = async (req, res, next) => {
     }
 
     if (!user) {
-      // New user — create account
+      // ── New user — create account ─────────────────────────────────────────
       isNewUser = true;
       const name =
         [first_name?.trim(), last_name?.trim()].filter(Boolean).join(" ") ||
@@ -80,24 +80,32 @@ export const verifyUserOtp = async (req, res, next) => {
         role: "customer",
         name,
         ...(isEmailMode
-          ? { email: email.trim().toLowerCase() }
-          : { mobile: mobile.trim(), phone_code }),
+          ? { email: email.trim().toLowerCase(), email_verified_at: new Date() }
+          : {
+              mobile: mobile.trim(),
+              phone_code,
+              mobile_verified_at: new Date(),
+            }),
         status: "active",
-        email_verified_at: isEmailMode ? new Date() : null,
-        mobile_verified_at: !isEmailMode ? new Date() : null,
       });
     } else {
-      // Existing user checks
+      // ── Existing user — validate status and verified_at ───────────────────
       if (user.status !== "active") {
-        throw StatusError.forbidden(req.__("This account has been blocked"));
+        throw StatusError.forbidden(
+          req.__("Your account has been blocked. Please contact support."),
+        );
       }
 
-      // Mark verified
       if (isEmailMode && !user.email_verified_at) {
-        await user.updateOne({ email_verified_at: new Date() });
+        throw StatusError.forbidden(
+          req.__("Your email is not verified. Please contact support."),
+        );
       }
+
       if (!isEmailMode && !user.mobile_verified_at) {
-        await user.updateOne({ mobile_verified_at: new Date() });
+        throw StatusError.forbidden(
+          req.__("Your mobile number is not verified. Please contact support."),
+        );
       }
     }
 
@@ -113,22 +121,29 @@ export const verifyUserOtp = async (req, res, next) => {
       );
     }
 
-    // ── Generate tokens ───────────────────────────────────────────────────────
-    const token = await userService.generateTokens({
-      user_id: user._id,
-      email: user.email,
-      role: user.role,
-    });
+    // ── Build response data based on purpose ──────────────────────────────────
+    let data = {};
 
-    // ── Response ──────────────────────────────────────────────────────────────
-    return res.status(200).json({
-      status: "success",
-      message: req.__("OTP verified successfully"),
-      data: {
+    if (purpose === "auth") {
+      const token = await userService.generateTokens({
+        user_id: user._id,
+        email: user.email,
+        role: user.role,
+      });
+      data = {
         is_new_user: isNewUser,
         user: new UserResource(user).exec(),
         token,
-      },
+      };
+    } else if (purpose === "forgot_password" || purpose === "reset_password") {
+      const resetToken = await userService.generateResetToken(user._id);
+      data = { reset_token: resetToken };
+    }
+
+    return res.status(200).json({
+      status: "success",
+      message: req.__("OTP verified successfully"),
+      data,
     });
   } catch (error) {
     next(error);

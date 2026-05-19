@@ -24,7 +24,7 @@ export const resetPassword = async (req, res, next) => {
     await User.findByIdAndUpdate(userId, { password: hashedPassword });
 
     res.status(200).json({
-      status: "success",
+      status: true,
       message: req.__("Password reset successfully"),
     });
   } catch (error) {

@@ -139,5 +139,10 @@
 	"OTP verified successfully": "OTP verified successfully",
 	"Signup successful! Welcome aboard.": "Signup successful! Welcome aboard.",
 	"Failed to send OTP email. Please try again.": "Failed to send OTP email. Please try again.",
-	"OTP not found or already used": "OTP not found or already used"
+	"OTP not found or already used": "OTP not found or already used",
+	"No account found with this {{type}}. Please check and try again.": "No account found with this {{type}}. Please check and try again.",
+	"OTP has expired": "OTP has expired",
+	"Customer updated successfully": "Customer updated successfully",
+	"Your account has been blocked. Please contact support.": "Your account has been blocked. Please contact support.",
+	"Customer activated successfully": "Customer activated successfully"
 }

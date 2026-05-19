@@ -3,23 +3,29 @@ const { Schema, model } = mongoose;
 
 const OtpVerificationSchema = new Schema(
   {
+    // ── Contact identifier ──────────────────────────────────────────────────
     email: {
       type: String,
       lowercase: true,
       trim: true,
       default: null,
-      index: true,
     },
 
     mobile: {
       type: String,
       trim: true,
       default: null,
-      index: true,
     },
 
+    // ── Used by rate-limit cooldown check (phone_code + mobile combined) ────
+    identifier: {
+      type: String,
+      default: null,
+    },
+
+    // ── OTP (bcrypt hashed) ─────────────────────────────────────────────────
     otp: {
-      type: String, // 🔐 store hashed OTP (not number)
+      type: String,
       required: true,
     },
 
@@ -27,19 +33,18 @@ const OtpVerificationSchema = new Schema(
       type: String,
       required: true,
       enum: [
+        "auth",
         "register",
         "login",
-        "resetpassword",
-        "forgotpassword",
-        "updatecontact",
-        "auth",
+        "reset_password",
+        "forgot_password",
+        "update_contact",
       ],
-      index: true,
     },
 
     token: {
       type: String,
-      required: false,
+      default: null,
     },
 
     meta: {
@@ -52,15 +57,22 @@ const OtpVerificationSchema = new Schema(
       default: 0,
     },
 
+    // ── Timestamps set by controller ────────────────────────────────────────
     verified_at: {
       type: Date,
       default: null,
     },
 
+    // expired_at: manually marked expired (e.g. on resend or wrong OTP)
+    expired_at: {
+      type: Date,
+      default: null,
+    },
+
+    // expires_at: natural expiry time (used by TTL index)
     expires_at: {
       type: Date,
       required: true,
-      index: true,
     },
   },
   {
@@ -69,12 +81,13 @@ const OtpVerificationSchema = new Schema(
   },
 );
 
-/* 🔥 Auto-delete expired OTPs */
+// ── TTL: auto-delete documents after expires_at ───────────────────────────────
 OtpVerificationSchema.index({ expires_at: 1 }, { expireAfterSeconds: 0 });
 
-/* 🔎 Fast lookup */
-OtpVerificationSchema.index({ mobile: 1, type: 1 });
-OtpVerificationSchema.index({ email: 1, type: 1 });
+// ── Fast lookup by controller queries ─────────────────────────────────────────
+OtpVerificationSchema.index({ identifier: 1, purpose: 1 });
+OtpVerificationSchema.index({ email: 1, purpose: 1 });
+OtpVerificationSchema.index({ mobile: 1, purpose: 1 });
 
 const OtpVerification = model("otp_verifications", OtpVerificationSchema);
 

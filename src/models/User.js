@@ -26,7 +26,8 @@ const UserSchema = new Schema(
     email: {
       type: String,
       required: false,
-      default: null,
+      // no default: null — omit field entirely for mobile-only users
+      // sparse index only excludes MISSING fields in MongoDB 7.0, not null values
       lowercase: true,
       trim: true,
     },
@@ -39,7 +40,6 @@ const UserSchema = new Schema(
       type: String,
       required: false,
       default: null,
-      // unique: true,
     },
     address: {
       type: String,
@@ -112,10 +112,15 @@ const UserSchema = new Schema(
   { versionKey: false },
 );
 
-// Apply Mongoose pagination plugin
+// ── Indexes — defined here only (not on field) to ensure sparse is respected ──
+// email: unique per real email, null values excluded (mobile-only users allowed)
+UserSchema.index({ email: 1 }, { unique: true, sparse: true });
+
+// mobile: unique per phone_code+mobile combo, null values excluded
+UserSchema.index({ phone_code: 1, mobile: 1 }, { unique: true, sparse: true });
+
 UserSchema.plugin(mongooseAggregatePaginate);
 
-// Create model
 const User = model("users", UserSchema);
 
 export default User;

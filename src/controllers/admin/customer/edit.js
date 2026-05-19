@@ -1,113 +1,99 @@
-import Category from "../../../models/Category.js";
-import Media from "../../../models/Media.js";
+import User from "../../../models/User.js";
+import UserResource from "../../../resources/UserResource.js";
 import { StatusError } from "../../../config/index.js";
-import { s3Handler } from "../../../services/s3Handler/s3Handler.js";
-import path from "path";
-import CategoryResource from "../../../resources/CategoryResource.js";
 import { generalHelper } from "../../../helpers/index.js";
 
 /**
- * Edit Category
+ * Admin — Edit Customer
  * @param req
  * @param res
  * @param next
  */
 export const edit = async (req, res, next) => {
   try {
-    const { _id, name, description, parent_category, status } = req.body;
-    const image = req?.files?.image ?? null; // Get uploaded file (Single)
+    const { _id, name, email, phone_code, mobile, password, status } = req.body;
 
     if (!_id) {
-      throw StatusError.badRequest(req.__("Category ID is required"));
+      throw StatusError.badRequest(req.__("Customer ID is required"));
     }
 
-    // Find the existing category
-    const category = await Category.findById(_id).exec();
-    if (!category) {
-      throw StatusError.notFound(req.__("Category not found"));
+    // ── Find existing customer ────────────────────────────────────────────────
+    const customer = await User.findOne({
+      _id,
+      role: { $in: ["user", "customer"] },
+      deleted_at: null,
+    });
+
+    if (!customer) {
+      throw StatusError.notFound(req.__("Customer not found"));
     }
 
-    // Generate new slug only if the name has changed
-    let slug = category.slug;
-    if (name && name !== category.name) {
-      slug = generalHelper.generateSlugName(name);
-
-      // Check if another category with the same slug exists
-      let existingCategory = await Category.findOne({
-        slug,
+    // ── Check duplicate email (exclude self) ──────────────────────────────────
+    if (email && email.trim().toLowerCase() !== customer.email) {
+      const emailExists = await User.findOne({
+        email: email.trim().toLowerCase(),
+        deleted_at: null,
         _id: { $ne: _id },
-      }).exec();
-      let count = 1;
-
-      // Regenerate slug if a duplicate is found
-      while (existingCategory) {
-        slug = generalHelper.generateSlugName(`${name}-${count}`);
-        existingCategory = await Category.findOne({
-          slug,
-          _id: { $ne: _id },
-        }).exec();
-        count++;
+      });
+      if (emailExists) {
+        throw StatusError.conflict(
+          req.__("A user with this email already exists"),
+        );
       }
     }
 
-    // Prepare update data
-    let sanitizedParentCategory = null;
-
-    if (
-      parent_category !== undefined &&
-      parent_category !== null &&
-      parent_category !== "" &&
-      parent_category !== "null" &&
-      generalHelper.sanitizeObjectId(parent_category)
-    ) {
-      sanitizedParentCategory = generalHelper.sanitizeObjectId(parent_category);
+    // ── Check duplicate mobile (exclude self) ─────────────────────────────────
+    if (mobile && mobile.trim() !== customer.mobile) {
+      const mobileExists = await User.findOne({
+        phone_code: phone_code ?? customer.phone_code ?? "91",
+        mobile: mobile.trim(),
+        deleted_at: null,
+        _id: { $ne: _id },
+      });
+      if (mobileExists) {
+        throw StatusError.conflict(
+          req.__("A user with this mobile number already exists"),
+        );
+      }
     }
 
+    // ── Build update payload ──────────────────────────────────────────────────
     const updateData = {
-      ...(name && { name }),
-      ...(slug && { slug }),
-      ...(description !== undefined && { description: description || null }),
+      ...(name && { name: name.trim() }),
       ...(status !== undefined && { status }),
-      ...(sanitizedParentCategory !== null && {
-        parent_category: sanitizedParentCategory,
-      }),
       updated_by: req.auth.user_id,
       updated_at: new Date(),
     };
 
-    // Handle image upload if a new image is provided
-    if (image) {
-      const key = `categories/${slug}${path.extname(image.name)}`;
-      const s3Upload = await s3Handler.uploadToS3(image, key);
-      if (!s3Upload) {
-        throw StatusError.badRequest(req.__("Category image upload failed"));
-      }
-      // Create Media record
-      const media = new Media({
-        reference_id: null, // To be updated later
-        reference_type: "categories",
-        alt_text: image.name,
-        url: key,
-        type: "image",
-        status: "active",
-        created_by: req.auth.user_id,
-      });
-      await media.save();
-      updateData.image = media?._id;
+    // Email changed — update and mark verified (admin action)
+    if (email && email.trim().toLowerCase() !== customer.email) {
+      updateData.email = email.trim().toLowerCase();
+      updateData.email_verified_at = new Date();
     }
 
-    // Update the category
-    const updatedCategory = await Category.findByIdAndUpdate(
+    // Mobile changed — update and mark verified (admin action)
+    if (mobile && mobile.trim() !== customer.mobile) {
+      updateData.mobile = mobile.trim();
+      updateData.phone_code = phone_code ?? customer.phone_code ?? "91";
+      updateData.mobile_verified_at = new Date();
+    }
+
+    // Password — hash only if provided
+    if (password) {
+      updateData.password = await generalHelper.bcryptMake(password);
+    }
+
+    // ── Apply update ──────────────────────────────────────────────────────────
+    const updatedCustomer = await User.findByIdAndUpdate(
       _id,
       { $set: updateData },
-      { new: true }
+      { new: true },
     );
 
-    // Success Response
-    res.status(200).json({
+    return res.status(200).json({
       status: "success",
-      message: req.__("Category updated successfully"),
-      data: new CategoryResource(updatedCategory).exec(),
+      message: req.__("Customer updated successfully"),
+      data: new UserResource(updatedCustomer).exec(),
     });
   } catch (error) {
     next(error);
