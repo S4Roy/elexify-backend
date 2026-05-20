@@ -6,7 +6,9 @@ import OrderResource from "../../../../resources/OrderResource.js";
 export const list = async (req, res, next) => {
   try {
     const user_id = req.auth?.user_id || null;
-
+    if (!user_id) {
+      throw StatusError.unauthorized(req.__("Unauthorized"));
+    }
     const {
       page = 1,
       limit = envs.pagination.limit,
@@ -28,11 +30,11 @@ export const list = async (req, res, next) => {
     const matchFilter = {
       deleted_at: null,
     };
-    if (req.auth.role == "customer") {
-      matchFilter.user = new mongoose.Types.ObjectId(user_id);
-    }
+    // if (req.auth.role == "customer") {
+    matchFilter.user = new mongoose.Types.ObjectId(user_id);
+    // }
 
-    if (slug) matchFilter.slug = slug;
+    // if (slug) matchFilter.slug = slug;
     if (_id) matchFilter._id = new mongoose.Types.ObjectId(_id);
     if (order_status) matchFilter.order_status = order_status;
     if (search_key) {
@@ -503,7 +505,7 @@ export const list = async (req, res, next) => {
         },
         {
           $replaceRoot: { newRoot: "$doc" },
-        }
+        },
       );
       const result = await Order.aggregate(pipeline);
       if (!result.length) throw StatusError.notFound(req.__("Order not found"));
@@ -519,7 +521,7 @@ export const list = async (req, res, next) => {
     res.status(200).json({
       status: "success",
       message: req.__(
-        `${slug || _id ? "Details" : "List"} fetched successfully`
+        `${slug || _id ? "Details" : "List"} fetched successfully`,
       ),
       data,
     });
