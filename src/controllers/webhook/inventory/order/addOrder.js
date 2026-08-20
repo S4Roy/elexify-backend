@@ -1,9 +1,9 @@
-import mongoose from "mongoose";
 import Order from "../../../../models/Order.js";
 import OrderItem from "../../../../models/OrderItem.js";
 import User from "../../../../models/User.js";
 import Address from "../../../../models/Address.js";
 import Product from "../../../../models/Product.js";
+import ProductVariation from "../../../../models/ProductVariation.js";
 import Country from "../../../../models/Country.js";
 import State from "../../../../models/State.js";
 import City from "../../../../models/City.js";
@@ -37,72 +37,46 @@ export const addOrder = async (req, res, next) => {
       const updatePayload = {
         order_status: status,
       };
+
+      // Some orders were previously persisted with zero matched line items
+      // (see resolveOrderItems below for why) and every retry of this same
+      // webhook used to just no-op the status update forever. If items are
+      // still missing and this payload has some, try to backfill them now.
+      const existingItemCount = await OrderItem.countDocuments({
+        order_id: existingOrder._id,
+      });
+      if (existingItemCount === 0 && Array.isArray(items) && items.length) {
+        const orderItems = await resolveOrderItems(existingOrder._id, items);
+        if (orderItems.length) {
+          await OrderItem.insertMany(orderItems);
+
+          const totalAmount = parseFloat(total ?? 0);
+          const discountAmount = parseFloat(discount ?? 0);
+          const shippingAmount = parseFloat(shipping ?? 0);
+
+          Object.assign(updatePayload, {
+            total_amount: totalAmount - discountAmount - shippingAmount,
+            discount: discountAmount,
+            shipping: shippingAmount,
+            grand_total: totalAmount,
+            item_count: orderItems.length,
+            total_items: orderItems.length,
+          });
+
+          console.log(
+            `✅ Backfilled ${orderItems.length} item(s) for previously-empty order ${order_id}`
+          );
+        } else {
+          console.warn(
+            `⚠️ Order ${order_id} still has no matching products — items remain unresolved`
+          );
+        }
+      }
+
       await Order.updateOne(
         { _id: existingOrder._id },
         { $set: updatePayload }
       );
-      // if (billing_address?.address_1) {
-      //   const { country, state, city } = await findCountryStateCity(
-      //     billing_address
-      //   );
-      //   console.log(
-      //     "billing_address",
-      //     country,
-      //     state,
-      //     city,
-      //     billing_address?.postcode
-      //   );
-      //   const updateBilling = await Address.findByIdAndUpdate(
-      //     existingOrder.billing_address,
-      //     {
-      //       country: country ,
-      //       country_name: billing_address.country || "",
-      //       state: state ,
-      //       state_name: billing_address.state || "",
-      //       city: city ,
-      //       city_name: billing_address.city || "",
-      //       land_mark: billing_address.landmark || "",
-      //       postcode: billing_address.postcode || "",
-      //     },
-      //     { new: true }
-      //   );
-      //   console.log(
-      //     "updateBilling",
-      //     updateBilling?.address_type,
-      //     updateBilling?._id
-      //   );
-      // }
-      // if (shipping_address?.address_1) {
-      //   const { country, state, city } = await findCountryStateCity(
-      //     shipping_address
-      //   );
-      //   console.log(
-      //     "shipping_address ",
-      //     country,
-      //     state,
-      //     city,
-      //     shipping_address?.postcode
-      //   );
-      //   const updateBilling = await Address.findByIdAndUpdate(
-      //     existingOrder.shipping_address,
-      //     {
-      //       country: country ,
-      //       country_name: shipping_address.country || "",
-      //       state: state ,
-      //       state_name: shipping_address.state || "",
-      //       city: city ,
-      //       city_name: shipping_address.city || "",
-      //       land_mark: shipping_address.landmark || "",
-      //       postcode: shipping_address.postcode || "",
-      //     },
-      //     { new: true }
-      //   );
-      //   console.log(
-      //     "updateShipping",
-      //     updateBilling?.address_type,
-      //     updateBilling?._id
-      //   );
-      // }
 
       return res.status(200).json({
         status: "success",
@@ -110,6 +84,7 @@ export const addOrder = async (req, res, next) => {
         data: {
           order_id: existingOrder.id,
           order_status: updatePayload.order_status,
+          items_backfilled: updatePayload.item_count ?? 0,
         },
       });
     }
@@ -248,12 +223,22 @@ export const addOrder = async (req, res, next) => {
         });
       }
     }
+
+    // 🛒 5. Resolve items BEFORE creating the order — an order with zero
+    // resolvable products should never be persisted in the first place
+    // (that's exactly what produced the stuck empty orders the branch
+    // above now has to backfill).
+    const orderItems = await resolveOrderItems(null, items);
+    if (!orderItems.length) {
+      throw new StatusError(400, "No valid products found in the order");
+    }
+
     const totalAmount = parseFloat(total ?? 0);
     const discountAmount = parseFloat(discount ?? 0);
     const shippingAmount = parseFloat(shipping ?? 0);
-
     const sub_total = totalAmount - discountAmount - shippingAmount;
-    // ✅ 5. Create Order first (without products)
+
+    // ✅ 6. Create the order now that we know it has real items
     const order = await Order.create({
       id: order_id,
       user: user._id,
@@ -263,80 +248,26 @@ export const addOrder = async (req, res, next) => {
       order_status: status,
       total_amount: sub_total,
       discount: discountAmount,
-      item_count: items?.length || 0,
+      item_count: orderItems.length,
       shipping: shippingAmount,
       grand_total: totalAmount,
       payment_method,
       transaction_id: `EXT-${order_id}`,
-      total_items: items.length,
+      total_items: orderItems.length,
       is_migrated: true,
       note: "Imported from external source",
+      // Without this the schema default (Date.now, and immutable thereafter)
+      // silently wins and every synced order shows the webhook-processing
+      // time instead of when it was actually placed in WooCommerce.
+      created_at: created_at ? new Date(created_at) : new Date(),
+      updated_at: updated_at ? new Date(updated_at) : null,
     });
 
-    const orderItems = [];
-    const stockTransactions = [];
-
-    for (const item of items) {
-      const productDoc = await Product.findOne({ id: String(item.product_id) });
-      if (!productDoc) {
-        console.warn(`⚠️ Product not found for ID: ${item.product_id}`);
-        continue;
-      }
-
-      const quantity = item.quantity;
-      const unit_price = parseFloat(item.unit_price ?? item.price ?? 0);
-      const total_price = parseFloat(item.subtotal ?? unit_price * quantity);
-      const regular_price = parseFloat(item.regular_price ?? 0);
-      const sale_price = parseFloat(item.sale_price ?? 0);
-
-      // if (productDoc.current_stock < quantity) {
-      //   throw new StatusError(400, `Insufficient stock for ${productDoc.name}`);
-      // }
-
-      // Reduce stock
-      // productDoc.current_stock -= quantity;
-      // await productDoc.save();
-
-      console.log(`🛒 Adding product: ${productDoc.name} x${quantity}`);
-
-      // ✅ Prepare order item document
-      orderItems.push({
-        order_id: order._id,
-        product_id: productDoc._id,
-        quantity,
-        unit_price,
-        total_price,
-        regular_price,
-        sale_price,
-        currency: "INR",
-        exchnage_rate: 1,
-      });
-
-      // 📊 Prepare stock transaction
-      // stockTransactions.push({
-      //   product_id: productDoc._id,
-      //   type: "sale",
-      //   quantity,
-      //   reference_type: "order",
-      //   reference_id: order._id,
-      //   sale_price: unit_price,
-      //   created_by: user._id,
-      // });
-    }
-
-    if (!orderItems.length) {
-      throw new StatusError(400, "No valid products found in the order");
-    }
-
-    // ✅ Save order items
+    for (const item of orderItems) item.order_id = order._id;
     await OrderItem.insertMany(orderItems);
-
-    // ✅ Save stock transactions
-    // await StockTransaction.insertMany(stockTransactions);
 
     console.log(`✅ Order created: ${order.id}`);
     console.log(`📦 Order items added: ${orderItems.length}`);
-    console.log(`📊 Stock transactions logged: ${stockTransactions.length}`);
 
     return res.status(200).json({
       status: "success",
@@ -348,6 +279,71 @@ export const addOrder = async (req, res, next) => {
     next(error);
   }
 };
+
+/**
+ * Match WooCommerce order line items to Elexify Product/ProductVariation
+ * docs by SKU — the only identifier the two systems actually share. The
+ * Product schema has no field for WooCommerce's numeric product_id (there's
+ * no `id`/external-id column on it at all), so the original code's
+ * `Product.findOne({ id: item.product_id })` could never match anything —
+ * every synced order silently ended up with zero items. `sku` is unique on
+ * both Product and ProductVariation, so it's the correct join key; variable
+ * products are matched against ProductVariation first (its own SKU, falling
+ * back to the parent's via WooCommerce's own get_sku() behavior on the
+ * plugin side) so `variation_id` gets populated correctly too.
+ */
+async function resolveOrderItems(orderId, items) {
+  const orderItems = [];
+
+  for (const item of items ?? []) {
+    if (!item?.sku) {
+      console.warn(
+        `⚠️ Order item missing SKU (WC product_id: ${item?.product_id}) — skipped`
+      );
+      continue;
+    }
+
+    const variationDoc = await ProductVariation.findOne({
+      sku: item.sku,
+    }).populate("product_id");
+    const productDoc = variationDoc?.product_id
+      ? variationDoc.product_id
+      : await Product.findOne({ sku: item.sku });
+
+    if (!productDoc) {
+      console.warn(
+        `⚠️ No product/variation found for SKU: ${item.sku} (WC product_id: ${item.product_id})`
+      );
+      continue;
+    }
+
+    const quantity = item.quantity;
+    const unit_price = parseFloat(item.unit_price ?? item.price ?? 0);
+    const total_price = parseFloat(item.subtotal ?? unit_price * quantity);
+    const regular_price = parseFloat(item.regular_price ?? 0);
+    const sale_price = parseFloat(item.sale_price ?? 0);
+
+    console.log(
+      `🛒 Matched product: ${productDoc.name} x${quantity} (sku: ${item.sku})`
+    );
+
+    orderItems.push({
+      order_id: orderId,
+      product_id: productDoc._id,
+      variation_id: variationDoc?._id ?? null,
+      quantity,
+      unit_price,
+      total_price,
+      regular_price,
+      sale_price,
+      currency: "INR",
+      exchnage_rate: 1,
+    });
+  }
+
+  return orderItems;
+}
+
 const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 const normalize = (v) => v?.toString().trim().toLowerCase();
