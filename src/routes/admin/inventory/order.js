@@ -22,5 +22,18 @@ orderRouter.post(
   inventoryController.orderController.add
 );
 orderRouter.get("/stats", inventoryController.orderController.stats);
+orderRouter.get("/trend", inventoryController.orderController.trend);
+orderRouter.get(
+  "/performance",
+  inventoryController.orderController.performance
+);
+orderRouter.get(
+  "/leaderboard",
+  inventoryController.orderController.leaderboard
+);
+orderRouter.get(
+  "/geo-stats",
+  inventoryController.orderController.geoStats
+);
 
 export { orderRouter };

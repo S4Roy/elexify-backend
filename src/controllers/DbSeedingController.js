@@ -1452,7 +1452,7 @@ export const seed = async function (req, resp) {
       },
       {
         slug: "site_tagline",
-        value: "Transform your life with Energized Rudraksha",
+        value: "Your Trusted Source for Electronic Components",
         label: "Site Tagline",
         type: "site_info",
       },
@@ -1481,22 +1481,55 @@ export const seed = async function (req, resp) {
         type: "contact_info",
       },
       {
+        // wa.me-format number (country code + digits, no "+" or spaces) used
+        // to build WhatsApp deep links across the storefront. Kept distinct
+        // from contact_mobile — a WhatsApp Business number doesn't have to
+        // be the same line as the general support number.
+        slug: "whatsapp_number",
+        value: "919064401121",
+        label: "WhatsApp Number (digits only, with country code)",
+        type: "contact_info",
+      },
+      {
+        slug: "social_instagram_url",
+        value: "",
+        label: "Instagram URL",
+        type: "social_links",
+      },
+      {
+        slug: "social_facebook_url",
+        value: "",
+        label: "Facebook URL",
+        type: "social_links",
+      },
+      {
+        slug: "social_youtube_url",
+        value: "",
+        label: "YouTube URL",
+        type: "social_links",
+      },
+      {
         slug: "low_stock_threshold",
         value: "5",
         label: "Low Stock Threshold",
         type: "product_info",
       },
       {
-        slug: "rudraksha_consultation_fee",
-        value: "1500",
-        label: "Rudraksha Consultation Fee",
-        type: "consultation_fee",
+        // Editable from the admin Settings screen so marketing can swap the
+        // reel without a code deploy. Seeded blank — the real video must be
+        // uploaded via the Media picker and this value set to the resulting
+        // CDN URL.
+        slug: "homepage_video_url",
+        value: "",
+        label: "Homepage Video URL",
+        type: "homepage",
       },
       {
-        slug: "astro_consultation_fee",
-        value: "1500",
-        label: "Astro Consultation Fee",
-        type: "consultation_fee",
+        // Poster frame shown before playback / for reduced-motion users.
+        slug: "homepage_video_poster_url",
+        value: "",
+        label: "Homepage Video Poster Image",
+        type: "homepage",
       },
     ];
 

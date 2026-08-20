@@ -145,5 +145,9 @@
 	"Customer updated successfully": "Customer updated successfully",
 	"Your account has been blocked. Please contact support.": "Your account has been blocked. Please contact support.",
 	"Customer activated successfully": "Customer activated successfully",
-	"Usage fetched successfully": "Usage fetched successfully"
+	"Usage fetched successfully": "Usage fetched successfully",
+	"Order trend fetched successfully": "Order trend fetched successfully",
+	"Order performance fetched successfully": "Order performance fetched successfully",
+	"Leaderboard fetched successfully": "Leaderboard fetched successfully",
+	"Geo stats fetched successfully": "Geo stats fetched successfully"
 }

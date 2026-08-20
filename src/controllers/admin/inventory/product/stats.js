@@ -4,6 +4,7 @@ import Category from "../../../../models/Category.js";
 import User from "../../../../models/User.js";
 import SiteSetting from "../../../../models/SiteSetting.js";
 import Order from "../../../../models/Order.js"; // ✅ Import order model
+import { dashboardHelper } from "../../../../helpers/index.js";
 
 export const stats = async (req, res, next) => {
   try {
@@ -15,6 +16,22 @@ export const stats = async (req, res, next) => {
     const LOW_STOCK_THRESHOLD = lowStockSetting?.value
       ? parseInt(lowStockSetting.value, 10)
       : 5;
+
+    // Customer count: scoped to signups within from/to when supplied (same
+    // resolveDateRange standard as order/stats and order/trend), falling
+    // back to the all-time count so existing callers keep working unchanged.
+    const { from, to } = req.query;
+    const customerMatch = {
+      deleted_at: null,
+      role: "customer",
+      status: "active",
+    };
+    if (from || to) {
+      const { startDate, endDate } = dashboardHelper.resolveDateRange(
+        req.query
+      );
+      customerMatch.created_at = { $gte: startDate, $lte: endDate };
+    }
 
     const [
       simple_stats,
@@ -85,18 +102,15 @@ export const stats = async (req, res, next) => {
       Category.countDocuments({ deleted_at: null, status: "active" }),
 
       // Customer count
-      User.countDocuments({
-        deleted_at: null,
-        role: "customer",
-        status: "active",
-      }),
+      User.countDocuments(customerMatch),
 
       // ✅ Total orders count
       Order.countDocuments({ deleted_at: null }),
 
-      // ✅ Total revenue (only paid orders)
+      // ✅ Total revenue (see helpers/dashboard/revenueMatch.js for why this
+      // isn't payment_status === "paid")
       Order.aggregate([
-        { $match: { payment_status: "paid", deleted_at: null } },
+        { $match: { deleted_at: null, ...dashboardHelper.revenueStatusMatch } },
         { $group: { _id: null, total: { $sum: "$grand_total" } } },
       ]),
     ]);
@@ -107,6 +121,8 @@ export const stats = async (req, res, next) => {
       data: {
         simple_stats,
         variable_stats,
+        simple_products: simple_stats[0]?.total?.[0]?.count || 0,
+        variable_products: variable_count,
         total_products:
           (simple_stats[0]?.total?.[0]?.count || 0) + variable_count,
         low_stock:

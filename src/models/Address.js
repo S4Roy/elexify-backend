@@ -76,6 +76,12 @@ const AddressSchema = new Schema(
   },
   { versionKey: false }
 );
+// Indexes — both were entirely missing, which meant every $lookup joining
+// into this collection by user or by state (dashboard geo stats, order
+// creation's address resolution, etc.) fell back to a full collection scan.
+AddressSchema.index({ user: 1 });
+AddressSchema.index({ state: 1 });
+
 // Apply pagination plugin
 AddressSchema.plugin(mongooseAggregatePaginate);
 

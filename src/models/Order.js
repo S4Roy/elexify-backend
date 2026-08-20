@@ -92,6 +92,11 @@ const OrderSchema = new Schema(
 OrderSchema.index({ user: 1, created_at: -1 });
 OrderSchema.index({ order_status: 1 });
 OrderSchema.index({ "products.product": 1 });
+// Matches the {deleted_at, created_at range} $match every dashboard
+// endpoint (trend/performance/leaderboard/geo-stats) opens with — without
+// this they fell back to a full collection scan of every order.
+OrderSchema.index({ deleted_at: 1, created_at: -1 });
+OrderSchema.index({ billing_address: 1 });
 
 // Apply pagination plugin
 OrderSchema.plugin(mongooseAggregatePaginate);
