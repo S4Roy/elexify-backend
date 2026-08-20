@@ -14,6 +14,10 @@ mediaRouter.get(
 
 mediaRouter.post("/add", mediaValidation.add, mediaController.add);
 
+mediaRouter.put("/edit", mediaValidation.edit, mediaController.edit);
+
 mediaRouter.delete("/delete", mediaValidation.remove, mediaController.remove);
+
+mediaRouter.get("/:id/usage", mediaValidation.usage, mediaController.usage);
 
 export { mediaRouter };

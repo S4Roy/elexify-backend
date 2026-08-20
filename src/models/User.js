@@ -27,7 +27,6 @@ const UserSchema = new Schema(
       type: String,
       required: false,
       // no default: null — omit field entirely for mobile-only users
-      // sparse index only excludes MISSING fields in MongoDB 7.0, not null values
       lowercase: true,
       trim: true,
     },
@@ -112,12 +111,38 @@ const UserSchema = new Schema(
   { versionKey: false },
 );
 
-// ── Indexes — defined here only (not on field) to ensure sparse is respected ──
-// email: unique per real email, null values excluded (mobile-only users allowed)
-UserSchema.index({ email: 1 }, { unique: true, sparse: true });
+// ── Indexes — partial indexes, NOT sparse ─────────────────────────────────
+// sparse only excludes documents missing the field; it still indexes an
+// explicit `null` value, so two docs with email: null collide on the
+// unique index (E11000, keyValue: { email: null }). A partialFilterExpression
+// with $type excludes null (and missing) values from the index entirely.
 
-// mobile: unique per phone_code+mobile combo, null values excluded
-UserSchema.index({ phone_code: 1, mobile: 1 }, { unique: true, sparse: true });
+// email: unique per real email among non-deleted users. null/missing email
+// excluded (mobile-only users allowed); soft-deleted users excluded so a
+// deleted account never blocks a real user from claiming that email later.
+UserSchema.index(
+  { email: 1 },
+  {
+    unique: true,
+    partialFilterExpression: {
+      email: { $type: "string" },
+      deleted_at: null,
+    },
+  },
+);
+
+// mobile: unique per phone_code+mobile combo among non-deleted users.
+UserSchema.index(
+  { phone_code: 1, mobile: 1 },
+  {
+    unique: true,
+    partialFilterExpression: {
+      phone_code: { $type: "string" },
+      mobile: { $type: "string" },
+      deleted_at: null,
+    },
+  },
+);
 
 UserSchema.plugin(mongooseAggregatePaginate);
 

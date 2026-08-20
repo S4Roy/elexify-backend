@@ -1,6 +1,7 @@
 import path, { resolve, dirname } from "path";
 import express from "express";
 import cors from "cors";
+import helmet from "helmet";
 import basicAuth from "express-basic-auth";
 import bearerToken from "express-bearer-token";
 import swaggerUi from "swagger-ui-express";
@@ -29,6 +30,7 @@ import { v1WebhookRouter } from "./routes/webhook/index.js";
 // import indexRoutes from "./routes/index.js";
 import { fileURLToPath } from "url";
 import { envs } from "./config/index.js";
+import { buildAllowedOrigins, buildCorsOptions } from "./config/corsOptions.js";
 import { errors } from "celebrate";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -41,6 +43,17 @@ i18n.configure({
   objectNotation: true,
 });
 const app = express();
+
+// Production runs behind a reverse proxy that sets X-Forwarded-For.
+// Without this, Express doesn't trust that header, so express-rate-limit
+// can't safely resolve the real client IP — it refuses to guess (rather
+// than either rate-limiting the proxy's IP for everyone, or blindly
+// trusting a header a client could spoof to dodge rate limits) and throws
+// ERR_ERL_UNEXPECTED_X_FORWARDED_FOR instead. `1` trusts exactly one hop
+// (the immediate proxy) — the standard setting for a single reverse proxy
+// (nginx, a platform load balancer) in front of the app. Increase this if
+// there's more than one proxy layer between the client and this server.
+app.set("trust proxy", 1);
 
 app.use(i18n.init); // ✅ Middleware for translations
 // // Global Configuration
@@ -65,12 +78,35 @@ app.use(i18n.init); // ✅ Middleware for translations
 
 // Initialize Express App
 
+// Security headers on every response (CSP disabled — the admin panel's
+// Swagger UI and various inline assets aren't set up for it, and getting a
+// CSP wrong silently breaks pages rather than failing loudly).
+app.use(helmet({ contentSecurityPolicy: false }));
+
 // Serve Static Files
+// helmet's default Cross-Origin-Resource-Policy: same-origin blocks these
+// from being embedded (<img>, iframe, etc.) from any other origin —
+// including our own admin panel on a different subdomain. These assets
+// (uploaded media, product images) are meant to be publicly embeddable
+// anywhere, so relax CORP for this route specifically rather than
+// weakening it for the API as a whole.
+app.use("/public", (req, res, next) => {
+  res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
+  next();
+});
 app.use("/public", express.static(path.join(__dirname, "../public")));
 app.use(morganConf);
 
-// Initialize CORS
-app.use(cors());
+// Initialize CORS — restricted to the known first-party frontends (site,
+// admin panel, local dev) instead of reflecting every origin.
+const allowedOrigins = buildAllowedOrigins(
+  "http://localhost:4200",
+  "http://localhost:3000",
+  "http://localhost:5173",
+  "https://www.elexify.online",
+  "https://elexify.baseweb.in",
+);
+app.use(cors(buildCorsOptions(allowedOrigins)));
 app.use(express.json({ limit: "5mb" }));
 app.use(express.urlencoded({ limit: "5mb", extended: true }));
 app.use(fileUpload());
@@ -114,6 +150,7 @@ cron.schedule("0 */6 * * *", async () => {
 
 app.use(
   `${envs.basePath}/api/v1/auth`,
+  middleware.authRateLimiter,
   middleware.accessTokenIfAny,
   v1AuthRouter,
 );
@@ -123,6 +160,7 @@ app.use(
   `${envs.basePath}/api/v1/admin`,
   middleware.validateApiKey,
   middleware.validateAccessToken,
+  middleware.userAdminAccessControl,
   v1AdminRouter,
 );
 app.use(

@@ -144,5 +144,6 @@
 	"OTP has expired": "OTP has expired",
 	"Customer updated successfully": "Customer updated successfully",
 	"Your account has been blocked. Please contact support.": "Your account has been blocked. Please contact support.",
-	"Customer activated successfully": "Customer activated successfully"
+	"Customer activated successfully": "Customer activated successfully",
+	"Usage fetched successfully": "Usage fetched successfully"
 }

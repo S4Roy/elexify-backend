@@ -18,6 +18,10 @@ export const list = async (req, res, next) => {
       search_key = "",
       sort_by = "created_at",
       sort_order = -1,
+      status = null,
+      type = null,
+      from_date = null,
+      to_date = null,
     } = req.query;
 
     const slug = null;
@@ -35,6 +39,21 @@ export const list = async (req, res, next) => {
         { email: { $regex: ".*" + search_key + ".*", $options: "i" } },
         { phone: { $regex: ".*" + search_key + ".*", $options: "i" } },
       ];
+    }
+    if (status) {
+      matchFilter.status = { $in: status.split(",") };
+    }
+    if (type) {
+      matchFilter.type = { $in: type.split(",") };
+    }
+    if (from_date || to_date) {
+      matchFilter.created_at = {};
+      if (from_date) matchFilter.created_at.$gte = new Date(from_date);
+      if (to_date) {
+        const end = new Date(to_date);
+        end.setHours(23, 59, 59, 999);
+        matchFilter.created_at.$lte = end;
+      }
     }
     const pipeline = [{ $match: matchFilter }];
     let data;

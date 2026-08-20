@@ -19,6 +19,7 @@ export const list = async (req, res, next) => {
       sort_by = "created_at",
       sort_order = -1,
       slug: querySlug = null, // alias to avoid name collision
+      status = null,
     } = req.query;
     const { slug: paramSlug = null } = req.params;
 
@@ -32,6 +33,9 @@ export const list = async (req, res, next) => {
     let matchFilter = { deleted_at: null };
     if (slug) {
       matchFilter.slug = slug;
+    }
+    if (status) {
+      matchFilter.status = { $in: status.split(",") };
     }
 
     if (search_key) {

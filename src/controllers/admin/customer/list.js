@@ -20,6 +20,11 @@ export const list = async (req, res, next) => {
       sort_order = -1,
       parent_brand = null,
       slug: querySlug = null, // alias to avoid name collision
+      status = null,
+      from_date = null,
+      to_date = null,
+      email_verified = null,
+      mobile_verified = null,
     } = req.query;
     const { slug: paramSlug = null } = req.params;
 
@@ -38,6 +43,26 @@ export const list = async (req, res, next) => {
         { email: { $regex: ".*" + search_key + ".*", $options: "i" } },
         { mobile: { $regex: ".*" + search_key + ".*", $options: "i" } },
       ];
+    }
+    if (status) {
+      matchFilter.status = { $in: status.split(",") };
+    }
+    if (from_date || to_date) {
+      matchFilter.created_at = {};
+      if (from_date) matchFilter.created_at.$gte = new Date(from_date);
+      if (to_date) {
+        const end = new Date(to_date);
+        end.setHours(23, 59, 59, 999);
+        matchFilter.created_at.$lte = end;
+      }
+    }
+    if (email_verified) {
+      matchFilter.email_verified_at =
+        email_verified === "yes" ? { $ne: null } : null;
+    }
+    if (mobile_verified) {
+      matchFilter.mobile_verified_at =
+        mobile_verified === "yes" ? { $ne: null } : null;
     }
     const pipeline = [{ $match: matchFilter }];
     let data;

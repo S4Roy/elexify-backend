@@ -1,3 +1,3 @@
-import { AWS } from "./awsConfig.js";
+import { s3Client } from "./awsConfig.js";
 
-export { AWS };
+export { s3Client };

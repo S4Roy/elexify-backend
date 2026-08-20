@@ -13,6 +13,7 @@ export const list = celebrate({
       .allow("", null)
       .valid("name", "created_at", "sort_order", "parent_category"),
     type: Joi.string().optional().allow("", null).valid("parent", "sub"),
+    status: Joi.string().optional().allow("", null),
     sort_order: Joi.number().optional().allow(null).valid(-1, 1),
     all: Joi.string()
       .optional()

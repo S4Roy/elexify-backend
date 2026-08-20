@@ -6,6 +6,10 @@ export const list = celebrate({
     limit: Joi.number().optional(),
     _id: Joi.string().optional().allow("", null),
     order_status: Joi.string().optional().allow("", null),
+    payment_status: Joi.string().optional().allow("", null),
+    payment_method: Joi.string().optional().allow("", null),
+    from_date: Joi.string().optional().allow("", null),
+    to_date: Joi.string().optional().allow("", null),
     search_key: Joi.string().optional().allow("", null),
     sort_by: Joi.string()
       .optional()

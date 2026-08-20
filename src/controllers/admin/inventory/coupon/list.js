@@ -23,6 +23,9 @@ export const list = async (req, res, next) => {
       status = null,
       applicable_for = null,
       applicable_scope = null,
+      discount_type = null,
+      from_date = null,
+      to_date = null,
     } = req.query;
 
     const { id: paramId = null } = req.params;
@@ -48,7 +51,9 @@ export const list = async (req, res, next) => {
     }
 
     if (status) {
-      matchFilter.status = status;
+      // Support a comma-separated list (multiselect filter) as well as a
+      // single value, so both "active" and "active,inactive" work.
+      matchFilter.status = { $in: status.split(",") };
     }
 
     if (applicable_for) {
@@ -57,6 +62,24 @@ export const list = async (req, res, next) => {
 
     if (applicable_scope) {
       matchFilter.applicable_scope = applicable_scope;
+    }
+
+    if (discount_type) {
+      matchFilter.discount_type = discount_type;
+    }
+
+    // Validity window filter: return coupons whose active period (start_date
+    // .. end_date) overlaps the requested from_date/to_date range.
+    if (from_date || to_date) {
+      matchFilter.$and = matchFilter.$and || [];
+      if (from_date) {
+        matchFilter.$and.push({ end_date: { $gte: new Date(from_date) } });
+      }
+      if (to_date) {
+        const end = new Date(to_date);
+        end.setHours(23, 59, 59, 999);
+        matchFilter.$and.push({ start_date: { $lte: end } });
+      }
     }
 
     if (search_key) {

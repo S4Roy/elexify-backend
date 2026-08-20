@@ -35,13 +35,20 @@ export const list = celebrate({
       "string.base": "Search key must be a string",
     }),
 
-    status: Joi.string()
+    status: Joi.string().optional().allow("", null).messages({
+      "string.base": "Status must be a string",
+    }),
+
+    discount_type: Joi.string()
       .optional()
       .allow("", null)
-      .valid("active", "inactive")
+      .valid("percentage", "fixed")
       .messages({
-        "any.only": "Status must be either active or inactive",
+        "any.only": "Discount type must be percentage or fixed",
       }),
+
+    from_date: Joi.string().optional().allow("", null),
+    to_date: Joi.string().optional().allow("", null),
 
     sort_by: Joi.string()
       .optional()

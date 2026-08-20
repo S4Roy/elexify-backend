@@ -22,6 +22,7 @@ export const list = async (req, res, next) => {
       parent_classification = null,
       slug: querySlug = null, // alias to avoid name collision
       type = null,
+      status = null,
     } = req.query;
     const { slug: paramSlug = null } = req.params;
 
@@ -66,6 +67,9 @@ export const list = async (req, res, next) => {
       // matchFilter.parent_classification = null;
     }
 
+    if (status) {
+      matchFilter.status = { $in: status.split(",") };
+    }
     if (search_key) {
       matchFilter.$or = [
         { name: { $regex: ".*" + search_key + ".*", $options: "i" } },

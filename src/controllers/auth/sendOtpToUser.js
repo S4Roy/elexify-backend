@@ -4,6 +4,7 @@ import OtpVerification from "../../models/OtpVerification.js";
 import { StatusError } from "../../config/index.js";
 import { smsService, emailService } from "../../services/index.js";
 import { generalHelper } from "../../helpers/index.js";
+import { normalizeMobile } from "../../helpers/mobileHelper.js";
 import { envs } from "../../config/index.js";
 
 const OTP_LENGTH = envs.otp.length || 6;
@@ -36,9 +37,20 @@ export const sendOtpToUser = async (req, res, next) => {
     }
 
     const isEmailMode = !!email;
+
+    // ── Normalize + validate mobile (strip +/country code/spaces) ────────────
+    let normalizedMobile = null;
+    const normalizedPhoneCode = phone_code ?? "91";
+    if (!isEmailMode) {
+      normalizedMobile = normalizeMobile(mobile, normalizedPhoneCode);
+      if (!normalizedMobile) {
+        throw StatusError.badRequest(req.__("Invalid mobile number"));
+      }
+    }
+
     const identifier = isEmailMode
       ? email.trim().toLowerCase()
-      : `${phone_code ?? "91"}${mobile.trim()}`;
+      : `${normalizedPhoneCode}${normalizedMobile}`;
 
     // ── Find user ─────────────────────────────────────────────────────────────
     let user = null;
@@ -50,8 +62,8 @@ export const sendOtpToUser = async (req, res, next) => {
       }).lean();
     } else {
       user = await User.findOne({
-        phone_code: phone_code ?? "91",
-        mobile: mobile.trim(),
+        phone_code: normalizedPhoneCode,
+        mobile: normalizedMobile,
         deleted_at: null,
         role: { $in: ["user", "customer"] },
       }).lean();
@@ -136,7 +148,7 @@ export const sendOtpToUser = async (req, res, next) => {
       identifier,
       ...(isEmailMode
         ? { email: email.trim().toLowerCase() }
-        : { mobile: `${phone_code ?? "91"}${mobile.trim()}` }),
+        : { mobile: normalizedMobile }),
       otp: hashedOtp,
       purpose,
       expires_at: moment().add(OTP_EXPIRY_MINUTES, "minutes").toDate(),

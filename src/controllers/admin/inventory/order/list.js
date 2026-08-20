@@ -15,6 +15,10 @@ export const list = async (req, res, next) => {
       sort_by = "id",
       sort_order = -1,
       _id = null,
+      payment_status = null,
+      payment_method = null,
+      from_date = null,
+      to_date = null,
     } = req.query;
 
     const { slug = null } = req.params;
@@ -35,6 +39,21 @@ export const list = async (req, res, next) => {
     if (slug) matchFilter.slug = slug;
     if (_id) matchFilter._id = new mongoose.Types.ObjectId(_id);
     if (order_status) matchFilter.order_status = order_status;
+    if (payment_status) {
+      matchFilter.payment_status = { $in: payment_status.split(",") };
+    }
+    if (payment_method) {
+      matchFilter.payment_method = { $in: payment_method.split(",") };
+    }
+    if (from_date || to_date) {
+      matchFilter.created_at = {};
+      if (from_date) matchFilter.created_at.$gte = new Date(from_date);
+      if (to_date) {
+        const end = new Date(to_date);
+        end.setHours(23, 59, 59, 999);
+        matchFilter.created_at.$lte = end;
+      }
+    }
     if (search_key) {
       matchFilter.$or = [
         { id: { $regex: search_key, $options: "i" } },

@@ -14,5 +14,6 @@ export const list = celebrate({
       .valid("name", "created_at"),
     type: Joi.string().optional().allow("", null).valid("parent", "sub"),
     sort_order: Joi.number().optional().allow(null).valid(-1, 1),
+    status: Joi.string().optional().allow("", null),
   }),
 });

@@ -1,6 +1,7 @@
 import mongoose from "mongoose";
 import Category from "../../../../models/Category.js";
 import Tag from "../../../../models/Tag.js";
+import Brand from "../../../../models/Brand.js";
 import Classification from "../../../../models/Classification.js";
 import ProductSpecification from "../../../../models/ProductSpecification.js";
 import Product from "../../../../models/Product.js";
@@ -18,9 +19,14 @@ export const list = async (req, res, next) => {
       sort_order = -1,
       _id = null,
       category = null,
+      brand = null,
+      status = null,
+      type = null,
       stock_status = null, // in_stock, low_stock, out_of_stock
       tags = null,
       classifications = null,
+      min_price = null,
+      max_price = null,
       all = "false",
     } = req.query;
     const { slug } = req.params;
@@ -34,6 +40,8 @@ export const list = async (req, res, next) => {
     const matchFilter = { deleted_at: null };
     if (slug) matchFilter.slug = slug;
     if (_id) matchFilter._id = new mongoose.Types.ObjectId(_id);
+    if (status) matchFilter.status = status;
+    if (type) matchFilter.type = type;
     let classificationIds = [];
     if (classifications) {
       const classifications_slugs = classifications
@@ -63,15 +71,29 @@ export const list = async (req, res, next) => {
       }
     }
     if (category) {
-      const existingCategory = await Category.findOne({
-        slug: category,
+      const category_slugs = category.split(",").map((s) => s.trim());
+      const foundCategories = await Category.find({
+        slug: { $in: category_slugs },
         deleted_at: null,
-      }).exec();
-      if (existingCategory) {
+      }).select("_id");
+      if (foundCategories.length) {
+        const categoryIds = foundCategories.map((cat) => cat._id);
         matchFilter.$or = [
-          { categories: existingCategory._id },
-          { sub_categories: existingCategory._id },
+          { categories: { $in: categoryIds } },
+          { sub_categories: { $in: categoryIds } },
         ];
+      }
+    }
+
+    // 🔹 Filter by brand
+    if (brand) {
+      const brand_slugs = brand.split(",").map((s) => s.trim());
+      const foundBrands = await Brand.find({
+        slug: { $in: brand_slugs },
+        deleted_at: null,
+      }).select("_id");
+      if (foundBrands.length) {
+        matchFilter.brand = { $in: foundBrands.map((b) => b._id) };
       }
     }
 
@@ -114,6 +136,27 @@ export const list = async (req, res, next) => {
                     : []),
 
                   // variable products: pass through now; they will be narrowed after $lookup of variations
+                  { type: "variable" },
+                ],
+              },
+            },
+          ]
+        : []),
+      // BEFORE variation lookups — price range
+      ...(min_price || max_price
+        ? [
+            {
+              $match: {
+                $or: [
+                  // simple products: filter here using product.regular_price
+                  {
+                    type: "simple",
+                    regular_price: {
+                      ...(min_price ? { $gte: Number(min_price) } : {}),
+                      ...(max_price ? { $lte: Number(max_price) } : {}),
+                    },
+                  },
+                  // variable products: pass through now; narrowed after $lookup of variations
                   { type: "variable" },
                 ],
               },
@@ -250,6 +293,32 @@ export const list = async (req, res, next) => {
           ]
         : []),
 
+      // Variation price range filter (applies when product is variable)
+      ...(min_price || max_price
+        ? [
+            {
+              $addFields: {
+                variations: {
+                  $filter: {
+                    input: "$variations",
+                    as: "v",
+                    cond: {
+                      $and: [
+                        ...(min_price
+                          ? [{ $gte: ["$$v.regular_price", Number(min_price)] }]
+                          : []),
+                        ...(max_price
+                          ? [{ $lte: ["$$v.regular_price", Number(max_price)] }]
+                          : []),
+                      ],
+                    },
+                  },
+                },
+              },
+            },
+          ]
+        : []),
+
       // Lookup variation attribute values
       {
         $lookup: {
@@ -349,7 +418,7 @@ export const list = async (req, res, next) => {
       },
 
       // ===== NEW STAGE: exclude variable products that have no variations after filtering =====
-      ...(stock_status
+      ...(stock_status || min_price || max_price
         ? [
             {
               $match: {

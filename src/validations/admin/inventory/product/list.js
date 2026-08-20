@@ -6,6 +6,7 @@ export const list = celebrate({
     limit: Joi.number().optional(),
     _id: Joi.string().optional().allow("", null),
     category: Joi.string().optional().allow("", null),
+    brand: Joi.string().optional().allow("", null),
     tags: Joi.string().optional().allow("", null),
     classifications: Joi.string().optional().allow("", null),
     search_key: Joi.string().optional().allow("", null),
@@ -17,6 +18,10 @@ export const list = celebrate({
       .optional()
       .allow("", null)
       .valid("in_stock", "low_stock", "out_of_stock"),
+    status: Joi.string().optional().allow("", null).valid("active", "inactive"),
+    type: Joi.string().optional().allow("", null).valid("simple", "variable"),
+    min_price: Joi.number().optional().allow(null),
+    max_price: Joi.number().optional().allow(null),
     sort_order: Joi.number().optional().allow(null).valid(-1, 1),
     all: Joi.string()
       .optional()

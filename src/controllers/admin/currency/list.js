@@ -19,6 +19,7 @@ export const list = async (req, res, next) => {
       sort_by = "created_at",
       sort_order = -1,
       _id = null,
+      status = null,
     } = req.query;
     const { slug = null } = req.params;
 
@@ -29,6 +30,9 @@ export const list = async (req, res, next) => {
     };
     let matchFilter = { deleted_at: null };
 
+    if (status) {
+      matchFilter.status = { $in: status.split(",") };
+    }
     if (search_key) {
       matchFilter.$or = [
         { name: { $regex: ".*" + search_key + ".*", $options: "i" } },

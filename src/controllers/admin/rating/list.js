@@ -19,6 +19,8 @@ export const list = async (req, res, next) => {
       sort_by = "created_at",
       sort_order = -1,
       _id = null,
+      status = null,
+      rating = null,
     } = req.query;
     const { slug = null } = req.params;
 
@@ -35,6 +37,14 @@ export const list = async (req, res, next) => {
         { code: { $regex: ".*" + search_key + ".*", $options: "i" } },
         { status: { $regex: ".*" + search_key + ".*", $options: "i" } },
       ];
+    }
+    if (status) {
+      matchFilter.status = { $in: status.split(",") };
+    }
+    if (rating) {
+      matchFilter.rating = {
+        $in: rating.split(",").map((r) => Number(r)),
+      };
     }
     const pipeline = [
       { $match: matchFilter },

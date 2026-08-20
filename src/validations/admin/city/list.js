@@ -20,5 +20,6 @@ export const list = celebrate({
         "status"
       ),
     sort_order: Joi.number().optional().allow(null).valid(-1, 1),
+    status: Joi.string().optional().allow("", null),
   }),
 });

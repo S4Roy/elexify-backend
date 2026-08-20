@@ -19,5 +19,6 @@ export const list = celebrate({
       .messages({
         "any.only": "All must be either 'true' or 'false'",
       }),
+    status: Joi.string().optional().allow("", null),
   }),
 });

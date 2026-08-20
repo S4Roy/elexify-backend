@@ -1,37 +1,26 @@
 import { StatusError } from "../config/index.js";
-import { userRoleService } from "../services/index.js";
+
+// Roles allowed to use the admin panel API. "customer", "vendor", and "user"
+// are storefront-side roles and must never reach /api/v1/admin/*.
+const ADMIN_PANEL_ROLES = [
+  "superadmin",
+  "manager",
+  "supervisor",
+  "staff",
+  "operator",
+];
 
 /**
- * This function is used for validating access control for admin end user
+ * Ensures the authenticated user (set by validateAccessToken) holds an
+ * admin-panel role before allowing access to admin routes.
  * @param req
  * @param res
  * @param next
  */
-
-export const userAdminAccessControl = (permission = []) => {
-  return async (req, res, next) => {
-    try {
-      const userId = req.userDetails.userId ? req.userDetails.userId : "";
-      if (!userId) throw StatusError.unauthorized("");
-
-      const userRoleId = req.userDetails.user_role_id ? req.userDetails.user_role_id : "";
-      if (!userRoleId) throw StatusError.unauthorized("");
-
-      const userType = req.userDetails.user_type ? req.userDetails.user_type : "";
-      if (!userType) throw StatusError.unauthorized("");
-      if (userType == "guests" || userType == "users") throw StatusError.unauthorized("");
-
-      if (permission && permission.length > 0) {
-        const checkRole = await userRoleService.checkUserRoleByIds(userId, userRoleId);
-        if (!checkRole) throw StatusError.unauthorized("");
-        // const checkPermission = await userPermissionService.checkPermission(userRoleId, permission);
-        // if (!checkPermission) throw StatusError.unauthorized("");
-        next();
-      } else {
-        throw StatusError.unauthorized("");
-      }
-    } catch (error) {
-      next(error);
-    }
-  };
+export const userAdminAccessControl = (req, res, next) => {
+  const role = req.auth?.role;
+  if (!role || !ADMIN_PANEL_ROLES.includes(role)) {
+    return next(StatusError.forbidden("You are not authorized to access this resource."));
+  }
+  next();
 };

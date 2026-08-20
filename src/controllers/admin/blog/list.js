@@ -21,6 +21,9 @@ export const list = async (req, res, next) => {
       sort_order = -1,
       slug,
       _id,
+      status = null,
+      from_date = null,
+      to_date = null,
     } = req.query;
     const options = {
       page: page,
@@ -33,6 +36,18 @@ export const list = async (req, res, next) => {
     }
     if (_id) {
       matchFilter._id = mongoose.Types.ObjectId(_id);
+    }
+    if (status) {
+      matchFilter.status = { $in: status.split(",") };
+    }
+    if (from_date || to_date) {
+      matchFilter.created_at = {};
+      if (from_date) matchFilter.created_at.$gte = new Date(from_date);
+      if (to_date) {
+        const end = new Date(to_date);
+        end.setHours(23, 59, 59, 999);
+        matchFilter.created_at.$lte = end;
+      }
     }
     let idsArray = [];
 

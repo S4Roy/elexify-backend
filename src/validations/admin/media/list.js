@@ -9,6 +9,8 @@ export const list = celebrate({
     parent_category: Joi.string().optional().allow("", null),
     reference_type: Joi.string().optional().allow("", null),
     search_key: Joi.string().optional().allow("", null),
+    type: Joi.string().optional().allow("", null).valid("image", "video"),
+    unused: Joi.boolean().optional(),
     sort_by: Joi.string()
       .optional()
       .allow("", null)

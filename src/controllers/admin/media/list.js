@@ -3,6 +3,7 @@ import { StatusError } from "../../../config/index.js";
 import { envs } from "../../../config/index.js";
 import MediaResource from "../../../resources/MediaResource.js";
 import mongoose from "mongoose";
+import { getUsedMediaIds } from "../../../helpers/media/getUsedMediaIds.js";
 
 /**
  * Media List
@@ -22,6 +23,8 @@ export const list = async (req, res, next) => {
       id_includes = null,
       slug: querySlug = null, // alias to avoid name collision
       reference_type,
+      type = null,
+      unused = null,
     } = req.query;
     const { slug: paramSlug = null } = req.params;
     let idsArray = [];
@@ -49,6 +52,16 @@ export const list = async (req, res, next) => {
     if (reference_type) {
       matchFilter.reference_type = reference_type;
     }
+    if (type) {
+      matchFilter.type = type;
+    }
+    if (unused === true || unused === "true") {
+      const usedIds = await getUsedMediaIds();
+      matchFilter._id = {
+        ...(matchFilter._id || {}),
+        $nin: [...usedIds].map((id) => new mongoose.Types.ObjectId(id)),
+      };
+    }
     if (querySlug) {
       let existingCategory = await Media.findOne({ slug: querySlug }).exec();
       matchFilter.parent_category = existingCategory?._id;
@@ -61,9 +74,12 @@ export const list = async (req, res, next) => {
       // matchFilter.parent_category = null;
     }
     if (search_key) {
+      const escaped = search_key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
       matchFilter.$or = [
-        { name: { $regex: ".*" + search_key + ".*", $options: "i" } },
-        { slug: { $regex: ".*" + search_key + ".*", $options: "i" } },
+        { name: { $regex: escaped, $options: "i" } },
+        { slug: { $regex: escaped, $options: "i" } },
+        { alt_text: { $regex: escaped, $options: "i" } },
+        { description: { $regex: escaped, $options: "i" } },
       ];
     }
     const pipeline = [{ $match: matchFilter }];

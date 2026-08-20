@@ -21,6 +21,7 @@ export const list = async (req, res, next) => {
       parent_brand = null,
       slug: querySlug = null, // alias to avoid name collision
       all = "false",
+      status = null,
     } = req.query;
     const { slug: paramSlug = null } = req.params;
 
@@ -43,6 +44,9 @@ export const list = async (req, res, next) => {
       matchFilter.parent_brand = new mongoose.Types.ObjectId(parent_brand);
     } else {
       // matchFilter.parent_brand = null;
+    }
+    if (status) {
+      matchFilter.status = { $in: status.split(",") };
     }
     if (search_key) {
       matchFilter.$or = [

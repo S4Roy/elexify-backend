@@ -5,6 +5,7 @@ import UserResource from "../../resources/UserResource.js";
 import { StatusError } from "../../config/index.js";
 import { userService, inventoryService } from "../../services/index.js";
 import { generalHelper } from "../../helpers/index.js";
+import { normalizeMobile } from "../../helpers/mobileHelper.js";
 
 export const verifyUserOtp = async (req, res, next) => {
   try {
@@ -21,10 +22,19 @@ export const verifyUserOtp = async (req, res, next) => {
     const guest_id = req.auth?.guest_id || null;
     const isEmailMode = !!email;
 
+    // ── Normalize + validate mobile — identical logic to sendOtpToUser ───────
+    let normalizedMobile = null;
+    if (!isEmailMode) {
+      normalizedMobile = normalizeMobile(mobile, phone_code);
+      if (!normalizedMobile) {
+        throw StatusError.badRequest(req.__("Invalid mobile number"));
+      }
+    }
+
     // ── identifier — same logic as sendOtpToUser ──────────────────────────────
     const identifier = isEmailMode
       ? email.trim().toLowerCase()
-      : `${phone_code}${mobile.trim()}`;
+      : `${phone_code}${normalizedMobile}`;
 
     // ── Fetch OTP record by identifier ────────────────────────────────────────
     const otpRecord = await OtpVerification.findOne({
@@ -63,7 +73,7 @@ export const verifyUserOtp = async (req, res, next) => {
     } else {
       user = await User.findOne({
         phone_code,
-        mobile: mobile.trim(),
+        mobile: normalizedMobile,
         deleted_at: null,
         role: { $in: ["user", "customer"] },
       });
@@ -82,7 +92,7 @@ export const verifyUserOtp = async (req, res, next) => {
         ...(isEmailMode
           ? { email: email.trim().toLowerCase(), email_verified_at: new Date() }
           : {
-              mobile: mobile.trim(),
+              mobile: normalizedMobile,
               phone_code,
               mobile_verified_at: new Date(),
             }),

@@ -22,6 +22,7 @@ export const list = async (req, res, next) => {
       parent_category = null,
       slug: querySlug = null, // alias to avoid name collision
       type = null,
+      status = null,
     } = req.query;
     const { slug: paramSlug = null } = req.params;
 
@@ -66,6 +67,9 @@ export const list = async (req, res, next) => {
         { name: { $regex: ".*" + search_key + ".*", $options: "i" } },
         { slug: { $regex: ".*" + search_key + ".*", $options: "i" } },
       ];
+    }
+    if (status) {
+      matchFilter.status = { $in: status.split(",") };
     }
     const pipeline = [
       { $match: matchFilter },

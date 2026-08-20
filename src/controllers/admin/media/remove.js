@@ -1,12 +1,12 @@
 import Media from "../../../models/Media.js";
 import { StatusError } from "../../../config/index.js";
 import MediaResource from "../../../resources/MediaResource.js";
+import { getMediaUsage } from "../../../helpers/media/getMediaUsage.js";
 
 /**
- * Edit Media
- * @param req
- * @param res
- * @param next
+ * Soft-delete Media — only allowed while the item isn't referenced by any
+ * live Product/Category/Blog/etc. document. A daily cron permanently purges
+ * (S3 + DB) anything left soft-deleted past the retention window.
  */
 export const remove = async (req, res, next) => {
   try {
@@ -20,6 +20,19 @@ export const remove = async (req, res, next) => {
     const media = await Media.findById(_id).exec();
     if (!media) {
       throw StatusError.notFound(req.__("Media not found"));
+    }
+
+    const usage = await getMediaUsage(media._id, { limit: 5 });
+    if (usage.length) {
+      const preview = usage
+        .slice(0, 3)
+        .map((u) => `${u.type}: ${u.label || "Untitled"}`)
+        .join(", ");
+      throw StatusError.badRequest(
+        req.__(
+          `Cannot delete — this media is still used in ${usage.length} place(s) (${preview}${usage.length > 3 ? ", ..." : ""}). Remove those references first.`
+        )
+      );
     }
 
     // Prepare update data
