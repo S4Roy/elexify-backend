@@ -106,6 +106,7 @@ const allowedOrigins = buildAllowedOrigins(
   "https://www.elexify.online",
   "https://elexify.baseweb.in",
   "https://inventory.elexify.online",
+  "https://api.elexify.online",
 );
 app.use(cors(buildCorsOptions(allowedOrigins)));
 app.use(express.json({ limit: "5mb" }));
