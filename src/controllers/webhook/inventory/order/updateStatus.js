@@ -5,21 +5,46 @@ import Address from "../../../../models/Address.js";
 import { StatusError } from "../../../../config/index.js";
 import mongoose from "mongoose";
 import { zohoService } from "../../../../services/index.js";
+import { derivePaymentStatus } from "../../../../helpers/order/derivePaymentStatus.js";
 
 export const updateStatus = async (req, res, next) => {
   try {
     let data = {};
-    const { order_id, status } = req.body;
+    const { order_id, status, transaction_id, payment_meta } = req.body;
+
+    const updateFields = {
+      order_status: status,
+      payment_status: derivePaymentStatus(status),
+    };
+    // Only overwrite with real values — don't clobber a good value from
+    // order creation with an empty one if this particular status change
+    // didn't carry gateway meta.
+    if (transaction_id) updateFields.transaction_id = transaction_id;
+    if (payment_meta && Object.keys(payment_meta).length) {
+      updateFields.payment_meta = payment_meta;
+    }
+
     // Find and update the order by external ID
     const orderDoc = await Order.findOneAndUpdate(
       { id: String(order_id) },
-      { order_status: status },
+      updateFields,
       { new: true }
     );
 
     if (!orderDoc) {
       throw new StatusError(404, "Order not found");
     }
+
+    // Stamp paid_at the first time this order flips to paid — the
+    // `paid_at: null` filter makes this a no-op on every later status
+    // change, so the original payment moment is never overwritten.
+    if (updateFields.payment_status === "paid") {
+      await Order.updateOne(
+        { _id: orderDoc._id, paid_at: null },
+        { $set: { paid_at: new Date() } }
+      );
+    }
+
     if (orderDoc.order_status === "processing") {
       const matchFilter = { deleted_at: null };
       matchFilter._id = new mongoose.Types.ObjectId(orderDoc?._id);

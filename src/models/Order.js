@@ -59,7 +59,6 @@ const OrderSchema = new Schema(
       required: false,
     },
     transaction_id: { type: String },
-    payment_status: { type: String },
     payment_meta: { type: Object, default: {} }, // optional Razorpay response etc.
 
     coupon_code: { type: String },

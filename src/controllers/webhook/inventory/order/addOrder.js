@@ -9,6 +9,7 @@ import State from "../../../../models/State.js";
 import City from "../../../../models/City.js";
 import { StatusError } from "../../../../config/index.js";
 import { zohoService } from "../../../../services/index.js";
+import { derivePaymentStatus } from "../../../../helpers/order/derivePaymentStatus.js";
 
 export const addOrder = async (req, res, next) => {
   try {
@@ -25,6 +26,8 @@ export const addOrder = async (req, res, next) => {
       billing_address,
       shipping_address,
       payment_method,
+      transaction_id,
+      payment_meta,
       items,
     } = req.body;
 
@@ -36,7 +39,14 @@ export const addOrder = async (req, res, next) => {
       console.warn(`⚠️ Duplicate order attempt: ${order_id}`);
       const updatePayload = {
         order_status: status,
+        payment_status: derivePaymentStatus(status),
       };
+      // Only overwrite with real values — a retry that couldn't find
+      // gateway meta this time shouldn't clobber a good value from before.
+      if (transaction_id) updatePayload.transaction_id = transaction_id;
+      if (payment_meta && Object.keys(payment_meta).length) {
+        updatePayload.payment_meta = payment_meta;
+      }
 
       // Some orders were previously persisted with zero matched line items
       // (see resolveOrderItems below for why) and every retry of this same
@@ -77,6 +87,16 @@ export const addOrder = async (req, res, next) => {
         { _id: existingOrder._id },
         { $set: updatePayload }
       );
+
+      // Stamp paid_at the first time this order flips to paid — the
+      // `paid_at: null` filter means this is a no-op on every later status
+      // update, so an order's original payment moment is never overwritten.
+      if (updatePayload.payment_status === "paid") {
+        await Order.updateOne(
+          { _id: existingOrder._id, paid_at: null },
+          { $set: { paid_at: new Date() } }
+        );
+      }
 
       return res.status(200).json({
         status: "success",
@@ -239,12 +259,13 @@ export const addOrder = async (req, res, next) => {
     const sub_total = totalAmount - discountAmount - shippingAmount;
 
     // ✅ 6. Create the order now that we know it has real items
+    const orderPaymentStatus = derivePaymentStatus(status);
     const order = await Order.create({
       id: order_id,
       user: user._id,
       billing_address: billingAddress?._id ?? null,
       shipping_address: shippingAddress?._id ?? null,
-      payment_status: "pending",
+      payment_status: orderPaymentStatus,
       order_status: status,
       total_amount: sub_total,
       discount: discountAmount,
@@ -252,7 +273,12 @@ export const addOrder = async (req, res, next) => {
       shipping: shippingAmount,
       grand_total: totalAmount,
       payment_method,
-      transaction_id: `EXT-${order_id}`,
+      // Real gateway transaction id when the plugin sent one (e.g. the
+      // Razorpay payment id via WooCommerce's own get_transaction_id());
+      // fall back to a synthetic id so the field is never blank.
+      transaction_id: transaction_id || `EXT-${order_id}`,
+      payment_meta: payment_meta && Object.keys(payment_meta).length ? payment_meta : {},
+      paid_at: orderPaymentStatus === "paid" ? new Date() : null,
       total_items: orderItems.length,
       is_migrated: true,
       note: "Imported from external source",
@@ -293,22 +319,37 @@ export const addOrder = async (req, res, next) => {
  * plugin side) so `variation_id` gets populated correctly too.
  */
 async function resolveOrderItems(orderId, items) {
+  const validItems = (items ?? []).filter((item) => {
+    if (item?.sku) return true;
+    console.warn(
+      `⚠️ Order item missing SKU (WC product_id: ${item?.product_id}) — skipped`
+    );
+    return false;
+  });
+
+  if (!validItems.length) return [];
+
+  const skus = [...new Set(validItems.map((item) => item.sku))];
+
+  // Batched instead of one findOne() per item (previously up to 2N
+  // sequential round trips for an N-item order) — matches this codebase's
+  // existing $in + in-memory-map convention (see
+  // controllers/admin/inventory/product/add.js's Media.find({ $in })).
+  const [variations, products] = await Promise.all([
+    ProductVariation.find({ sku: { $in: skus } }).populate("product_id"),
+    Product.find({ sku: { $in: skus } }),
+  ]);
+
+  const variationBySku = new Map(variations.map((v) => [v.sku, v]));
+  const productBySku = new Map(products.map((p) => [p.sku, p]));
+
   const orderItems = [];
 
-  for (const item of items ?? []) {
-    if (!item?.sku) {
-      console.warn(
-        `⚠️ Order item missing SKU (WC product_id: ${item?.product_id}) — skipped`
-      );
-      continue;
-    }
-
-    const variationDoc = await ProductVariation.findOne({
-      sku: item.sku,
-    }).populate("product_id");
+  for (const item of validItems) {
+    const variationDoc = variationBySku.get(item.sku);
     const productDoc = variationDoc?.product_id
       ? variationDoc.product_id
-      : await Product.findOne({ sku: item.sku });
+      : productBySku.get(item.sku);
 
     if (!productDoc) {
       console.warn(
