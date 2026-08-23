@@ -118,6 +118,18 @@ export const details = async (req, res, next) => {
         },
       },
 
+      // shipping class
+      {
+        $lookup: {
+          from: "shipping_classes",
+          localField: "shipping_class",
+          foreignField: "_id",
+          pipeline: [{ $project: { _id: 1, name: 1, slug: 1 } }],
+          as: "shipping_class",
+        },
+      },
+      { $unwind: { path: "$shipping_class", preserveNullAndEmptyArrays: true } },
+
       // classifications (sorted)
       {
         $lookup: {

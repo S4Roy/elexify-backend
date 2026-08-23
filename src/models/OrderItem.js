@@ -24,6 +24,7 @@ const OrderItemSchema = new Schema(
     total_price: { type: Number, required: true },
     regular_price: { type: Number },
     sale_price: { type: Number },
+    discount_percent: { type: Number, default: null }, // Quantity-tier discount percent applied
     currency: { type: String, default: "INR" },
     exchnage_rate: { type: Number, default: 1 },
   },

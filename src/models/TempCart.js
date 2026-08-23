@@ -30,6 +30,7 @@ const TempCartSchema = new Schema(
     // ✅ Add these
     price: { type: Number, required: true }, // Price per unit at the time of addition
     discounted_price: { type: Number, default: null }, // Optional: if a discount applies
+    discount_percent: { type: Number, default: null }, // Quantity-tier discount percent applied
 
     deleted_at: { type: Date, default: null }, // ✅ Soft delete flag
   },

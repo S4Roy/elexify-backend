@@ -30,18 +30,22 @@ const CartSchema = new Schema(
     // ✅ Add these
     price: { type: Number, required: true }, // Price per unit at the time of addition
     discounted_price: { type: Number, default: null }, // Optional: if a discount applies
+    discount_percent: { type: Number, default: null }, // Quantity-tier discount percent applied, for display/audit
 
     deleted_at: { type: Date, default: null }, // ✅ Soft delete flag
   },
   { timestamps: true },
 );
 
+// MongoDB partial-index filters only support a restricted operator set —
+// $ne/$not are rejected ("Expression not supported in partial index"), so
+// "not null" has to be expressed as $type instead of $exists + $ne.
 CartSchema.index(
   { user: 1, product: 1, variation: 1 },
   {
     unique: true,
     partialFilterExpression: {
-      user: { $exists: true, $ne: null },
+      user: { $type: "objectId" },
     },
   },
 );
@@ -51,7 +55,7 @@ CartSchema.index(
   {
     unique: true,
     partialFilterExpression: {
-      guest_id: { $exists: true, $ne: null },
+      guest_id: { $type: "string" },
     },
   },
 );

@@ -17,6 +17,18 @@ import * as enquiryValidation from "./enquiry/index.js";
 import * as countryValidation from "./country/index.js";
 import * as stateValidation from "./state/index.js";
 import * as cityValidation from "./city/index.js";
+import {
+  shippingClassValidation,
+  shippingZoneValidation,
+  shippingRateValidation,
+  shippingSettingsValidation,
+} from "./shipping/index.js";
+import { seoProductValidation, seoSettingsValidation } from "./seo/index.js";
+import * as homeValidation from "./home/index.js";
+import * as topBarValidation from "./topbar/index.js";
+import * as headerConfigValidation from "./header-config/index.js";
+import * as navigationMenuValidation from "./navigation-menu/index.js";
+import * as navigationMenuItemValidation from "./navigation-menu-item/index.js";
 
 export {
   inventoryValidation,
@@ -38,4 +50,15 @@ export {
   countryValidation,
   stateValidation,
   cityValidation,
+  shippingClassValidation,
+  shippingZoneValidation,
+  shippingRateValidation,
+  shippingSettingsValidation,
+  seoProductValidation,
+  seoSettingsValidation,
+  homeValidation,
+  topBarValidation,
+  headerConfigValidation,
+  navigationMenuValidation,
+  navigationMenuItemValidation,
 };

@@ -11,6 +11,10 @@ import * as paymentService from "./paymentService/index.js";
 import * as shiprocket from "./shiprocket/index.js";
 import * as zohoService from "./zoho/index.js";
 import * as smsService from "./sms/index.js";
+import * as shippingService from "./shipping/index.js";
+import * as seoService from "./seo/index.js";
+import * as homepageService from "./homepage/index.js";
+import * as navigationService from "./navigation/index.js";
 
 export {
   userService,
@@ -24,4 +28,8 @@ export {
   shiprocket,
   zohoService,
   smsService,
+  shippingService,
+  seoService,
+  homepageService,
+  navigationService,
 };

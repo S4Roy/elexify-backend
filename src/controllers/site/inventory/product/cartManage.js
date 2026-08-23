@@ -2,6 +2,7 @@ import Cart from "../../../../models/Cart.js";
 import Product from "../../../../models/Product.js";
 import ProductVariation from "../../../../models/ProductVariation.js";
 import { StatusError } from "../../../../config/index.js";
+import { inventoryService } from "../../../../services/index.js";
 
 export const cartManage = async (req, res, next) => {
   try {
@@ -20,7 +21,7 @@ export const cartManage = async (req, res, next) => {
 
     // 🔹 Fetch product (lightweight)
     const product = await Product.findById(product_id)
-      .select("type stock_quantity regular_price sale_price")
+      .select("type stock_quantity regular_price sale_price quantity_discounts")
       .lean();
 
     if (!product) {
@@ -85,6 +86,20 @@ export const cartManage = async (req, res, next) => {
       );
     }
 
+    // 🔹 Apply quantity-based discount tiers (product-level) on top of the current price
+    let discount_percent = null;
+    if (Array.isArray(product.quantity_discounts) && product.quantity_discounts.length) {
+      const tierResult = inventoryService.cartService.calculateQuantityDiscount({
+        basePrice: discounted_price ?? price,
+        quantity,
+        tiers: product.quantity_discounts,
+      });
+      if (tierResult.discountPercent > 0) {
+        discounted_price = tierResult.unitPrice;
+        discount_percent = tierResult.discountPercent;
+      }
+    }
+
     // 🔹 Remove case
     if (quantity <= 0) {
       if (existingCart && !existingCart.deleted_at) {
@@ -106,6 +121,7 @@ export const cartManage = async (req, res, next) => {
       existingCart.quantity = quantity;
       existingCart.price = price;
       existingCart.discounted_price = discounted_price;
+      existingCart.discount_percent = discount_percent;
       await existingCart.save();
 
       return res.status(200).json({
@@ -125,6 +141,7 @@ export const cartManage = async (req, res, next) => {
       quantity,
       price,
       discounted_price,
+      discount_percent,
     });
 
     return res.status(200).json({

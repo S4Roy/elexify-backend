@@ -35,6 +35,7 @@ export const add = async (req, res, next) => {
       width,
       height,
       shipping_class,
+      quantity_discounts = [],
       rarity = "",
       power_level = 0,
       regular_price,
@@ -54,6 +55,8 @@ export const add = async (req, res, next) => {
       specifications = [],
       ask_for_price,
       enable_enquiry,
+      is_featured,
+      is_bestseller,
     } = req.body;
 
     // 🔹 Slug generation
@@ -109,6 +112,8 @@ export const add = async (req, res, next) => {
       slug,
       ask_for_price,
       enable_enquiry,
+      is_featured,
+      is_bestseller,
       description: description || null,
       short_description: short_description || null,
       brand,
@@ -121,7 +126,8 @@ export const add = async (req, res, next) => {
       seo: seo._id,
       weight,
       dimensions: { length, width, height },
-      shipping_class,
+      shipping_class: shipping_class || null,
+      quantity_discounts,
       regular_price: product_type === "simple" ? regular_price : undefined,
       sale_price: product_type === "simple" ? sale_price : undefined,
       sale_start_date: product_type === "simple" ? sale_start_date : undefined,

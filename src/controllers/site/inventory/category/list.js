@@ -18,6 +18,7 @@ export const list = async (req, res, next) => {
       parent_category = null, // query param (not used currently)
       type = null, // query param
       parent_category_slug = null, // query param
+      ids = null, // comma-separated category ids (homepage "manual" category sections)
     } = req.query;
 
     const { slug = null } = req.params;
@@ -58,6 +59,18 @@ export const list = async (req, res, next) => {
     // Parent-only filter
     if (type === "parent") {
       matchFilter.parent_category = null;
+    }
+
+    // Explicit id list (homepage "manual" category sections)
+    if (ids) {
+      const idList = ids
+        .split(",")
+        .map((s) => s.trim())
+        .filter((id) => /^[0-9a-fA-F]{24}$/.test(id))
+        .map((id) => new mongoose.Types.ObjectId(id));
+      if (idList.length) {
+        matchFilter._id = { $in: idList };
+      }
     }
 
     // Build aggregation pipeline

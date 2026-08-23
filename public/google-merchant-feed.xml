@@ -1725,7 +1725,7 @@
       <g:title><![CDATA[TDT LiFePO4 4S 20A BMS 12.8V LiFePO4 With Balance]]></g:title>
       <g:description><![CDATA[TDT LiFePO4 4S 20A BMS 12.8V LiFePO4 With Balance]]></g:description>
       <g:link><![CDATA[http://localhost:4100/product/tdt-li-fe-po4-4s-20a-bms-12-8v-li-fe-po4-with-balance]]></g:link>
-      <g:availability>out of stock</g:availability>
+      <g:availability>in stock</g:availability>
       <g:price>599.00 INR</g:price>
       <g:condition>new</g:condition>
       <g:mpn>ELX-0158</g:mpn>
@@ -2444,6 +2444,17 @@
       <g:price>599.00 INR</g:price>
       <g:condition>new</g:condition>
       <g:mpn>ELX-0223</g:mpn>
+      <g:identifier_exists>yes</g:identifier_exists>
+    </item>
+    <item>
+      <g:id>ELX-224</g:id>
+      <g:title><![CDATA[TS to TS 6.35mm (1/4") 2 Meter Audio Cable – Premium Mono Instrument Cable]]></g:title>
+      <g:description><![CDATA[TS to TS 6.35mm 2 Meter...]]></g:description>
+      <g:link><![CDATA[http://localhost:4100/product/ts-to-ts-6-35mm-1-4-2-meter-audio-cable-premium-mono-instrument-cable]]></g:link>
+      <g:availability>in stock</g:availability>
+      <g:price>599.00 INR</g:price>
+      <g:condition>new</g:condition>
+      <g:mpn>ELX-224</g:mpn>
       <g:identifier_exists>yes</g:identifier_exists>
     </item>
   </channel>

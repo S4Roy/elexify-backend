@@ -21,6 +21,8 @@ class ProductResource extends Resource {
       sku: this.sku || null,
       ask_for_price: this.ask_for_price || false,
       enable_enquiry: this.enable_enquiry || false,
+      is_featured: this.is_featured || false,
+      is_bestseller: this.is_bestseller || false,
       description: this.description || null,
       short_description: this.short_description || null,
 
@@ -51,6 +53,9 @@ class ProductResource extends Resource {
       shipping_class: this.shipping_class
         ? new ShippingClassResource(this.shipping_class).exec()
         : null,
+      quantity_discounts: Array.isArray(this.quantity_discounts)
+        ? this.quantity_discounts
+        : [],
 
       attributes: Array.isArray(this.attributes) ? this.attributes : [],
 

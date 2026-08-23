@@ -1,7 +1,9 @@
 import Cart from "../../../../models/Cart.js";
 import ExchangeRate from "../../../../models/ExchangeRate.js";
+import Address from "../../../../models/Address.js";
 import { StatusError } from "../../../../config/index.js";
 import { envs } from "../../../../config/index.js";
+import { shippingService } from "../../../../services/index.js";
 import mongoose from "mongoose";
 
 export const carts = async (req, res, next) => {
@@ -17,6 +19,7 @@ export const carts = async (req, res, next) => {
       sort_by = "created_at",
       sort_order = -1,
       currency = "INR",
+      address_id = null,
     } = req.query;
 
     const ratesDoc = await ExchangeRate.findOne().sort({ updated_at: -1 });
@@ -230,6 +233,7 @@ export const carts = async (req, res, next) => {
             price: {
               $multiply: [{ $ifNull: ["$discounted_price", "$price"] }, rate],
             },
+            discount_percent: { $ifNull: ["$discount_percent", null] },
           },
         },
       },
@@ -288,15 +292,71 @@ export const carts = async (req, res, next) => {
       Cart.aggregate(totalPipeline),
     ]);
 
+    const subtotal = grandTotalResult[0]?.subtotal ?? 0;
+
+    // 🔹 Optional dynamic shipping + estimated delivery, once an address is selected (checkout)
+    let shipping = null;
+    let estimated_delivery = null;
+
+    if (address_id) {
+      const address = await Address.findOne({
+        _id: address_id,
+        deleted_at: null,
+        ...(user_id ? { user: user_id } : {}),
+      }).lean();
+
+      if (address) {
+        const rawCarts = await Cart.find(matchFilter)
+          .populate({ path: "product", select: "weight shipping_class stock_quantity status" })
+          .populate({ path: "variation", select: "weight shipping_class stock_quantity status" })
+          .lean();
+
+        const shippingItems = rawCarts
+          .filter((c) => c.product)
+          .map((c) => {
+            const source = c.variation || c.product;
+            return {
+              shipping_class: source.shipping_class || null,
+              weight: source.weight || 0,
+              quantity: c.quantity,
+            };
+          });
+
+        const isAvailable = rawCarts.every((c) => {
+          const source = c.variation || c.product;
+          return (
+            source &&
+            source.status !== "inactive" &&
+            (source.stock_quantity == null || source.stock_quantity >= c.quantity)
+          );
+        });
+
+        const rateResult = await shippingService.calculateShippingRate({
+          items: shippingItems,
+          address: { country: address.country, state: address.state, postcode: address.postcode },
+          orderSubtotal: subtotal,
+        });
+
+        shipping = { amount: rateResult.amount, zone: rateResult.zone?.name ?? null };
+        estimated_delivery = await shippingService.calculateDeliveryEstimate({
+          min_delivery_days: rateResult.min_delivery_days,
+          max_delivery_days: rateResult.max_delivery_days,
+          isAvailable,
+        });
+      }
+    }
+
     res.status(200).json({
       status: "success",
       message: req.__("List fetched successfully"),
       data: {
         docs,
-        subtotal: grandTotalResult[0]?.subtotal ?? 0,
-          total_discount: grandTotalResult[0]?.total_discount ?? 0,
+        subtotal,
+        total_discount: grandTotalResult[0]?.total_discount ?? 0,
         currency,
         exchange_rate: rate,
+        shipping,
+        estimated_delivery,
       },
     });
   } catch (error) {

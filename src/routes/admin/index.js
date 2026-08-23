@@ -18,6 +18,13 @@ import { enquiryRouter } from "./enquiry.js";
 import { countryRouter } from "./country.js";
 import { stateRouter } from "./state.js";
 import { cityRouter } from "./city.js";
+import { shippingRouter } from "./shipping/index.js";
+import { seoRouter } from "./seo/index.js";
+import { homeRouter } from "./home.js";
+import { topbarRouter } from "./topbar.js";
+import { headerConfigRouter } from "./header-config.js";
+import { navigationMenuRouter } from "./navigation-menu.js";
+import { adminNavigationRouter } from "./navigation.js";
 
 const v1AdminRouter = Router();
 // All routes go here
@@ -41,5 +48,12 @@ v1AdminRouter.use("/enquiry", enquiryRouter);
 v1AdminRouter.use("/country", countryRouter);
 v1AdminRouter.use("/state", stateRouter);
 v1AdminRouter.use("/city", cityRouter);
+v1AdminRouter.use("/shipping", shippingRouter);
+v1AdminRouter.use("/seo", seoRouter);
+v1AdminRouter.use("/home", homeRouter);
+v1AdminRouter.use("/topbar", topbarRouter);
+v1AdminRouter.use("/header-config", headerConfigRouter);
+v1AdminRouter.use("/navigation-menu", navigationMenuRouter);
+v1AdminRouter.use("/navigation", adminNavigationRouter);
 
 export { v1AdminRouter };

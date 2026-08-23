@@ -12,9 +12,19 @@ export const list = celebrate({
     sort_by: Joi.string()
       .optional()
       .allow("", null)
-      .valid("name", "recommended", "created_at", "price", "avg_rating"),
+      .valid(
+        "name",
+        "recommended",
+        "created_at",
+        "price",
+        "avg_rating",
+        "discount_percent"
+      ),
     sort_order: Joi.number().optional().allow(null).valid(-1, 1),
     price_min: Joi.number().optional().allow("", null),
     price_max: Joi.number().optional().allow("", null),
+    ids: Joi.string().optional().allow("", null),
+    is_featured: Joi.string().optional().allow("", null).valid("true", "false"),
+    is_bestseller: Joi.string().optional().allow("", null).valid("true", "false"),
   }),
 });

@@ -24,6 +24,9 @@ export const list = async (req, res, next) => {
       price_max = null,
       classifications = null,
       tags = null,
+      ids = null,
+      is_featured = null,
+      is_bestseller = null,
     } = req.query;
     const { slug = null } = req.params;
     const rate = rates?.rates?.get(currency) ?? 1;
@@ -87,6 +90,21 @@ export const list = async (req, res, next) => {
         );
       }
     }
+
+    // 🔹 Explicit id list (homepage "manual" product sections)
+    if (ids) {
+      const idList = ids
+        .split(",")
+        .map((s) => s.trim())
+        .filter((id) => /^[0-9a-fA-F]{24}$/.test(id))
+        .map((id) => new mongoose.Types.ObjectId(id));
+      if (idList.length) {
+        matchFilter._id = { $in: idList };
+      }
+    }
+    // 🔹 Homepage "featured" / "bestseller" product sections
+    if (is_featured === "true") matchFilter.is_featured = true;
+    if (is_bestseller === "true") matchFilter.is_bestseller = true;
 
     // SIMPLE products (not variations)
     const productPipeline = [

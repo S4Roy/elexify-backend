@@ -2,6 +2,7 @@ import TempCart from "../../../../models/TempCart.js";
 import Product from "../../../../models/Product.js";
 import ProductVariation from "../../../../models/ProductVariation.js";
 import { StatusError } from "../../../../config/index.js";
+import { inventoryService } from "../../../../services/index.js";
 
 /**
  * Add, Remove, or Update Product in TempCart (Supports Auth & Guest, Simple & Variable)
@@ -73,6 +74,20 @@ export const tempCartManage = async (req, res, next) => {
       }
     }
 
+    // 🔹 Apply quantity-based discount tiers (product-level) on top of the current price
+    let discount_percent = null;
+    if (Array.isArray(product.quantity_discounts) && product.quantity_discounts.length) {
+      const tierResult = inventoryService.cartService.calculateQuantityDiscount({
+        basePrice: discounted_price ?? price,
+        quantity,
+        tiers: product.quantity_discounts,
+      });
+      if (tierResult.discountPercent > 0) {
+        discounted_price = tierResult.unitPrice;
+        discount_percent = tierResult.discountPercent;
+      }
+    }
+
     // 🔍 Base filter: always per user or guest
     const baseFilter = user_id ? { user: user_id } : { guest_id };
 
@@ -97,6 +112,7 @@ export const tempCartManage = async (req, res, next) => {
       quantity,
       price,
       discounted_price,
+      discount_percent,
     });
 
     return res.status(200).json({

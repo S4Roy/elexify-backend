@@ -22,6 +22,8 @@ const MediaSchema = new Schema(
         "attributes",
         "tags",
         "why-choose-us",
+        "header_navigation",
+        "mega_menus",
       ],
       required: true,
     },

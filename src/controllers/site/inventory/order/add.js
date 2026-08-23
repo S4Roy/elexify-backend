@@ -10,6 +10,7 @@ import { StatusError } from "../../../../config/index.js";
 import {
   paymentService,
   inventoryService,
+  shippingService,
 } from "../../../../services/index.js";
 
 export const add = async (req, res, next) => {
@@ -18,10 +19,11 @@ export const add = async (req, res, next) => {
       currency = "INR",
       address_id,          // ✅ used to fetch the address
       payment_method,
-      shipping = 0,
       isDirectCheckout,
       coupon_code = null,
     } = req.body;
+    // ⚠️ Shipping is NEVER trusted from the client — it is always computed
+    // server-side below from the resolved address + cart contents.
 
     const user_id = req.auth?.user_id || null;
     const guest_id = req.auth?.guest_id || null;
@@ -71,6 +73,8 @@ export const add = async (req, res, next) => {
 
         total += total_price;
 
+        const stockSource = variation || product;
+
         return {
           product_id: product._id,
           variation_id: variation?._id || null,
@@ -80,6 +84,10 @@ export const add = async (req, res, next) => {
           total_price,
           base_unit_price,
           base_total_price,
+          shipping_class: stockSource.shipping_class || null,
+          weight: stockSource.weight || 0,
+          stock_quantity: stockSource.stock_quantity,
+          status: stockSource.status,
           cart_ref: cart,
         };
       })
@@ -87,6 +95,19 @@ export const add = async (req, res, next) => {
 
     if (!items.length) {
       throw StatusError.badRequest("No valid products found in cart.");
+    }
+
+    // 🔹 Defensive re-check: bail if anything went out of stock between cart-add and checkout,
+    // so we never confirm an order (or its delivery estimate) for unavailable items.
+    const unavailableItem = items.find(
+      (item) =>
+        item.status === "inactive" ||
+        (item.stock_quantity != null && item.stock_quantity < item.quantity)
+    );
+    if (unavailableItem) {
+      throw StatusError.badRequest(
+        "One or more items in your cart are no longer available in the requested quantity. Please review your cart."
+      );
     }
 
     // ── User ─────────────────────────────────────────────────────────────────
@@ -122,8 +143,33 @@ const address = await Address.findOne({
     }
 
     const discountAmount = parseFloat(discount.toFixed(2));
-    const shippingAmount = parseFloat((shipping * exchangeRate).toFixed(2));
     const sub_total = parseFloat(total.toFixed(2));
+
+    // ── Shipping + estimated delivery — computed server-side, never client-supplied ──────────
+    const rateResult = await shippingService.calculateShippingRate({
+      items: items.map((item) => ({
+        shipping_class: item.shipping_class,
+        weight: item.weight,
+        quantity: item.quantity,
+      })),
+      address: {
+        country: address.country,
+        state: address.state,
+        postcode: address.postcode,
+      },
+      orderSubtotal: sub_total,
+    });
+
+    const shippingAmount = parseFloat(
+      (rateResult.amount * exchangeRate).toFixed(2)
+    );
+
+    const deliveryEstimate = await shippingService.calculateDeliveryEstimate({
+      min_delivery_days: rateResult.min_delivery_days,
+      max_delivery_days: rateResult.max_delivery_days,
+      isAvailable: true,
+    });
+
     const grandTotal = parseFloat((sub_total - discountAmount + shippingAmount).toFixed(2));
 
     // ── Create order ─────────────────────────────────────────────────────────
@@ -147,6 +193,7 @@ const address = await Address.findOne({
       exchange_rate: exchangeRate,
       total_items: items.length,
       coupon_code: coupon_code || null,
+      etd: deliveryEstimate?.display || null,
     });
 
     // ── Order items ──────────────────────────────────────────────────────────
@@ -162,6 +209,7 @@ const address = await Address.findOne({
         total_price: item.total_price,
         regular_price: cart.price,
         sale_price: cart.discounted_price,
+        discount_percent: cart.discount_percent ?? null,
         currency,
         exchange_rate: exchangeRate,
       };

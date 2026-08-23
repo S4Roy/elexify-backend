@@ -126,6 +126,14 @@ const ProductSchema = new Schema(
       ref: "shipping_classes",
       default: null,
     },
+    // Tiered quantity discounts, e.g. [{min_quantity: 2, discount_percent: 5}, {min_quantity: 5, discount_percent: 10}]
+    quantity_discounts: [
+      {
+        _id: false,
+        min_quantity: { type: Number, min: 2, required: true },
+        discount_percent: { type: Number, min: 0, max: 100, required: true },
+      },
+    ],
     avg_rating: {
       type: Number,
       min: 0,
@@ -148,6 +156,14 @@ const ProductSchema = new Schema(
       default: false,
     },
     enable_enquiry: {
+      type: Boolean,
+      default: false,
+    },
+    is_featured: {
+      type: Boolean,
+      default: false,
+    },
+    is_bestseller: {
       type: Boolean,
       default: false,
     },

@@ -17,6 +17,8 @@ export const add = celebrate({
     classifications: Joi.array().items(Joi.string()).optional(),
     ask_for_price: Joi.boolean().optional().allow(null, ""),
     enable_enquiry: Joi.boolean().optional().allow(null, ""),
+    is_featured: Joi.boolean().optional().allow(null, ""),
+    is_bestseller: Joi.boolean().optional().allow(null, ""),
     status: Joi.string().valid("active", "inactive").default("active"),
 
     images: Joi.array()
@@ -46,7 +48,19 @@ export const add = celebrate({
     length: Joi.number().optional().allow(null),
     width: Joi.number().optional().allow(null),
     height: Joi.number().optional().allow(null),
-    shipping_class: Joi.string().optional().allow(null, ""),
+    shipping_class: Joi.string()
+      .regex(/^[0-9a-fA-F]{24}$/)
+      .optional()
+      .allow(null, "")
+      .messages({ "string.pattern.base": "Invalid Shipping Class ID format" }),
+    quantity_discounts: Joi.array()
+      .items(
+        Joi.object({
+          min_quantity: Joi.number().integer().min(2).required(),
+          discount_percent: Joi.number().min(0).max(100).required(),
+        })
+      )
+      .optional(),
 
     // Pricing (for simple product, nullable for variable)
     regular_price: Joi.number().optional().allow(null),

@@ -17,6 +17,19 @@ import * as enquiryController from "./enquiry/index.js";
 import * as countryController from "./country/index.js";
 import * as stateController from "./state/index.js";
 import * as cityController from "./city/index.js";
+import {
+  shippingClassController,
+  shippingZoneController,
+  shippingRateController,
+  shippingSettingsController,
+} from "./shipping/index.js";
+import { seoProductController, seoSettingsController } from "./seo/index.js";
+import * as homeController from "./home/index.js";
+import * as topBarController from "./topbar/index.js";
+import * as headerConfigController from "./header-config/index.js";
+import * as navigationMenuController from "./navigation-menu/index.js";
+import * as navigationMenuItemController from "./navigation-menu-item/index.js";
+import * as navigationPreviewController from "./navigation/index.js";
 
 export {
   inventoryController,
@@ -38,4 +51,16 @@ export {
   countryController,
   stateController,
   cityController,
+  shippingClassController,
+  shippingZoneController,
+  shippingRateController,
+  shippingSettingsController,
+  seoProductController,
+  seoSettingsController,
+  homeController,
+  topBarController,
+  headerConfigController,
+  navigationMenuController,
+  navigationMenuItemController,
+  navigationPreviewController,
 };

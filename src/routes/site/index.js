@@ -7,6 +7,7 @@ import { contactUsRouter } from "./contact_us.js";
 import { subscriberRouter } from "./subscriber.js";
 import { webhookRouter } from "./webhook/index.js";
 import { commonRouter } from "./common.js";
+import { navigationRouter } from "./navigation.js";
 
 const v1SiteRouter = Router();
 // All routes go here
@@ -19,5 +20,6 @@ v1SiteRouter.use("/contact-us", contactUsRouter);
 v1SiteRouter.use("/subscriber", subscriberRouter);
 v1SiteRouter.use("/webhook", webhookRouter);
 v1SiteRouter.use("/common", commonRouter);
+v1SiteRouter.use("/navigation", navigationRouter);
 
 export { v1SiteRouter };

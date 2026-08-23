@@ -11,4 +11,5 @@ cmsRouter.get("/banners", cmsController.banners);
 cmsRouter.get("/blogs", cmsController.blogs);
 cmsRouter.get("/blog-filter-option", cmsController.blog_filter_option);
 cmsRouter.get("/settings", cmsController.settings);
+cmsRouter.get("/home", cmsController.home);
 export { cmsRouter };

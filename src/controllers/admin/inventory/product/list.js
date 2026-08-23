@@ -175,6 +175,15 @@ export const list = async (req, res, next) => {
       { $unwind: { path: "$brand", preserveNullAndEmptyArrays: true } },
       {
         $lookup: {
+          from: "shipping_classes",
+          localField: "shipping_class",
+          foreignField: "_id",
+          as: "shipping_class",
+        },
+      },
+      { $unwind: { path: "$shipping_class", preserveNullAndEmptyArrays: true } },
+      {
+        $lookup: {
           from: "categories",
           localField: "categories",
           foreignField: "_id",

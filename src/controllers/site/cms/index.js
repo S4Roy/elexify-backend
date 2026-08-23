@@ -5,6 +5,7 @@ import { banners } from "./banners.js";
 import { blogs } from "./blogs.js";
 import { blog_filter_option } from "./blog-filter-option.js";
 import { settings } from "./settings.js";
+import { home } from "./home.js";
 
 export {
   faqList,
@@ -14,4 +15,5 @@ export {
   blogs,
   blog_filter_option,
   settings,
+  home,
 };

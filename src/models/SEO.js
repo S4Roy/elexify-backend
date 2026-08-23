@@ -63,6 +63,23 @@ const SEOSchema = new Schema(
     // ✅ JSON-LD Structured Data (for SEO)
     json_ld: { type: String, default: null }, // Store JSON-LD schema markup as a string
 
+    // ✅ Focus keyword & indexing control
+    focus_keyword: { type: String, trim: true, default: null },
+    robots: {
+      type: String,
+      enum: ["index,follow", "noindex,follow", "index,nofollow", "noindex,nofollow"],
+      default: "index,follow",
+    },
+    schema_enabled: { type: Boolean, default: true },
+
+    // ✅ Generation metadata — lets bulk generation skip hand-edited fields
+    generated: { type: Boolean, default: false },
+    generated_at: { type: Date, default: null },
+    generated_by: { type: Types.ObjectId, ref: "users", default: null },
+    title_manually_edited: { type: Boolean, default: false },
+    description_manually_edited: { type: Boolean, default: false },
+    focus_keyword_manually_edited: { type: Boolean, default: false },
+
     created_at: { type: Date, default: Date.now },
     updated_at: { type: Date, default: Date.now },
   },
