@@ -24,6 +24,7 @@ const MediaSchema = new Schema(
         "why-choose-us",
         "header_navigation",
         "mega_menus",
+        "site-settings",
       ],
       required: true,
     },

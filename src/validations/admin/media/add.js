@@ -17,13 +17,18 @@ export const add = celebrate({
         "attributes",
         "brands",
         "users",
+        "banners",
         "blogs",
-        "why-choose-us"
+        "tags",
+        "why-choose-us",
+        "header_navigation",
+        "mega_menus",
+        "site-settings"
       )
       .required()
       .messages({
         "any.only":
-          "Reference type must be one of 'products', 'categories', 'attributes', 'brands', or 'users'",
+          "Reference type must be one of 'products', 'categories', 'attributes', 'brands', 'users', 'banners', 'blogs', 'tags', 'why-choose-us', 'header_navigation', 'mega_menus', or 'site-settings'",
         "string.empty": "Reference type is required",
       }),
     status: Joi.string()

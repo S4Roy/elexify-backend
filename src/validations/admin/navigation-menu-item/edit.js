@@ -62,6 +62,11 @@ export const edit = celebrate({
     }),
   }),
   body: Joi.object({
+    // The admin panel's generic submitMenuItem() builds one payload for both
+    // add/edit and includes `_id` on it (used client-side to decide POST vs
+    // PUT) even though edit's real id comes from the URL param — accept and
+    // ignore it rather than reject the whole request.
+    _id: Joi.string().regex(objectIdPattern).optional(),
     parent_id: Joi.string().regex(objectIdPattern).optional().allow(null, ""),
     type: Joi.string()
       .valid(
