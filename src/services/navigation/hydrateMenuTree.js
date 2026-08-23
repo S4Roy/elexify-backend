@@ -10,7 +10,7 @@ const NAME_FIELD = { categories: "name", products: "name", pages: "title", blogs
 const IMAGE_FIELD = { categories: "image", products: "images", pages: null, blogs: "feature_image" };
 const URL_PREFIX = { categories: "/category", products: "/product", pages: "", blogs: "/blog" };
 
-const LINK_TYPE_TO_MODEL = { category: "categories", product: "products", internal_page: "pages" };
+const LINK_TYPE_TO_MODEL = { category: "categories", product: "products", internal_page: "pages", blog: "blogs" };
 
 const isResolved = (doc) => Boolean(doc) && doc.status !== "inactive" && !doc.deleted_at;
 
