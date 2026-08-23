@@ -1666,15 +1666,27 @@ export const seed = async function (req, resp) {
 
     if (seededAnyMenu) navigationService.invalidate();
 
-    const TotalOrders = await Order.find({});
-    for (const order of TotalOrders) {
-      if (order._id) {
-        const orderItems = await OrderItem.find({ order_id: order._id });
-        await Order.updateOne(
-          { _id: order._id },
-          { total_items: orderItems.length }
-        );
-      }
+    // Was one OrderItem.find + one Order.updateOne per order (20k+ sequential
+    // round trips against 10k+ orders — routinely exceeded the reverse-proxy
+    // timeout before this endpoint could ever respond). Two queries plus one
+    // bulkWrite compute the same per-order counts, defaulting to 0 for any
+    // order with no items — same result the per-order loop produced.
+    const allOrderIds = await Order.find({}).distinct("_id");
+    const itemCounts = await OrderItem.aggregate([
+      { $group: { _id: "$order_id", count: { $sum: 1 } } },
+    ]);
+    const countByOrderId = new Map(
+      itemCounts.map(({ _id, count }) => [String(_id), count]),
+    );
+    if (allOrderIds.length) {
+      await Order.bulkWrite(
+        allOrderIds.map((_id) => ({
+          updateOne: {
+            filter: { _id },
+            update: { total_items: countByOrderId.get(String(_id)) ?? 0 },
+          },
+        })),
+      );
     }
 
     return resp.send(`
