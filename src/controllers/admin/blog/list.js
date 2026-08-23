@@ -24,6 +24,7 @@ export const list = async (req, res, next) => {
       status = null,
       from_date = null,
       to_date = null,
+      all = "false",
     } = req.query;
     const options = {
       page: page,
@@ -69,6 +70,17 @@ export const list = async (req, res, next) => {
         { slug: { $regex: ".*" + search_key + ".*", $options: "i" } },
       ];
     }
+    if (all === "true") {
+      const allData = await Blog.find(matchFilter)
+        .select("_id title slug")
+        .exec();
+      return res.status(201).json({
+        status: "success",
+        message: req.__("List fetched successfully"),
+        data: allData,
+      });
+    }
+
     const pipeline = [
       { $match: matchFilter },
 

@@ -16,5 +16,12 @@ export const list = celebrate({
     status: Joi.string().optional().allow("", null),
     from_date: Joi.string().optional().allow("", null),
     to_date: Joi.string().optional().allow("", null),
+    all: Joi.string()
+      .optional()
+      .allow("", null)
+      .valid("true", "false")
+      .messages({
+        "any.only": "All must be either 'true' or 'false'",
+      }),
   }),
 });
