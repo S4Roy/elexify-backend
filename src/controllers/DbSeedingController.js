@@ -1556,12 +1556,12 @@ export const seed = async function (req, resp) {
       deleted_at: null,
     });
 
-    if (adminCount < 1) {
+    if (adminCount < 1 && process.env.SUPERADMIN_EMAIL && process.env.SUPERADMIN_PASSWORD) {
       const document = {
         role: "superadmin",
         name: "Super Admin",
-        email: "superadmin@rudrakshavalley.com",
-        password: await generalHelper.bcryptMake("Rudraksha@2025"),
+        email: process.env.SUPERADMIN_EMAIL,
+        password: await generalHelper.bcryptMake(process.env.SUPERADMIN_PASSWORD),
       };
 
       await User.create(document);
