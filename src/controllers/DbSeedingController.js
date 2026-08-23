@@ -9,6 +9,9 @@ import City from "../models/City.js";
 import fs from "fs";
 
 import User from "../models/User.js";
+import NavigationMenu from "../models/NavigationMenu.js";
+import NavigationMenuItem from "../models/NavigationMenuItem.js";
+import { navigationService } from "../services/index.js";
 
 export const seed = async function (req, resp) {
   try {
@@ -1581,6 +1584,87 @@ export const seed = async function (req, resp) {
     //   fs.readFileSync("./src/assets/locales/cities.json", "utf-8")
     // );
     // await City.insertMany(cities);
+
+    /**
+     * ==================================
+     * SEEDING DEFAULT NAVIGATION MENUS
+     * ==================================
+     * Only creates a menu (and its items) when that slug doesn't exist yet
+     * — never overwrites a menu an admin has already created/published, so
+     * this stays safe to call repeatedly (e.g. on every deploy).
+     */
+    const DEFAULT_MENUS = {
+      "main-menu": {
+        name: "Main Menu",
+        items: [
+          { label: "Home", custom_url: "/" },
+          { label: "Shop", custom_url: "/products" },
+          { label: "Blog", custom_url: "/blog" },
+          { label: "Contact Us", custom_url: "/contact-us" },
+        ],
+      },
+      "footer-menu": {
+        name: "Footer Menu",
+        items: [
+          { label: "Privacy Policy", custom_url: "/page/privacy-policy" },
+          { label: "Terms Of Use", custom_url: "/page/terms-and-conditions" },
+          { label: "FAQ", custom_url: "/faq" },
+        ],
+      },
+    };
+
+    let seededAnyMenu = false;
+
+    for (const [slug, config] of Object.entries(DEFAULT_MENUS)) {
+      const menu = await NavigationMenu.findOneAndUpdate(
+        { slug, deleted_at: null },
+        {
+          $setOnInsert: {
+            slug,
+            name: config.name,
+            status: "published",
+            published_at: new Date(),
+          },
+        },
+        { upsert: true, new: true, setDefaultsOnInsert: true },
+      );
+
+      const existingItemCount = await NavigationMenuItem.countDocuments({
+        menu_id: menu._id,
+        deleted_at: null,
+      });
+      if (existingItemCount > 0) continue;
+
+      for (const [order, item] of config.items.entries()) {
+        const published_snapshot = {
+          label: item.label,
+          type: "custom_url",
+          icon: null,
+          badge: null,
+          reference_id: null,
+          reference_model: null,
+          custom_url: item.custom_url,
+          target: "_self",
+          order,
+          enabled: true,
+          schedule: null,
+          mega_menu_content: null,
+          parent_id: null,
+        };
+        await NavigationMenuItem.create({
+          menu_id: menu._id,
+          type: "custom_url",
+          label: item.label,
+          custom_url: item.custom_url,
+          order,
+          is_published: true,
+          published_snapshot,
+        });
+      }
+      seededAnyMenu = true;
+    }
+
+    if (seededAnyMenu) navigationService.invalidate();
 
     const TotalOrders = await Order.find({});
     for (const order of TotalOrders) {
