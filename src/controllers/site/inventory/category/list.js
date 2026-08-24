@@ -19,6 +19,7 @@ export const list = async (req, res, next) => {
       type = null, // query param
       parent_category_slug = null, // query param
       ids = null, // comma-separated category ids (homepage "manual" category sections)
+      featured = null, // "true" -> only admin-curated Top Categories
     } = req.query;
 
     const { slug = null } = req.params;
@@ -59,6 +60,10 @@ export const list = async (req, res, next) => {
     // Parent-only filter
     if (type === "parent") {
       matchFilter.parent_category = null;
+    }
+
+    if (featured === "true") {
+      matchFilter.is_featured = true;
     }
 
     // Explicit id list (homepage "manual" category sections)
@@ -297,157 +302,7 @@ export const list = async (req, res, next) => {
             as: "banner",
           },
         },
-        { $unwind: { path: "$banner", preserveNullAndEmptyArrays: true } },
-
-        // details.block_2.image
-        {
-          $lookup: {
-            from: "medias",
-            localField: "details.block_2.image",
-            foreignField: "_id",
-            as: "details_block_2_image",
-          },
-        },
-        {
-          $unwind: {
-            path: "$details_block_2_image",
-            preserveNullAndEmptyArrays: true,
-          },
-        },
-        { $addFields: { "details.block_2.image": "$details_block_2_image" } },
-
-        // details.block_4.image
-        {
-          $lookup: {
-            from: "medias",
-            localField: "details.block_4.image",
-            foreignField: "_id",
-            as: "details_block_4_image",
-          },
-        },
-        {
-          $unwind: {
-            path: "$details_block_4_image",
-            preserveNullAndEmptyArrays: true,
-          },
-        },
-        { $addFields: { "details.block_4.image": "$details_block_4_image" } },
-
-        // details.block_4.bg
-        {
-          $lookup: {
-            from: "medias",
-            localField: "details.block_4.bg",
-            foreignField: "_id",
-            as: "details_block_4_bg",
-          },
-        },
-        {
-          $unwind: {
-            path: "$details_block_4_bg",
-            preserveNullAndEmptyArrays: true,
-          },
-        },
-        { $addFields: { "details.block_4.bg": "$details_block_4_bg" } },
-
-        // details.block_5.image
-        {
-          $lookup: {
-            from: "medias",
-            localField: "details.block_5.image",
-            foreignField: "_id",
-            as: "details_block_5_image",
-          },
-        },
-        {
-          $unwind: {
-            path: "$details_block_5_image",
-            preserveNullAndEmptyArrays: true,
-          },
-        },
-        { $addFields: { "details.block_5.image": "$details_block_5_image" } },
-
-        // details.block_6.image
-        {
-          $lookup: {
-            from: "medias",
-            localField: "details.block_6.image",
-            foreignField: "_id",
-            as: "details_block_6_image",
-          },
-        },
-        {
-          $unwind: {
-            path: "$details_block_6_image",
-            preserveNullAndEmptyArrays: true,
-          },
-        },
-        { $addFields: { "details.block_6.image": "$details_block_6_image" } },
-
-        // details.block_7.image
-        {
-          $lookup: {
-            from: "medias",
-            localField: "details.block_7.image",
-            foreignField: "_id",
-            as: "details_block_7_image",
-          },
-        },
-        {
-          $unwind: {
-            path: "$details_block_7_image",
-            preserveNullAndEmptyArrays: true,
-          },
-        },
-        { $addFields: { "details.block_7.image": "$details_block_7_image" } },
-
-        // details.block_8.image
-        {
-          $lookup: {
-            from: "medias",
-            localField: "details.block_8.image",
-            foreignField: "_id",
-            as: "details_block_8_image",
-          },
-        },
-        {
-          $unwind: {
-            path: "$details_block_8_image",
-            preserveNullAndEmptyArrays: true,
-          },
-        },
-        { $addFields: { "details.block_8.image": "$details_block_8_image" } },
-
-        // details.block_8.bg
-        {
-          $lookup: {
-            from: "medias",
-            localField: "details.block_8.bg",
-            foreignField: "_id",
-            as: "details_block_8_bg",
-          },
-        },
-        {
-          $unwind: {
-            path: "$details_block_8_bg",
-            preserveNullAndEmptyArrays: true,
-          },
-        },
-        { $addFields: { "details.block_8.bg": "$details_block_8_bg" } },
-
-        // cleanup temporary detail lookup fields
-        {
-          $project: {
-            details_block_2_image: 0,
-            details_block_4_image: 0,
-            details_block_4_bg: 0,
-            details_block_5_image: 0,
-            details_block_6_image: 0,
-            details_block_7_image: 0,
-            details_block_8_image: 0,
-            details_block_8_bg: 0,
-          },
-        }
+        { $unwind: { path: "$banner", preserveNullAndEmptyArrays: true } }
       );
 
       const aggData = await Category.aggregate(pipeline);

@@ -34,6 +34,7 @@ export const add = celebrate({
 
     image: Joi.string().optional().allow(null),
     banner: Joi.string().optional().allow(null),
+    is_featured: Joi.boolean().optional(),
 
     status: Joi.string()
       .valid("active", "inactive")
@@ -41,6 +42,5 @@ export const add = celebrate({
       .messages({
         "any.only": "Status must be either 'active' or 'inactive'",
       }),
-    details: Joi.object().optional().allow(null),
   }),
 });

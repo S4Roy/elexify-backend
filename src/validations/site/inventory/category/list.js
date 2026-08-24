@@ -14,5 +14,6 @@ export const list = celebrate({
       .valid("name", "created_at", "sort_order"),
     sort_order: Joi.number().optional().allow(null).valid(-1, 1),
     ids: Joi.string().optional().allow("", null),
+    featured: Joi.string().optional().allow("", null).valid("true", "false"),
   }),
 });

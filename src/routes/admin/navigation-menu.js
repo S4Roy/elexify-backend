@@ -5,6 +5,11 @@ import { navigationMenuItemRouter } from "./navigation-menu-item.js";
 
 const navigationMenuRouter = Router();
 
+// Literal route before the ":id"-param routes below.
+navigationMenuRouter.post(
+  "/generate-defaults",
+  navigationMenuController.generateDefaults
+);
 navigationMenuRouter.get("/list", navigationMenuController.list);
 navigationMenuRouter.post(
   "/add",

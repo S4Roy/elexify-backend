@@ -22,7 +22,7 @@ export const add = async (req, res, next) => {
       image,
       banner,
       banner_tag_line,
-      details,
+      is_featured,
     } = req.body;
     // Generate a unique slug
     let slug = generalHelper.generateSlugName(name);
@@ -44,7 +44,7 @@ export const add = async (req, res, next) => {
       parent_category: generalHelper.sanitizeObjectId(parent_category) || null,
       image: generalHelper.sanitizeObjectId(image) || null,
       banner: generalHelper.sanitizeObjectId(banner) || null,
-      details,
+      is_featured: is_featured ?? false,
       status: status || "active",
       created_by: req.auth.user_id,
       updated_by: req.auth.user_id,

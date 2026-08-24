@@ -78,6 +78,11 @@ const UserSchema = new Schema(
       type: String,
       default: null,
     },
+    google_id: {
+      type: String,
+      required: false,
+      default: null,
+    },
     created_at: {
       type: Date,
       default: Date.now,
@@ -139,6 +144,18 @@ UserSchema.index(
     partialFilterExpression: {
       phone_code: { $type: "string" },
       mobile: { $type: "string" },
+      deleted_at: null,
+    },
+  },
+);
+
+// google_id: unique per Google account among non-deleted users.
+UserSchema.index(
+  { google_id: 1 },
+  {
+    unique: true,
+    partialFilterExpression: {
+      google_id: { $type: "string" },
       deleted_at: null,
     },
   },

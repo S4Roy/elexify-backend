@@ -33,6 +33,12 @@ const slideSchema = Joi.object({
 const CONFIG_SCHEMAS = {
   hero: Joi.object({
     slides: Joi.array().items(slideSchema).default([]),
+    autoplay: Joi.boolean().default(true),
+    autoplay_interval_ms: Joi.number().integer().min(1000).max(20000).default(4000),
+    autoplay_pause_on_hover: Joi.boolean().default(true),
+    left_autoplay: Joi.boolean().default(true),
+    left_autoplay_interval_ms: Joi.number().integer().min(1000).max(20000).default(4000),
+    transition_direction: Joi.string().valid("auto", "ltr", "rtl").default("auto"),
   }),
   product_section: Joi.object({
     source_mode: Joi.string()

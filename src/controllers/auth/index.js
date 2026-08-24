@@ -5,6 +5,7 @@ import { requestPasswordReset } from "./requestPasswordReset.js";
 import { resetPassword } from "./resetPassword.js";
 import { sendOtpToUser } from "./sendOtpToUser.js";
 import { verifyUserOtp } from "./verifyUserOtp.js";
+import { googleLogin } from "./googleLogin.js";
 
 export {
   adminLogin,
@@ -14,4 +15,5 @@ export {
   resetPassword,
   sendOtpToUser,
   verifyUserOtp,
+  googleLogin,
 };

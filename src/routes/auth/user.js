@@ -44,4 +44,11 @@ userAuthRouter.post(
   authController.verifyUserOtp
 );
 
+// Google Sign-In
+userAuthRouter.post(
+  "/google",
+  authValidation.loginValidation.googleLogin,
+  authController.googleLogin
+);
+
 export { userAuthRouter };

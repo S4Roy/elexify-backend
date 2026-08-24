@@ -3,6 +3,7 @@ import { hydrateMenuTree } from "./hydrateMenuTree.js";
 import { cacheGet, cacheSet, invalidate } from "./navigationCache.js";
 import { getPublicNavigationConfig } from "./getPublicNavigationConfig.js";
 import { assertItemReferenceExists } from "./assertItemReferenceExists.js";
+import { buildShopMegaMenuContent } from "./buildShopMegaMenuContent.js";
 
 export {
   resolveVisibleMenuTree,
@@ -12,4 +13,5 @@ export {
   invalidate,
   getPublicNavigationConfig,
   assertItemReferenceExists,
+  buildShopMegaMenuContent,
 };

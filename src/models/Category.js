@@ -2,28 +2,6 @@ import mongoose from "mongoose";
 import mongooseAggregatePaginate from "mongoose-aggregate-paginate-v2";
 
 const { Schema, model, Types } = mongoose;
-const BlockSchema = new Schema(
-  {
-    title: { type: String, default: null },
-    heading: { type: String, default: null },
-    description: { type: String, default: null }, // store HTML
-    beej_mantra: { type: String, default: null },
-    recommended_chalisa: { type: String, default: null },
-    energization_procedure: { type: String, default: null },
-    ruling_planet: { type: String, default: null },
-    lord_deity: { type: String, default: null },
-    chakra_activated: { type: String, default: null },
-
-    // reference to medias collection (store ObjectId)
-    image: { type: Types.ObjectId, ref: "medias", default: null },
-
-    // background image / video keys
-    bg: { type: Types.ObjectId, ref: "medias", default: null },
-
-    external_url: { type: String, default: null },
-  },
-  { _id: false } // prevents creating an _id per block when used in parent doc
-);
 const CategorySchema = new Schema(
   {
     name: {
@@ -61,25 +39,14 @@ const CategorySchema = new Schema(
       default: null,
     },
     sort_order: { type: Number, default: 0 },
+    // Drives the storefront's "Top Categories" strip — an admin-curated
+    // subset rather than showing all categories inline.
+    is_featured: { type: Boolean, default: false },
     status: {
       type: String,
       required: true,
       enum: ["active", "inactive"],
       default: "active",
-    },
-    details: {
-      required: { type: Boolean, default: false },
-      block_1: { type: BlockSchema, default: () => ({}) },
-      block_2: { type: BlockSchema, default: () => ({}) },
-      block_3: {
-        benefits: { type: String },
-        who_should_wear: { type: String },
-      },
-      block_4: { type: BlockSchema, default: () => ({}) },
-      block_5: { type: BlockSchema, default: () => ({}) },
-      block_6: { type: BlockSchema, default: () => ({}) },
-      block_7: { type: BlockSchema, default: () => ({}) },
-      block_8: { type: BlockSchema, default: () => ({}) },
     },
     created_by: {
       type: Types.ObjectId,

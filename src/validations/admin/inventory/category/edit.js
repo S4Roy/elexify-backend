@@ -41,7 +41,7 @@ export const edit = celebrate({
 
     image: Joi.string().optional().allow(null),
     banner: Joi.string().optional().allow(null),
-    details: Joi.object().optional().allow(null),
+    is_featured: Joi.boolean().optional(),
     status: Joi.string()
       .valid("active", "inactive")
       .optional()

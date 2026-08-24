@@ -23,7 +23,7 @@ export const edit = async (req, res, next) => {
       image,
       banner,
       banner_tag_line,
-      details,
+      is_featured,
     } = req.body;
 
     if (!_id) {
@@ -89,6 +89,7 @@ export const edit = async (req, res, next) => {
       ...(banner_tag_line !== undefined && {
         banner_tag_line: banner_tag_line || "",
       }),
+      ...(is_featured !== undefined && { is_featured }),
       updated_by: req.auth.user_id,
       updated_at: new Date(),
     };
@@ -99,9 +100,6 @@ export const edit = async (req, res, next) => {
     }
     if (banner) {
       updateData.banner = banner;
-    }
-    if (details) {
-      updateData.details = details;
     }
     if (
       parent_category === "null" ||

@@ -4,6 +4,7 @@ import { signup } from "./signup.js";
 import { resetPassword } from "./resetPassword.js";
 import { sendOtp } from "./sendOtp.js";
 import { verifyOtp } from "./verifyOtp.js";
+import { googleLogin } from "./googleLogin.js";
 
 export {
   adminLogin,
@@ -12,4 +13,5 @@ export {
   signup,
   sendOtp,
   verifyOtp,
+  googleLogin,
 };

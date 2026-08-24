@@ -181,5 +181,12 @@
 	"Top bar published successfully": "Top bar published successfully",
 	"Menu item deleted successfully": "Menu item deleted successfully",
 	"Menu items reordered successfully": "Menu items reordered successfully",
-	"Shipping Settings updated successfully": "Shipping Settings updated successfully"
+	"Shipping Settings updated successfully": "Shipping Settings updated successfully",
+	"Menu preview fetched successfully": "Menu preview fetched successfully",
+	"Top bar updated successfully": "Top bar updated successfully",
+	"Header config updated successfully": "Header config updated successfully",
+	"Menu deleted successfully": "Menu deleted successfully",
+	"Menu item updated successfully": "Menu item updated successfully",
+	"Default menus generated successfully": "Default menus generated successfully",
+	"Header config published successfully": "Header config published successfully"
 }

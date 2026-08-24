@@ -59,6 +59,9 @@ export const envs = {
     secret: process.env.PAYPAL_SECRET,
     env: process.env.PAYPAL_ENV,
   },
+  google: {
+    clientId: process.env.GOOGLE_CLIENT_ID || "",
+  },
   shiprocket: {
     email: process.env.SHIP_ROCKET_EMAIL,
     password: process.env.SHIP_ROCKET_PASSWORD,

@@ -6,7 +6,12 @@ const scheduleSchema = Joi.object({
 }).allow(null);
 
 const announcementSchema = Joi.object({
+  // Echoed back by GET since AnnouncementSchema has `timestamps: true` —
+  // accepted (and ignored on write) so an unmodified edit-and-save round
+  // trip doesn't fail validation on its own read-only fields.
   _id: Joi.string().optional(),
+  createdAt: Joi.date().optional(),
+  updatedAt: Joi.date().optional(),
   message: Joi.string().required().messages({
     "string.empty": "Announcement message is required",
     "any.required": "Announcement message is required",
