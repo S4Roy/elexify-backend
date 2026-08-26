@@ -8,7 +8,7 @@ class MediaResource extends Resource {
       type: this.type || "",
       mime_type: this.mime_type || "",
       size: this.size || "",
-      thumbnail: this.thumbnail || "",
+      thumbnail: "",
       alt_text: this.alt_text || "",
       is_primary: this.is_primary || false,
       created_at: this.created_at || null,
@@ -16,6 +16,10 @@ class MediaResource extends Resource {
 
     if (this.url) {
       doc.url = `${envs.s3.BASE_URL}${this.url}`;
+    }
+
+    if (this.thumbnail) {
+      doc.thumbnail = `${envs.s3.BASE_URL}${this.thumbnail}`;
     }
 
     return doc;

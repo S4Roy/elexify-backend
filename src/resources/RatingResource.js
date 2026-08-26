@@ -13,7 +13,7 @@ class RatingResource extends Resource {
       rating: this.rating || null,
       title: this.title || null,
       description: this.description || null,
-      media: this.media || [],
+      media: MediaResource.collection(this.media || []),
       status: this.status || null,
       created_at: this.created_at || null,
       updated_at: this.updated_at || null,

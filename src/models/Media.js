@@ -25,6 +25,7 @@ const MediaSchema = new Schema(
         "header_navigation",
         "mega_menus",
         "site-settings",
+        "ratings",
       ],
       required: true,
     },
