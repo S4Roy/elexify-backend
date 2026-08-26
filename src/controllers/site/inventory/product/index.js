@@ -16,6 +16,7 @@ import { enquiry } from "./enquiry.js";
 import { customiseMalaAttributes } from "./customiseMalaAttributes.js";
 import { customiseMalaCartManage } from "./customiseMalaCartManage.js";
 import { applyCoupon } from "./applyCoupon.js";
+import { availableCoupons } from "./availableCoupons.js";
 
 export {
   list,
@@ -36,4 +37,5 @@ export {
   customiseMalaAttributes,
   customiseMalaCartManage,
   applyCoupon,
+  availableCoupons,
 };

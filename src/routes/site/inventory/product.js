@@ -88,4 +88,8 @@ productRouter.post(
   "/cart/apply-coupon",
   inventoryController.productController.applyCoupon
 );
+productRouter.get(
+  "/available-coupons",
+  inventoryController.productController.availableCoupons
+);
 export { productRouter };

@@ -5,7 +5,11 @@ import { cmsValidation } from "../../validations/site/index.js";
 const cmsRouter = Router();
 
 cmsRouter.get("/faqs", cmsValidation.list, cmsController.faqList);
-cmsRouter.get("/ratings", cmsValidation.list, cmsController.ratingList);
+cmsRouter.get(
+  "/ratings",
+  cmsValidation.ratingList,
+  cmsController.ratingList,
+);
 cmsRouter.get("/page/:slug", cmsController.pageContent);
 cmsRouter.get("/banners", cmsController.banners);
 cmsRouter.get("/blogs", cmsController.blogs);

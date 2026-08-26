@@ -18,6 +18,8 @@ export const ratingList = async (req, res, next) => {
       search_key = "",
       sort_by = "created_at",
       sort_order = -1,
+      product_id = null,
+      variation_id = null,
     } = req.query;
 
     const options = {
@@ -26,6 +28,13 @@ export const ratingList = async (req, res, next) => {
       sort: { [sort_by]: sort_order },
     };
     let matchFilter = { deleted_at: null, status: "approved" };
+
+    if (product_id) {
+      matchFilter.product_id = new mongoose.Types.ObjectId(product_id);
+    }
+    if (variation_id) {
+      matchFilter.variation_id = new mongoose.Types.ObjectId(variation_id);
+    }
 
     if (search_key) {
       matchFilter.$or = [
