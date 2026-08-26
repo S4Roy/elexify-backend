@@ -1,4 +1,5 @@
 import crypto from "crypto";
+import Razorpay from "razorpay";
 import { envs, StatusError } from "../../../../config/index.js";
 import Order from "../../../../models/Order.js";
 import OrderItem from "../../../../models/OrderItem.js";
@@ -8,6 +9,37 @@ import Product from "../../../../models/Product.js";
 import ProductVariation from "../../../../models/ProductVariation.js";
 import { inventoryService } from "../../../../services/index.js";
 import User from "../../../../models/User.js";
+
+const razorpay = new Razorpay({
+  key_id: envs.razorpay.key_id,
+  key_secret: envs.razorpay.key_secret,
+});
+
+// Best-effort fetch of the instrument actually used (card/upi/netbanking/
+// wallet) so the order confirmation can show it — never let this block
+// checkout if Razorpay's API hiccups.
+const fetchPaymentInstrument = async (paymentId) => {
+  try {
+    const payment = await razorpay.payments.fetch(paymentId);
+    return {
+      method: payment.method || null,
+      card: payment.card
+        ? {
+            last4: payment.card.last4 || null,
+            network: payment.card.network || null,
+            type: payment.card.type || null,
+            issuer: payment.card.issuer || null,
+          }
+        : null,
+      vpa: payment.vpa || null,
+      bank: payment.bank || null,
+      wallet: payment.wallet || null,
+    };
+  } catch (err) {
+    console.warn("Razorpay payment instrument fetch failed:", err?.message || err);
+    return {};
+  }
+};
 
 export const verifyPayment = async (req, res, next) => {
   try {
@@ -33,7 +65,10 @@ export const verifyPayment = async (req, res, next) => {
       throw StatusError.badRequest("Payment signature mismatch");
     }
 
-    // 3️⃣ Update order only if not already processing
+    // 3️⃣ Fetch which instrument (card/upi/netbanking/wallet) was actually used
+    const instrument = await fetchPaymentInstrument(razorpay_payment_id);
+
+    // 4️⃣ Update order only if not already processing
     const order = await Order.findOneAndUpdate(
       { id: order_id, order_status: { $ne: "processing" } },
       {
@@ -44,6 +79,7 @@ export const verifyPayment = async (req, res, next) => {
           razorpay_order_id,
           razorpay_payment_id,
           razorpay_signature,
+          ...instrument,
         },
         paid_at: new Date(),
       },

@@ -521,6 +521,7 @@ export const details = async (req, res, next) => {
       {
         $addFields: {
           debug_wishlist_count: { $size: { $ifNull: ["$wishlist", []] } },
+          is_wishlisted: { $gt: [{ $size: { $ifNull: ["$wishlist", []] } }, 0] },
           wishlist: {
             $cond: [
               { $gt: [{ $size: { $ifNull: ["$wishlist", []] } }, 0] },

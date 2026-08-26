@@ -1,5 +1,6 @@
 import Address from "../../../models/Address.js";
 import { StatusError } from "../../../config/index.js";
+import { assertPincodeServiceable } from "../../../services/shipping/assertPincodeServiceable.js";
 
 /**
  * Edit Address
@@ -38,6 +39,10 @@ export const edit = async (req, res, next) => {
     });
 
     if (!address) throw StatusError.notFound("Address not found");
+
+    if (postcode !== undefined) {
+      await assertPincodeServiceable(postcode, country ?? address.country);
+    }
 
     // Unset other default addresses
     if (is_default) {

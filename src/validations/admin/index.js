@@ -17,6 +17,7 @@ import * as enquiryValidation from "./enquiry/index.js";
 import * as countryValidation from "./country/index.js";
 import * as stateValidation from "./state/index.js";
 import * as cityValidation from "./city/index.js";
+import * as pincodeValidation from "./pincode/index.js";
 import {
   shippingClassValidation,
   shippingZoneValidation,
@@ -50,6 +51,7 @@ export {
   countryValidation,
   stateValidation,
   cityValidation,
+  pincodeValidation,
   shippingClassValidation,
   shippingZoneValidation,
   shippingRateValidation,

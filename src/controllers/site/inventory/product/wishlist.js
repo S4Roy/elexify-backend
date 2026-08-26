@@ -1,12 +1,15 @@
 import Category from "../../../../models/Category.js";
 import Product from "../../../../models/Product.js";
 import Wishlist from "../../../../models/Wishlist.js";
+import ExchangeRate from "../../../../models/ExchangeRate.js";
 import { StatusError } from "../../../../config/index.js";
 import { envs } from "../../../../config/index.js";
 import mongoose from "mongoose";
 
 export const wishlist = async (req, res, next) => {
   try {
+    const rates = await ExchangeRate.findOne().sort({ updated_at: -1 });
+
     const {
       page = 1,
       limit = envs.pagination.limit,
@@ -14,8 +17,10 @@ export const wishlist = async (req, res, next) => {
       sort_by = "created_at",
       sort_order = -1,
       category = null,
+      currency = "INR",
     } = req.query;
     const { slug = null } = req.params;
+    const rate = rates?.rates?.get(currency) ?? 1;
 
     const user_id = req.auth?.user_id || null;
     const guest_id = req.auth?.guest_id || null;
@@ -383,6 +388,45 @@ export const wishlist = async (req, res, next) => {
               else: "$regular_price",
             },
           },
+        },
+      },
+      {
+        $addFields: {
+          converted_price: { $round: [{ $multiply: ["$price", rate] }, 2] },
+          converted_sale_price: {
+            $round: [{ $multiply: ["$sale_price", rate] }, 2],
+          },
+          converted_regular_price: {
+            $round: [{ $multiply: ["$regular_price", rate] }, 2],
+          },
+          discount_percent: {
+            $cond: [
+              {
+                $and: [
+                  { $gt: ["$regular_price", 0] },
+                  { $gt: ["$sale_price", 0] },
+                ],
+              },
+              {
+                $round: [
+                  {
+                    $multiply: [
+                      {
+                        $divide: [
+                          { $subtract: ["$regular_price", "$sale_price"] },
+                          "$regular_price",
+                        ],
+                      },
+                      100,
+                    ],
+                  },
+                  2,
+                ],
+              },
+              0,
+            ],
+          },
+          currency: currency,
         },
       },
       {

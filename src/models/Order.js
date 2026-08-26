@@ -71,6 +71,8 @@ const OrderSchema = new Schema(
     awb: { type: String },
     etd: { type: String },
     courier_name: { type: String },
+    processing_at: { type: Date, default: null },
+    shipped_at: { type: Date, default: null },
     delivered_at: { type: Date, default: null },
     is_migrated: { type: Boolean, default: false },
     created_at: {

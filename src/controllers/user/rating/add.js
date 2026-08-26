@@ -57,7 +57,12 @@ export const add = async (req, res) => {
 
     // ✅ Update product's avg rating & total reviews
     const agg = await Rating.aggregate([
-      { $match: { product_id, status: "approved" } },
+      {
+        $match: {
+          product_id: new mongoose.Types.ObjectId(product_id),
+          status: "approved",
+        },
+      },
       {
         $group: {
           _id: "$product_id",

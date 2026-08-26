@@ -1,4 +1,5 @@
 import { list } from "./list.js";
+import { alsoLike } from "./alsoLike.js";
 import { wishlist } from "./wishlist.js";
 import { toggleWishList } from "./toggleWishList.js";
 import { cartManage } from "./cartManage.js";
@@ -20,6 +21,7 @@ import { availableCoupons } from "./availableCoupons.js";
 
 export {
   list,
+  alsoLike,
   wishlist,
   toggleWishList,
   cartManage,

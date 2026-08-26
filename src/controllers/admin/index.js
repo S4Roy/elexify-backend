@@ -17,6 +17,7 @@ import * as enquiryController from "./enquiry/index.js";
 import * as countryController from "./country/index.js";
 import * as stateController from "./state/index.js";
 import * as cityController from "./city/index.js";
+import * as pincodeController from "./pincode/index.js";
 import {
   shippingClassController,
   shippingZoneController,
@@ -51,6 +52,7 @@ export {
   countryController,
   stateController,
   cityController,
+  pincodeController,
   shippingClassController,
   shippingZoneController,
   shippingRateController,

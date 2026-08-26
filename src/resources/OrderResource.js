@@ -30,6 +30,7 @@ class OrderResource extends Resource {
       order_items: (this.order_items || []).map((item) => {
         return {
           product_id: item.product?._id || null,
+          variation_id: item.variation?._id || null,
           sku: item.product?.sku || item.variation?.sku,
           display_name: item.display_name || null,
           name: item.product?.name || null,
@@ -46,12 +47,20 @@ class OrderResource extends Resource {
           categories: CategoryResourceMinimal.collection(
             item.product?.categories || []
           ),
+          rating_summary: item.rating_summary || null,
         };
       }),
       currency: this.currency || "INR",
       note: this.note || null,
       payment_status: this.payment_status || null,
       payment_meta: this.payment_meta || null,
+      paid_at: this.paid_at || null,
+      awb: this.awb || null,
+      etd: this.etd || null,
+      courier_name: this.courier_name || null,
+      processing_at: this.processing_at || null,
+      shipped_at: this.shipped_at || null,
+      delivered_at: this.delivered_at || null,
       created_at: this.created_at || null,
       updated_at: this.updated_at || null,
     };

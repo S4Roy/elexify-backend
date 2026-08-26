@@ -64,6 +64,10 @@ productRouter.get(
   inventoryController.productController.specifications
 );
 productRouter.get(
+  "/also-like/:slug",
+  inventoryController.productController.alsoLike
+);
+productRouter.get(
   "/temp-carts",
   inventoryValidation.productValidation.carts,
   inventoryController.productController.tempCarts

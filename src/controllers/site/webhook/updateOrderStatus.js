@@ -60,6 +60,9 @@ export const updateOrderStatus = async (req, res, next) => {
       .toLowerCase();
 
     const newStatus = incoming;
+    const eventTimestamp = current_timestamp
+      ? new Date(current_timestamp)
+      : new Date();
 
     // const event = {
     //   // provider: "shiprocket",
@@ -112,8 +115,12 @@ export const updateOrderStatus = async (req, res, next) => {
         if ("order_status" in order) order.order_status = newStatus;
         else order.status = newStatus;
 
-        // If delivered, note delivered_at
-        if (newStatus === "delivered") {
+        // Stamp the timestamp for the stage the order just entered
+        if (newStatus === "processing") {
+          order.processing_at = eventTimestamp;
+        } else if (newStatus === "shipped") {
+          order.shipped_at = eventTimestamp;
+        } else if (newStatus === "delivered") {
           order.delivered_at = eventTimestamp;
         }
       }

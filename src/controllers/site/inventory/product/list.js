@@ -25,6 +25,7 @@ export const list = async (req, res, next) => {
       classifications = null,
       tags = null,
       ids = null,
+      exclude = null,
       is_featured = null,
       is_bestseller = null,
     } = req.query;
@@ -102,6 +103,19 @@ export const list = async (req, res, next) => {
         matchFilter._id = { $in: idList };
       }
     }
+    // 🔹 Exclude specific ids (e.g. the current product on its own detail page)
+    let excludeIds = [];
+    if (exclude) {
+      excludeIds = exclude
+        .split(",")
+        .map((s) => s.trim())
+        .filter((id) => /^[0-9a-fA-F]{24}$/.test(id))
+        .map((id) => new mongoose.Types.ObjectId(id));
+      if (excludeIds.length) {
+        matchFilter._id = { ...(matchFilter._id || {}), $nin: excludeIds };
+      }
+    }
+
     // 🔹 Homepage "featured" / "bestseller" product sections
     if (is_featured === "true") matchFilter.is_featured = true;
     if (is_bestseller === "true") matchFilter.is_bestseller = true;
@@ -150,6 +164,9 @@ export const list = async (req, res, next) => {
       { $match: { "product.deleted_at": null } },
 
       // Optional filters from parent product
+      ...(excludeIds.length
+        ? [{ $match: { "product._id": { $nin: excludeIds } } }]
+        : []),
       ...(categoryIds.length
         ? [
             {

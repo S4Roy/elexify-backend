@@ -52,6 +52,10 @@ export const userLogin = async (req, res, next) => {
         guest_id,
         user._id
       );
+      await inventoryService.cartService.transferGuestTempCartToUser(
+        guest_id,
+        user._id
+      );
       await inventoryService.wishlistService.transferGuestWishlistToUser(
         guest_id,
         user._id

@@ -256,6 +256,38 @@ export const list = async (req, res, next) => {
             as: "variation_attr_defs",
           },
         },
+        // --- RATING lookup: the current user's own review on this item ---
+        {
+          $lookup: {
+            from: "product_ratings",
+            let: {
+              pid: "$order_items.product_id",
+              vid: "$order_items.variation_id",
+            },
+            pipeline: [
+              {
+                $match: {
+                  $expr: {
+                    $and: [
+                      { $eq: ["$user", new mongoose.Types.ObjectId(user_id)] },
+                      { $eq: ["$product_id", "$$pid"] },
+                      {
+                        $eq: [
+                          { $ifNull: ["$variation_id", null] },
+                          { $ifNull: ["$$vid", null] },
+                        ],
+                      },
+                      { $eq: [{ $ifNull: ["$deleted_at", null] }, null] },
+                    ],
+                  },
+                },
+              },
+              { $project: { rating: 1, title: 1, description: 1 } },
+            ],
+            as: "user_review_doc",
+          },
+        },
+
         // --- CUSTOMIZATION lookup ---
         {
           $lookup: {
@@ -382,6 +414,29 @@ export const list = async (req, res, next) => {
                 },
                 null,
               ],
+            },
+            "order_items.rating_summary": {
+              avg_rating: { $ifNull: ["$product_doc.avg_rating", 0] },
+              total_reviews: { $ifNull: ["$product_doc.total_reviews", 0] },
+              user_review: {
+                $let: {
+                  vars: {
+                    doc: { $arrayElemAt: ["$user_review_doc", 0] },
+                  },
+                  in: {
+                    $cond: [
+                      { $ifNull: ["$$doc", false] },
+                      {
+                        _id: "$$doc._id",
+                        rating: "$$doc.rating",
+                        title: "$$doc.title",
+                        description: "$$doc.description",
+                      },
+                      null,
+                    ],
+                  },
+                },
+              },
             },
             // Choose images to display for the line item
             "order_items.display_images": {

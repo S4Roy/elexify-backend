@@ -37,7 +37,7 @@ export const envs = {
     expiry_minutes: Number(process.env.OTP_EXPIRY_MINUTES) || 10,
     max_attempts: Number(process.env.OTP_MAX_ATTEMPTS) || 5,
     resend_interval_seconds:
-      Number(process.env.OTP_RESEND_INTERVAL_SECONDS) || 120,
+      Number(process.env.OTP_RESEND_INTERVAL_SECONDS) || 60,
   },
   aws: {
     accessKeyId: process.env.S3_ACCESS_KEY || "",

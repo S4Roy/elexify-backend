@@ -36,12 +36,16 @@ const WishlistSchema = new Schema(
   { versionKey: false }
 );
 
+// MongoDB partial-index filters only support a restricted operator set —
+// $ne/$not are rejected ("Expression not supported in partial index"), so
+// "not null" has to be expressed as $type instead of $exists + $ne.
+
 // For logged-in users only (user != null)
 WishlistSchema.index(
   { user: 1, product: 1, variation: 1 },
   {
     unique: true,
-    partialFilterExpression: { user: { $exists: true, $ne: null } },
+    partialFilterExpression: { user: { $type: "objectId" } },
   }
 );
 
@@ -50,7 +54,7 @@ WishlistSchema.index(
   { guest_id: 1, product: 1, variation: 1 },
   {
     unique: true,
-    partialFilterExpression: { guest_id: { $exists: true, $ne: null } },
+    partialFilterExpression: { guest_id: { $type: "string" } },
   }
 );
 

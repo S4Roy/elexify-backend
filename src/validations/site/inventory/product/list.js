@@ -24,6 +24,7 @@ export const list = celebrate({
     price_min: Joi.number().optional().allow("", null),
     price_max: Joi.number().optional().allow("", null),
     ids: Joi.string().optional().allow("", null),
+    exclude: Joi.string().optional().allow("", null),
     is_featured: Joi.string().optional().allow("", null).valid("true", "false"),
     is_bestseller: Joi.string().optional().allow("", null).valid("true", "false"),
   }),
