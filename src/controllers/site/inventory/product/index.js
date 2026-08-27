@@ -18,6 +18,7 @@ import { customiseMalaAttributes } from "./customiseMalaAttributes.js";
 import { customiseMalaCartManage } from "./customiseMalaCartManage.js";
 import { applyCoupon } from "./applyCoupon.js";
 import { availableCoupons } from "./availableCoupons.js";
+import { compare } from "./compare.js";
 
 export {
   list,
@@ -40,4 +41,5 @@ export {
   customiseMalaCartManage,
   applyCoupon,
   availableCoupons,
+  compare,
 };

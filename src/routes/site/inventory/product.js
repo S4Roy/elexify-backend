@@ -9,6 +9,7 @@ productRouter.get(
   inventoryValidation.productValidation.list,
   inventoryController.productController.list
 );
+productRouter.post("/compare", inventoryController.productController.compare);
 
 productRouter.get(
   "/details/:slug",
