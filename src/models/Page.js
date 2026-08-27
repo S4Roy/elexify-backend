@@ -20,6 +20,8 @@ const PageSchema = new Schema(
     content: {
       type: String, // Use rich text (HTML/Markdown) or structured JSON if needed
     },
+    short_description: { type: String, trim: true, default: "" },
+    feature_image: { type: Types.ObjectId, ref: "medias", default: null },
     extra: {
       categories: [{ type: Types.ObjectId, ref: "categories" }],
       images: [{ type: Types.ObjectId, ref: "medias" }],

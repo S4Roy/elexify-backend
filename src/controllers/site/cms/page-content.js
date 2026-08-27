@@ -15,11 +15,15 @@ export const pageContent = async (req, res, next) => {
     const pipeline = [
       { $match: matchFilter },
 
+      // Older policy pages may not have an `extra` object. Normalize it
+      // before using $size/$range so a valid page cannot crash this query.
+      { $set: { categoryIds: { $ifNull: ["$extra.categories", []] } } },
+
       // Lookup categories
       {
         $lookup: {
           from: "categories",
-          localField: "extra.categories",
+          localField: "categoryIds",
           foreignField: "_id",
           as: "categories",
         },
@@ -129,12 +133,12 @@ export const pageContent = async (req, res, next) => {
         $addFields: {
           categories: {
             $map: {
-              input: { $range: [0, { $size: "$extra.categories" }] },
+              input: { $range: [0, { $size: "$categoryIds" }] },
               as: "idx",
               in: {
                 $let: {
                   vars: {
-                    catId: { $arrayElemAt: ["$extra.categories", "$$idx"] },
+                    catId: { $arrayElemAt: ["$categoryIds", "$$idx"] },
                   },
                   in: {
                     $mergeObjects: [
@@ -198,17 +202,43 @@ export const pageContent = async (req, res, next) => {
       },
 
       {
+        $lookup: {
+          from: "seos",
+          localField: "seo",
+          foreignField: "_id",
+          as: "seo",
+        },
+      },
+      { $unwind: { path: "$seo", preserveNullAndEmptyArrays: true } },
+      {
+        $lookup: {
+          from: "medias",
+          localField: "feature_image",
+          foreignField: "_id",
+          as: "feature_image",
+        },
+      },
+      { $unwind: { path: "$feature_image", preserveNullAndEmptyArrays: true } },
+      {
         $project: {
           title: 1,
+          slug: 1,
           content: 1,
+          short_description: 1,
+          feature_image: 1,
+          seo: 1,
           status: 1,
           created_at: 1,
+          updated_at: 1,
           categories: 1,
         },
       },
     ];
 
     let data = await Page.aggregate(pipeline);
+    if (!data.length) {
+      throw StatusError.notFound(req.__("Page not found"));
+    }
     data = await new HomePageResource(data[0]).exec();
 
     res.status(200).json({

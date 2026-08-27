@@ -11,6 +11,7 @@ import fs from "fs";
 import User from "../models/User.js";
 import NavigationMenu from "../models/NavigationMenu.js";
 import NavigationMenuItem from "../models/NavigationMenuItem.js";
+import Page from "../models/Page.js";
 import { navigationService } from "../services/index.js";
 
 export const seed = async function (req, resp) {
@@ -1549,6 +1550,42 @@ export const seed = async function (req, resp) {
       });
     }
 
+    // Functional FAQ and Contact routes still use Page records for their
+    // admin-managed title, introduction, and SEO copy. Seed only when absent
+    // so subsequent CMS edits are never overwritten.
+    const requiredPages = [
+      {
+        slug: "faq",
+        title: "Frequently Asked Questions",
+        short_description:
+          "Quick answers about Elexify products, orders, payments, shipping, returns, and support.",
+        content: "",
+      },
+      {
+        slug: "contact-us",
+        title: "Contact Us",
+        short_description:
+          "Have a product or order question? Our team is here to help.",
+        content:
+          "<p>Send us a message using the form and our support team will respond as soon as possible.</p>",
+      },
+    ];
+
+    for (const page of requiredPages) {
+      await Page.updateOne(
+        { slug: page.slug },
+        {
+          $setOnInsert: {
+            ...page,
+            status: "active",
+            extra: { categories: [], images: [] },
+            created_at: new Date(),
+          },
+        },
+        { upsert: true },
+      );
+    }
+
     /**
      * ==================================
      * INSERTING SUPERADMIN IF NOT EXISTS
@@ -1600,7 +1637,7 @@ export const seed = async function (req, resp) {
           { label: "Home", custom_url: "/" },
           { label: "Shop", custom_url: "/products" },
           { label: "Blog", custom_url: "/blog" },
-          { label: "Contact Us", custom_url: "/contact-us" },
+          { label: "Contact Us", custom_url: "/page/contact-us" },
         ],
       },
       "footer-menu": {

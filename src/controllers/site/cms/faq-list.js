@@ -16,8 +16,8 @@ export const faqList = async (req, res, next) => {
       page = 1,
       limit = envs.pagination.limit,
       search_key = "",
-      sort_by = "created_at",
-      sort_order = -1,
+      sort_by = "order",
+      sort_order = 1,
     } = req.query;
 
     const options = {

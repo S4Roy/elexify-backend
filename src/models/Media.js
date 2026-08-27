@@ -19,6 +19,7 @@ const MediaSchema = new Schema(
         "users",
         "banners",
         "blogs",
+        "pages",
         "attributes",
         "tags",
         "why-choose-us",

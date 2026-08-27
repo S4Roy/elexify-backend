@@ -9,7 +9,7 @@ import { StatusError } from "../../../config/index.js";
  */
 export const add = async (req, res, next) => {
   try {
-    const { slug, title, content ,extra} = req.body;
+    const { slug, title, content, short_description, feature_image, seo, extra } = req.body;
 
     if (!slug) {
       throw StatusError.badRequest("Slug is required.");
@@ -24,6 +24,9 @@ export const add = async (req, res, next) => {
       // 🔹 Update
       existingPage.title = title || existingPage.title;
       existingPage.content = content || existingPage.content;
+      if (short_description !== undefined) existingPage.short_description = short_description;
+      if (feature_image !== undefined) existingPage.feature_image = feature_image || null;
+      if (seo !== undefined) existingPage.seo = seo || null;
       existingPage.updated_by = req.auth?.user_id || null;
       existingPage.updated_at = new Date();
       existingPage.extra = extra || existingPage.extra;
@@ -42,6 +45,9 @@ export const add = async (req, res, next) => {
         slug: trimmedSlug,
         title,
         content,
+        short_description: short_description || "",
+        feature_image: feature_image || null,
+        seo: seo || null,
         created_by: req.auth?.user_id || null,
         created_at: new Date(),
       });
