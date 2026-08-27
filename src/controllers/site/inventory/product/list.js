@@ -740,13 +740,19 @@ export const list = async (req, res, next) => {
 
     // Add search at the very end (covers simple + variation rows)
     if (search_key) {
+      // Escape regex metacharacters so literal punctuation in the search
+      // string (parentheses, dots, quotes, etc. — common in product names
+      // like `TS to TS 6.35mm (1/4")...`) is matched as text, not
+      // interpreted as regex syntax (e.g. unescaped "(...)" silently
+      // becomes a non-matching capture group instead of literal parens).
+      const escapedSearchKey = search_key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
       pipeline.push({
         $match: {
           $or: [
-            { name: { $regex: search_key, $options: "i" } },
-            { slug: { $regex: search_key, $options: "i" } },
-            { sku: { $regex: search_key, $options: "i" } },
-            { "attributes.value.value": { $regex: search_key, $options: "i" } }, // search attribute values
+            { name: { $regex: escapedSearchKey, $options: "i" } },
+            { slug: { $regex: escapedSearchKey, $options: "i" } },
+            { sku: { $regex: escapedSearchKey, $options: "i" } },
+            { "attributes.value.value": { $regex: escapedSearchKey, $options: "i" } }, // search attribute values
           ],
         },
       });

@@ -566,6 +566,33 @@ export const list = async (req, res, next) => {
       if (!result.length) throw StatusError.notFound(req.__("Order not found"));
       data = new OrderResource(result[0]).exec();
     } else {
+      // Recalculate units for historical orders that stored the number of
+      // distinct lines in total_items. This keeps list badges accurate without
+      // requiring a destructive data migration.
+      pipeline.push(
+        {
+          $lookup: {
+            from: "order_items",
+            localField: "_id",
+            foreignField: "order_id",
+            as: "item_count_rows",
+          },
+        },
+        {
+          $set: {
+            total_items: {
+              $sum: {
+                $map: {
+                  input: "$item_count_rows",
+                  as: "row",
+                  in: { $ifNull: ["$$row.quantity", 0] },
+                },
+              },
+            },
+          },
+        },
+        { $unset: "item_count_rows" },
+      );
       const agg = Order.aggregate(pipeline);
       const result = await Order.aggregatePaginate(agg, options);
       result.docs = await OrderResource.collection(result.docs);

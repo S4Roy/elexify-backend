@@ -96,7 +96,7 @@ export const validateCoupon = async ({
 
   for (const item of carts) {
     const quantity = item.quantity;
-    const unitPrice = Number(item.price);
+    const unitPrice = Number(item.discounted_price ?? item.price);
     const lineTotal = unitPrice * quantity;
 
     cartSubtotalINR += lineTotal;

@@ -53,12 +53,17 @@ export const envs = {
   razorpay: {
     key_id: process.env.RAZORPAY_KEY_ID,
     key_secret: process.env.RAZORPAY_KEY_SECRET,
+    webhook_secret: process.env.RAZORPAY_WEBHOOK_SECRET,
   },
   paypal: {
     client_id: process.env.PAYPAL_CLIENT_ID,
     secret: process.env.PAYPAL_SECRET,
     env: process.env.PAYPAL_ENV,
   },
+  // Company/GST/invoice details live in SiteSetting (see
+  // src/services/invoiceService/getCompanySettings.js) rather than here,
+  // so an admin can edit them via the existing Settings page without a
+  // redeploy.
   google: {
     clientId: process.env.GOOGLE_CLIENT_ID || "",
   },

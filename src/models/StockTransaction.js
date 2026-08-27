@@ -9,6 +9,11 @@ const StockTransactionSchema = new Schema(
       ref: "products",
       required: true,
     },
+    variation: {
+      type: Types.ObjectId,
+      ref: "product_variations",
+      default: null,
+    },
     type: {
       type: String,
       enum: ["in", "out", "sale", "return", "adjustment"],

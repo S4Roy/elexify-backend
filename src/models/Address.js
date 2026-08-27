@@ -27,6 +27,8 @@ const AddressSchema = new Schema(
     },
     country_name: { type: String },
     postcode: { type: String, required: true },
+    latitude: { type: Number, min: -90, max: 90, default: null },
+    longitude: { type: Number, min: -180, max: 180, default: null },
 
     address_type: {
       type: String,

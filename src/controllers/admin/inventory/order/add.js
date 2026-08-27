@@ -5,9 +5,11 @@ import OrderItem from "../../../../models/OrderItem.js";
 import User from "../../../../models/User.js";
 import Address from "../../../../models/Address.js";
 import Product from "../../../../models/Product.js";
+import ProductVariation from "../../../../models/ProductVariation.js";
 import ExchangeRate from "../../../../models/ExchangeRate.js"; // ✅
 import { StatusError } from "../../../../config/index.js";
 import { paymentService } from "../../../../services/index.js";
+import { snapshotAddress } from "../../../../services/invoiceService/snapshotAddress.js";
 
 export const add = async (req, res, next) => {
   try {
@@ -155,6 +157,8 @@ export const add = async (req, res, next) => {
       user: user._id,
       billing_address: billingAddress?._id ?? null,
       shipping_address: billingAddress?._id ?? null,
+      billing_address_snapshot: snapshotAddress(billingAddress),
+      shipping_address_snapshot: snapshotAddress(billingAddress),
       payment_status: "pending",
       order_status: "pending",
       total_amount: sub_total,
@@ -178,6 +182,10 @@ export const add = async (req, res, next) => {
         continue;
       }
 
+      const variationDoc = item.variation_id
+        ? await ProductVariation.findById(item.variation_id)
+        : null;
+
       orderItems.push({
         order_id: order._id,
         product_id: productDoc._id,
@@ -189,6 +197,9 @@ export const add = async (req, res, next) => {
         sale_price: item.unit_price, // Assume current unit_price is final
         currency: currency,
         exchnage_rate: exchangeRate,
+        product_name: productDoc.name || null,
+        sku: variationDoc?.sku || productDoc.sku || null,
+        variation_name: variationDoc?.combination_key || null,
       });
     }
 

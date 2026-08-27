@@ -60,6 +60,8 @@ export const edit = celebrate({
       .optional()
       .allow(null, "")
       .messages({ "string.pattern.base": "Invalid Shipping Class ID format" }),
+    cod_status: Joi.string().valid("use_global", "allowed", "disallowed").optional(),
+    prepaid_only: Joi.boolean().optional(),
     quantity_discounts: Joi.array()
       .items(
         Joi.object({
@@ -110,6 +112,8 @@ export const edit = celebrate({
           width: Joi.number().optional().allow(null, ""),
           height: Joi.number().optional().allow(null, ""),
           shipping_class: Joi.string().optional().allow(null, ""),
+          cod_status: Joi.string().valid("use_global", "allowed", "disallowed").optional(),
+          prepaid_only: Joi.boolean().optional(),
           rarity: Joi.string().optional().allow(null, ""),
 
           regular_price: Joi.number().required(),

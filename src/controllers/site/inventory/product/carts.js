@@ -1,9 +1,10 @@
 import Cart from "../../../../models/Cart.js";
 import ExchangeRate from "../../../../models/ExchangeRate.js";
 import Address from "../../../../models/Address.js";
+import User from "../../../../models/User.js";
 import { StatusError } from "../../../../config/index.js";
 import { envs } from "../../../../config/index.js";
-import { shippingService } from "../../../../services/index.js";
+import { inventoryService, shippingService } from "../../../../services/index.js";
 import mongoose from "mongoose";
 
 export const carts = async (req, res, next) => {
@@ -233,6 +234,18 @@ export const carts = async (req, res, next) => {
             price: {
               $multiply: [{ $ifNull: ["$discounted_price", "$price"] }, rate],
             },
+            regular_price: { $multiply: [{ $ifNull: ["$price", 0] }, rate] },
+            discount: {
+              $multiply: [
+                {
+                  $max: [
+                    { $subtract: ["$price", { $ifNull: ["$discounted_price", "$price"] }] },
+                    0,
+                  ],
+                },
+                rate,
+              ],
+            },
             discount_percent: { $ifNull: ["$discount_percent", null] },
           },
         },
@@ -287,16 +300,23 @@ export const carts = async (req, res, next) => {
   },
 ];
 
-    const [docs, grandTotalResult] = await Promise.all([
+    const [docs, pricingCarts] = await Promise.all([
       Cart.aggregate(pipeline),
-      Cart.aggregate(totalPipeline),
+      Cart.find(matchFilter)
+        .select("quantity price discounted_price discount_percent")
+        .lean(),
     ]);
 
-    const subtotal = grandTotalResult[0]?.subtotal ?? 0;
+    const pricing = inventoryService.cartService.calculatePricingBreakdown(
+      pricingCarts,
+      rate,
+    );
+    const subtotal = pricing.net_product_amount;
 
     // 🔹 Optional dynamic shipping + estimated delivery, once an address is selected (checkout)
     let shipping = null;
     let estimated_delivery = null;
+    let cod = null;
 
     if (address_id) {
       const address = await Address.findOne({
@@ -307,8 +327,8 @@ export const carts = async (req, res, next) => {
 
       if (address) {
         const rawCarts = await Cart.find(matchFilter)
-          .populate({ path: "product", select: "weight shipping_class stock_quantity status" })
-          .populate({ path: "variation", select: "weight shipping_class stock_quantity status" })
+          .populate({ path: "product", select: "weight shipping_class stock_quantity status cod_status prepaid_only categories brand" })
+          .populate({ path: "variation", select: "weight shipping_class stock_quantity status cod_status prepaid_only" })
           .lean();
 
         const shippingItems = rawCarts
@@ -343,6 +363,15 @@ export const carts = async (req, res, next) => {
           max_delivery_days: rateResult.max_delivery_days,
           isAvailable,
         });
+        const customer = user_id ? await User.findById(user_id).select("role").lean() : null;
+        cod = await shippingService.calculateCodEligibility({
+          items: rawCarts,
+          address,
+          orderAmount: subtotal + rateResult.amount,
+          user: customer,
+          zone: rateResult.zone,
+          exchangeRate: rate,
+        });
       }
     }
 
@@ -352,11 +381,12 @@ export const carts = async (req, res, next) => {
       data: {
         docs,
         subtotal,
-        total_discount: grandTotalResult[0]?.total_discount ?? 0,
+        ...pricing,
         currency,
         exchange_rate: rate,
         shipping,
         estimated_delivery,
+        cod,
       },
     });
   } catch (error) {

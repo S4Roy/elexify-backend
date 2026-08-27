@@ -35,5 +35,16 @@ orderRouter.get(
   "/geo-stats",
   inventoryController.orderController.geoStats
 );
+orderRouter.post(
+  "/cancel",
+  inventoryValidation.orderValidation.cancel,
+  inventoryController.orderController.cancel
+);
+orderRouter.post(
+  "/refund/retry",
+  inventoryValidation.orderValidation.retryRefund,
+  inventoryController.orderController.retryRefund
+);
+orderRouter.get("/invoice", inventoryController.orderController.invoice);
 
 export { orderRouter };

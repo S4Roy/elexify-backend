@@ -15,6 +15,8 @@ import * as shippingService from "./shipping/index.js";
 import * as seoService from "./seo/index.js";
 import * as homepageService from "./homepage/index.js";
 import * as navigationService from "./navigation/index.js";
+import * as orderService from "./orderService/index.js";
+import * as invoiceService from "./invoiceService/index.js";
 
 export {
   userService,
@@ -32,4 +34,6 @@ export {
   seoService,
   homepageService,
   navigationService,
+  orderService,
+  invoiceService,
 };

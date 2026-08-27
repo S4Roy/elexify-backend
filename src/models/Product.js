@@ -126,6 +126,12 @@ const ProductSchema = new Schema(
       ref: "shipping_classes",
       default: null,
     },
+    cod_status: {
+      type: String,
+      enum: ["use_global", "allowed", "disallowed"],
+      default: "use_global",
+    },
+    prepaid_only: { type: Boolean, default: false },
     // Tiered quantity discounts, e.g. [{min_quantity: 2, discount_percent: 5}, {min_quantity: 5, discount_percent: 10}]
     quantity_discounts: [
       {

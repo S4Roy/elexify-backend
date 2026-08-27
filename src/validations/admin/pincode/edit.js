@@ -18,6 +18,9 @@ export const edit = celebrate({
       }),
 
     note: Joi.string().max(300).optional().allow("", null),
+    cod_status: Joi.string()
+      .valid("use_global", "allowed", "disallowed")
+      .optional(),
 
     city_id: Joi.number().optional().allow(null),
     state_id: Joi.number().optional().allow(null),

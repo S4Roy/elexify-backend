@@ -93,6 +93,21 @@ export const edit = celebrate({
         "string.pattern.base": "Postcode must be a valid 6-digit number",
       }),
 
+    latitude: Joi.number().min(-90).max(90).optional().allow(null).messages({
+      "number.min": "Latitude must be between -90 and 90",
+      "number.max": "Latitude must be between -90 and 90",
+    }),
+
+    longitude: Joi.number()
+      .min(-180)
+      .max(180)
+      .optional()
+      .allow(null)
+      .messages({
+        "number.min": "Longitude must be between -180 and 180",
+        "number.max": "Longitude must be between -180 and 180",
+      }),
+
     address_type: Joi.string()
       .valid("home", "office", "billing", "shipping", "other",)
       .optional()

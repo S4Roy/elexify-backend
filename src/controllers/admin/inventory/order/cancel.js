@@ -1,0 +1,29 @@
+import { orderService } from "../../../../services/index.js";
+
+export const cancel = async (req, res, next) => {
+  try {
+    const { order_id, reason, comment } = req.body;
+    const admin_id = req.auth?.user_id || null;
+
+    const order = await orderService.cancelOrder({
+      orderId: order_id,
+      actorType: "admin",
+      actorId: admin_id,
+      reason,
+      comment,
+    });
+
+    return res.status(200).json({
+      status: "success",
+      message: "Order cancelled successfully",
+      data: {
+        order_status: order.order_status,
+        payment_status: order.payment_status,
+        cancellation: order.cancellation,
+        refund: order.refund,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};

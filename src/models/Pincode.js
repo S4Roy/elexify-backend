@@ -20,6 +20,9 @@ const PincodeSchema = new Schema(
     // matching once city_id/state_id are resolved.
     district: { type: String, default: null },
     source_state_name: { type: String, default: null },
+    // Best city-like name derived from India Post taluk/division/region.
+    // Retained for diagnostics and as a fallback when master IDs change.
+    source_city_name: { type: String, default: null },
 
     city_id: { type: Number, ref: "cities", default: null },
     state_id: { type: Number, ref: "states", default: null },
@@ -33,6 +36,11 @@ const PincodeSchema = new Schema(
     // Free-text reason an admin can attach when excluding a pincode
     // (e.g. "Out of courier network", "COD not supported here").
     note: { type: String, default: null },
+    cod_status: {
+      type: String,
+      enum: ["use_global", "allowed", "disallowed"],
+      default: "use_global",
+    },
 
     created_at: { type: Date, default: Date.now },
     updated_at: { type: Date, default: null },

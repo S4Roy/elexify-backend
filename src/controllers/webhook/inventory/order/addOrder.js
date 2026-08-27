@@ -10,6 +10,7 @@ import City from "../../../../models/City.js";
 import { StatusError } from "../../../../config/index.js";
 import { zohoService } from "../../../../services/index.js";
 import { derivePaymentStatus } from "../../../../helpers/order/derivePaymentStatus.js";
+import { snapshotAddress } from "../../../../services/invoiceService/snapshotAddress.js";
 
 export const addOrder = async (req, res, next) => {
   try {
@@ -265,6 +266,8 @@ export const addOrder = async (req, res, next) => {
       user: user._id,
       billing_address: billingAddress?._id ?? null,
       shipping_address: shippingAddress?._id ?? null,
+      billing_address_snapshot: snapshotAddress(billingAddress),
+      shipping_address_snapshot: snapshotAddress(shippingAddress),
       payment_status: orderPaymentStatus,
       order_status: status,
       total_amount: sub_total,
@@ -379,6 +382,9 @@ async function resolveOrderItems(orderId, items) {
       sale_price,
       currency: "INR",
       exchnage_rate: 1,
+      product_name: productDoc.name || null,
+      sku: variationDoc?.sku || productDoc.sku || null,
+      variation_name: variationDoc?.combination_key || null,
     });
   }
 

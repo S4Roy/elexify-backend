@@ -18,6 +18,20 @@ export const tempCartManage = async (req, res, next) => {
 
     const { product_id, variation_id = null, quantity = 1 } = req.body;
 
+    const baseFilter = user_id ? { user: user_id } : { guest_id };
+
+    // Normal cart checkout explicitly clears any stale direct-checkout row.
+    // Clearing does not require a product identifier.
+    if (Number(quantity) <= 0) {
+      await TempCart.deleteMany({ ...baseFilter, deleted_at: null });
+      return res.status(200).json({
+        status: "success",
+        message: req.__("TempCart cleared"),
+        data: null,
+        is_carted: false,
+      });
+    }
+
     if (!product_id) {
       throw StatusError.badRequest(req.__("Product ID is required"));
     }
@@ -89,30 +103,62 @@ export const tempCartManage = async (req, res, next) => {
     }
 
     // 🔍 Base filter: always per user or guest
-    const baseFilter = user_id ? { user: user_id } : { guest_id };
-
-    // ✅ Ensure only one active TempCart per user/guest
-    await TempCart.deleteMany({ ...baseFilter, deleted_at: null });
-
-    // 🚨 If quantity <= 0 → clear cart and exit
-    if (quantity <= 0) {
-      return res.status(200).json({
-        status: "success",
-        message: req.__("TempCart cleared"),
-        data: null,
-        is_carted: false,
-      });
-    }
-
-    // ➕ Create new single entry
-    const newCart = await TempCart.create({
+    const itemFilter = {
       ...baseFilter,
       product: product_id,
       variation: variation_id || null,
-      quantity,
-      price,
-      discounted_price,
-      discount_percent,
+    };
+
+    // Delete a previous Buy Now selection, but retain this item's row so it
+    // can be updated atomically. The former delete-then-create sequence raced
+    // when checkout revalidation and a double request arrived together,
+    // producing E11000 for the unique user/product/variation index.
+    await TempCart.deleteMany({
+      ...baseFilter,
+      deleted_at: null,
+      $nor: [
+        {
+          product: product_id,
+          variation: variation_id || null,
+        },
+      ],
+    });
+
+    const update = {
+      $set: {
+        quantity,
+        price,
+        discounted_price,
+        discount_percent,
+        deleted_at: null,
+      },
+    };
+    let newCart;
+    try {
+      newCart = await TempCart.findOneAndUpdate(itemFilter, update, {
+        new: true,
+        upsert: true,
+        runValidators: true,
+      });
+    } catch (error) {
+      // Two first-time requests can still race at the unique-index boundary:
+      // the winner inserts, then the loser retries as a normal update.
+      if (error?.code !== 11000) throw error;
+      newCart = await TempCart.findOneAndUpdate(itemFilter, update, {
+        new: true,
+        runValidators: true,
+      });
+      if (!newCart) {
+        throw error;
+      }
+    }
+
+    // A concurrent request for a different product may have landed after the
+    // first cleanup. Enforce TempCart's single-selection contract once more.
+    await TempCart.deleteMany({
+      ...baseFilter,
+      _id: { $ne: newCart._id },
+      deleted_at: null,
     });
 
     return res.status(200).json({

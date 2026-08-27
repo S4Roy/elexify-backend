@@ -21,6 +21,8 @@ class AddressResource extends Resource {
       country: this.country || null,
       country_name: this.country_name || null,
       postcode: this.postcode || null,
+      latitude: this.latitude ?? null,
+      longitude: this.longitude ?? null,
 
       address_type: this.address_type || "home",
       purpose: this.purpose || "shipping",

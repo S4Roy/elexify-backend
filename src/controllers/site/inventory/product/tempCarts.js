@@ -3,6 +3,10 @@ import ExchangeRate from "../../../../models/ExchangeRate.js";
 import { StatusError } from "../../../../config/index.js";
 import { envs } from "../../../../config/index.js";
 import mongoose from "mongoose";
+import { inventoryService } from "../../../../services/index.js";
+import Address from "../../../../models/Address.js";
+import User from "../../../../models/User.js";
+import { shippingService } from "../../../../services/index.js";
 
 export const tempCarts = async (req, res, next) => {
   try {
@@ -17,6 +21,7 @@ export const tempCarts = async (req, res, next) => {
       sort_by = "created_at",
       sort_order = -1,
       currency = "INR",
+      address_id = null,
     } = req.query;
 
     const ratesDoc = await ExchangeRate.findOne().sort({ updated_at: -1 });
@@ -207,18 +212,56 @@ export const tempCarts = async (req, res, next) => {
       {
         $addFields: {
           effective_price: {
-            $multiply: [{ $ifNull: ["$price", 0] }, rate],
+            $multiply: [
+              { $ifNull: ["$discounted_price", { $ifNull: ["$price", 0] }] },
+              rate,
+            ],
           },
           total_price: {
             $multiply: [
               { $ifNull: ["$quantity", 0] },
-              { $multiply: [{ $ifNull: ["$price", 0] }, rate] },
+              {
+                $multiply: [
+                  { $ifNull: ["$discounted_price", { $ifNull: ["$price", 0] }] },
+                  rate,
+                ],
+              },
             ],
           },
           cart: {
             _id: "$_id",
             quantity: "$quantity",
-            price: { $multiply: [{ $ifNull: ["$price", 0] }, rate] },
+            price: {
+              $multiply: [
+                { $ifNull: ["$discounted_price", { $ifNull: ["$price", 0] }] },
+                rate,
+              ],
+            },
+            regular_price: { $multiply: [{ $ifNull: ["$price", 0] }, rate] },
+            discounted_price: {
+              $cond: [
+                { $ne: ["$discounted_price", null] },
+                { $multiply: ["$discounted_price", rate] },
+                null,
+              ],
+            },
+            discount: {
+              $multiply: [
+                {
+                  $max: [
+                    {
+                      $subtract: [
+                        { $ifNull: ["$price", 0] },
+                        { $ifNull: ["$discounted_price", { $ifNull: ["$price", 0] }] },
+                      ],
+                    },
+                    0,
+                  ],
+                },
+                rate,
+              ],
+            },
+            discount_percent: "$discount_percent",
           },
         },
       },
@@ -250,7 +293,35 @@ export const tempCarts = async (req, res, next) => {
             $sum: {
               $multiply: [
                 { $ifNull: ["$quantity", 0] },
-                { $multiply: [{ $ifNull: ["$price", 0] }, rate] },
+                {
+                  $multiply: [
+                    { $ifNull: ["$discounted_price", { $ifNull: ["$price", 0] }] },
+                    rate,
+                  ],
+                },
+              ],
+            },
+          },
+          total_discount: {
+            $sum: {
+              $multiply: [
+                { $ifNull: ["$quantity", 0] },
+                {
+                  $multiply: [
+                    {
+                      $max: [
+                        {
+                          $subtract: [
+                            { $ifNull: ["$price", 0] },
+                            { $ifNull: ["$discounted_price", { $ifNull: ["$price", 0] }] },
+                          ],
+                        },
+                        0,
+                      ],
+                    },
+                    rate,
+                  ],
+                },
               ],
             },
           },
@@ -258,19 +329,72 @@ export const tempCarts = async (req, res, next) => {
       },
     ];
 
-    const [docs, grandTotalResult] = await Promise.all([
+    const [docs, pricingCarts] = await Promise.all([
       TempCart.aggregate(pipeline),
-      TempCart.aggregate(totalPipeline),
+      TempCart.find(matchFilter)
+        .select("quantity price discounted_price discount_percent")
+        .lean(),
     ]);
+    const pricing = inventoryService.cartService.calculatePricingBreakdown(
+      pricingCarts,
+      rate,
+    );
+
+    let shipping = null;
+    let estimated_delivery = null;
+    let cod = null;
+    if (address_id) {
+      const address = await Address.findOne({
+        _id: address_id,
+        deleted_at: null,
+        ...(user_id ? { user: user_id } : {}),
+      }).lean();
+      if (address) {
+        const rawCarts = await TempCart.find(matchFilter)
+          .populate({ path: "product", select: "weight shipping_class stock_quantity status cod_status prepaid_only categories brand" })
+          .populate({ path: "variation", select: "weight shipping_class stock_quantity status cod_status prepaid_only" })
+          .lean();
+        const rateResult = await shippingService.calculateShippingRate({
+          items: rawCarts.map((c) => {
+            const source = c.variation || c.product;
+            return { shipping_class: source?.shipping_class || null, weight: source?.weight || 0, quantity: c.quantity };
+          }),
+          address: { country: address.country, state: address.state, postcode: address.postcode },
+          orderSubtotal: pricing.net_product_amount,
+        });
+        shipping = { amount: rateResult.amount, zone: rateResult.zone?.name ?? null };
+        estimated_delivery = await shippingService.calculateDeliveryEstimate({
+          min_delivery_days: rateResult.min_delivery_days,
+          max_delivery_days: rateResult.max_delivery_days,
+          isAvailable: rawCarts.every((c) => {
+            const source = c.variation || c.product;
+            return source && source.status !== "inactive" && (source.stock_quantity == null || source.stock_quantity >= c.quantity);
+          }),
+        });
+        const customer = user_id ? await User.findById(user_id).select("role").lean() : null;
+        cod = await shippingService.calculateCodEligibility({
+          items: rawCarts,
+          address,
+          orderAmount: pricing.net_product_amount + rateResult.amount,
+          user: customer,
+          zone: rateResult.zone,
+          exchangeRate: rate,
+        });
+      }
+    }
 
     res.status(200).json({
       status: "success",
       message: req.__("List fetched successfully"),
       data: {
         docs,
-        subtotal: grandTotalResult[0]?.subtotal ?? 0,
+        subtotal: pricing.net_product_amount,
+        ...pricing,
         currency,
         exchange_rate: rate,
+        shipping,
+        estimated_delivery,
+        cod,
       },
     });
   } catch (error) {

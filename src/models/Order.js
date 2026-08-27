@@ -51,6 +51,7 @@ const OrderSchema = new Schema(
     total_items: { type: Number, default: 0 },
     discount: { type: Number, default: 0 },
     shipping: { type: Number, default: 0 },
+    cod_fee: { type: Number, default: 0 },
     grand_total: { type: Number, required: true },
 
     payment_method: {
@@ -75,6 +76,62 @@ const OrderSchema = new Schema(
     shipped_at: { type: Date, default: null },
     delivered_at: { type: Date, default: null },
     is_migrated: { type: Boolean, default: false },
+
+    // Set true the moment stock is actually decremented for this order
+    // (COD at placement, Razorpay/PayPal at payment verification). Cancel
+    // flow gates inventory restoration on this flag rather than inferring
+    // from payment_method/payment_status, since historical COD orders
+    // placed before this field existed never decremented stock at all.
+    stock_reserved: { type: Boolean, default: false },
+    inventory_reverted: { type: Boolean, default: false },
+
+    cancellation: {
+      reason: { type: String, default: null },
+      comment: { type: String, default: null },
+      requested_at: { type: Date, default: null },
+      cancelled_at: { type: Date, default: null },
+      // No `default: null` here — Mongoose applies defaults at document
+      // creation, and an enum validator rejects `null` unless it's an
+      // explicit enum member. Leaving it undefined until actually set
+      // lets enum validation skip unset orders (the vast majority).
+      cancelled_by: { type: String, enum: ["customer", "admin"] },
+    },
+
+    refund: {
+      razorpay_refund_id: { type: String, default: null },
+      razorpay_payment_id: { type: String, default: null },
+      amount: { type: Number, default: null },
+      status: {
+        type: String,
+        enum: ["not_required", "processing", "processed", "failed"],
+        default: "not_required",
+      },
+      failure_reason: { type: String, default: null },
+      idempotency_key: { type: String, default: null },
+      initiated_at: { type: Date, default: null },
+      completed_at: { type: Date, default: null },
+      attempted_at: { type: Date, default: null },
+    },
+
+    // Denormalized pointer for fast eligibility checks/display. Written
+    // once at generation time and never mutated again — the full frozen
+    // snapshot (line items, addresses, totals, GST breakdown) lives in the
+    // separate Invoice collection (src/models/Invoice.js).
+    invoice: {
+      generated: { type: Boolean, default: false },
+      invoice_number: { type: String, default: null },
+      invoice_date: { type: Date, default: null },
+      generated_at: { type: Date, default: null },
+    },
+
+    // Point-in-time copies of the resolved billing/shipping Address docs,
+    // captured at order placement. billing_address/shipping_address above
+    // remain live refs (existing behavior, unchanged); these snapshots
+    // exist so an invoice never reflects a later address edit/deletion.
+    // Orders placed before this field existed have these as null — the
+    // invoice service falls back to the live ref for those (best-effort).
+    billing_address_snapshot: { type: Object, default: null },
+    shipping_address_snapshot: { type: Object, default: null },
     created_at: {
       type: Date,
       default: Date.now,

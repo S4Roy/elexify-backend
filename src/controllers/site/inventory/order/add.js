@@ -6,12 +6,16 @@ import OrderItem from "../../../../models/OrderItem.js";
 import User from "../../../../models/User.js";
 import Address from "../../../../models/Address.js";
 import ExchangeRate from "../../../../models/ExchangeRate.js";
+import Product from "../../../../models/Product.js";
+import ProductVariation from "../../../../models/ProductVariation.js";
+import StockTransaction from "../../../../models/StockTransaction.js";
 import { StatusError } from "../../../../config/index.js";
 import {
   paymentService,
   inventoryService,
   shippingService,
 } from "../../../../services/index.js";
+import { snapshotAddress } from "../../../../services/invoiceService/snapshotAddress.js";
 
 export const add = async (req, res, next) => {
   try {
@@ -50,7 +54,7 @@ export const add = async (req, res, next) => {
         deleted_at: null,
         ...(user_id ? { user: user_id } : { guest_id }),
       })
-      .populate("product variation");
+      .populate("product variation customization_id");
 
     if (!carts.length) {
       throw StatusError.badRequest("No items found in cart.");
@@ -65,15 +69,38 @@ export const add = async (req, res, next) => {
         const variation = cart.variation;
         if (!product) return null;
 
-        const quantity = cart.quantity;
-        const base_unit_price = parseFloat(cart.discounted_price ?? cart.price);
+        const quantity = Math.max(1, Number(cart.quantity) || 1);
+        const stockSource = variation || product;
+        const regularPrice = Number(stockSource.regular_price);
+        const salePrice = Number(stockSource.sale_price);
+        let base_unit_price =
+          Number.isFinite(salePrice) && salePrice >= 0 && salePrice < regularPrice
+            ? salePrice
+            : regularPrice;
+        let discountPercent = null;
+
+        // Rebuild payable pricing from authoritative product/customization
+        // records. Stored cart prices are display snapshots and may be stale.
+        if (cart.customization_id?.total_price != null) {
+          base_unit_price = Number(cart.customization_id.total_price);
+        } else if (Array.isArray(product.quantity_discounts)) {
+          const tier = inventoryService.cartService.calculateQuantityDiscount({
+            basePrice: base_unit_price,
+            quantity,
+            tiers: product.quantity_discounts,
+          });
+          base_unit_price = tier.unitPrice;
+          discountPercent = tier.discountPercent || null;
+        }
+
+        if (!Number.isFinite(base_unit_price) || base_unit_price < 0) {
+          throw StatusError.badRequest("A product has an invalid current price.");
+        }
         const base_total_price = base_unit_price * quantity;
         const unit_price = parseFloat((base_unit_price * exchangeRate).toFixed(2));
         const total_price = parseFloat((base_total_price * exchangeRate).toFixed(2));
 
         total += total_price;
-
-        const stockSource = variation || product;
 
         return {
           product_id: product._id,
@@ -88,6 +115,9 @@ export const add = async (req, res, next) => {
           weight: stockSource.weight || 0,
           stock_quantity: stockSource.stock_quantity,
           status: stockSource.status,
+          regular_price: parseFloat((regularPrice * exchangeRate).toFixed(2)),
+          sale_price: base_unit_price < regularPrice ? unit_price : null,
+          discount_percent: discountPercent,
           cart_ref: cart,
         };
       })
@@ -136,7 +166,13 @@ const address = await Address.findOne({
       const couponData = await inventoryService.cartService.validateCoupon({
         code: coupon_code,
         user: { _id: user._id, role: user.role },
-        carts,
+        carts: items.map((item) => ({
+          ...item.cart_ref.toObject(),
+          price: item.base_unit_price,
+          discounted_price: null,
+          product: item.cart_ref.product,
+          variation: item.cart_ref.variation,
+        })),
         currency,
       });
       discount = couponData.discount;
@@ -170,7 +206,29 @@ const address = await Address.findOne({
       isAvailable: true,
     });
 
-    const grandTotal = parseFloat((sub_total - discountAmount + shippingAmount).toFixed(2));
+    const amountBeforePaymentFee = parseFloat(
+      (sub_total - discountAmount + shippingAmount).toFixed(2),
+    );
+    let codFee = 0;
+    if (payment_method === "cod") {
+      const cod = await shippingService.calculateCodEligibility({
+        items: items.map((item) => ({
+          product: item.cart_ref.product,
+          variation: item.cart_ref.variation,
+          customization_id: item.customization_id,
+        })),
+        address,
+        orderAmount: amountBeforePaymentFee,
+        user,
+        zone: rateResult.zone,
+        exchangeRate,
+      });
+      if (!cod.eligible) {
+        throw StatusError.badRequest(cod.reason || "Cash on Delivery is unavailable for this order.");
+      }
+      codFee = cod.fee;
+    }
+    const grandTotal = parseFloat((amountBeforePaymentFee + codFee).toFixed(2));
 
     // ── Create order ─────────────────────────────────────────────────────────
     const order_id = `ORD-${Date.now()}`;
@@ -180,18 +238,22 @@ const address = await Address.findOne({
       user: user._id,
       billing_address: address._id,
       shipping_address: address._id,
+      billing_address_snapshot: snapshotAddress(address),
+      shipping_address_snapshot: snapshotAddress(address),
       payment_status: "pending",
       order_status: "pending",
       total_amount: sub_total,
       discount: discountAmount,
       shipping: shippingAmount,
+      cod_fee: codFee,
       grand_total: grandTotal,
       currency,
       payment_method,
       transaction_id: `EXT-${order_id}`,
       note: "Checkout",
       exchange_rate: exchangeRate,
-      total_items: items.length,
+      // Item count means purchasable units, not distinct order lines.
+      total_items: items.reduce((sum, item) => sum + item.quantity, 0),
       coupon_code: coupon_code || null,
       etd: deliveryEstimate?.display || null,
     });
@@ -207,15 +269,53 @@ const address = await Address.findOne({
         quantity: item.quantity,
         unit_price: item.unit_price,
         total_price: item.total_price,
-        regular_price: cart.price,
-        sale_price: cart.discounted_price,
-        discount_percent: cart.discount_percent ?? null,
+        regular_price: item.regular_price,
+        sale_price: item.sale_price,
+        discount_percent: item.discount_percent,
         currency,
         exchange_rate: exchangeRate,
+        // Point-in-time snapshot — see OrderItem.js for why invoices must
+        // never live-join product_id/variation_id for display.
+        product_name: cart.product?.name || null,
+        sku: cart.variation?.sku || cart.product?.sku || null,
+        variation_name: cart.variation?.combination_key || null,
       };
     });
 
     await OrderItem.insertMany(orderItems);
+
+    // ── COD stock reservation ───────────────────────────────────────────────
+    // COD orders have no separate payment-confirmation step (unlike
+    // Razorpay/PayPal, which reserve stock in verifyPayment.js once payment
+    // clears), so the order is fully accepted the moment it's placed — stock
+    // must be decremented here, or a COD order never reserves inventory at all.
+    if (payment_method === "cod") {
+      for (const item of items) {
+        if (item.variation_id) {
+          await ProductVariation.updateOne(
+            { _id: item.variation_id },
+            { $inc: { stock_quantity: -item.quantity } }
+          );
+        } else {
+          await Product.updateOne(
+            { _id: item.product_id },
+            { $inc: { stock_quantity: -item.quantity } }
+          );
+        }
+        await StockTransaction.create({
+          product: item.product_id,
+          variation: item.variation_id || null,
+          type: "sale",
+          quantity: item.quantity,
+          reference_id: order._id,
+          reference_type: "order",
+          mrp: item.regular_price || 0,
+          selling_price: item.unit_price || 0,
+        });
+      }
+      await Order.updateOne({ _id: order._id }, { stock_reserved: true });
+      order.stock_reserved = true;
+    }
 
     // ── Cart cleanup ─────────────────────────────────────────────────────────
     if (isDirectCheckout) {

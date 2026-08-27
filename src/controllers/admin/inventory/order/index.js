@@ -8,6 +8,9 @@ import { performance } from "./performance.js";
 import { leaderboard } from "./leaderboard.js";
 import { geoStats } from "./geoStats.js";
 import { shipping } from "./shipping.js";
+import { cancel } from "./cancel.js";
+import { retryRefund } from "./retryRefund.js";
+import { invoice } from "./invoice.js";
 
 export {
   add,
@@ -20,4 +23,7 @@ export {
   leaderboard,
   geoStats,
   shipping,
+  cancel,
+  retryRefund,
+  invoice,
 };

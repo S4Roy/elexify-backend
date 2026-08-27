@@ -27,6 +27,15 @@ const OrderItemSchema = new Schema(
     discount_percent: { type: Number, default: null }, // Quantity-tier discount percent applied
     currency: { type: String, default: "INR" },
     exchnage_rate: { type: Number, default: 1 },
+
+    // Point-in-time snapshot, populated at order-item creation from the
+    // then-current Product/ProductVariation docs. Invoices (and any other
+    // historical display) must read these rather than live-joining
+    // product_id/variation_id, so a later product rename/price change never
+    // rewrites an already-placed order's line items.
+    product_name: { type: String, default: null },
+    sku: { type: String, default: null },
+    variation_name: { type: String, default: null },
   },
   {
     timestamps: true,

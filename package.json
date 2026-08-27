@@ -6,6 +6,7 @@
   "scripts": {
     "test": "vitest run",
     "test:watch": "vitest",
+    "import:pincodes": "node src/scripts/importPincodes.js",
     "start": "nodemon src/server.js "
   },
   "author": {
@@ -49,6 +50,7 @@
     "node-cron": "^4.2.1",
     "node-input-validator": "^4.4.1",
     "nodemailer": "^2.7.2",
+    "pdfkit": "^0.20.1",
     "pusher": "^5.1.1-beta",
     "razorpay": "^2.9.6",
     "read-excel-file": "^5.5.3",

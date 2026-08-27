@@ -8,7 +8,7 @@ import { StatusError } from "../../../config/index.js";
  */
 export const edit = async (req, res, next) => {
   try {
-    const { _id, status, note, city_id, state_id } = req.body;
+    const { _id, status, cod_status, note, city_id, state_id } = req.body;
 
     const pincode = await Pincode.findById(_id);
     if (!pincode) {
@@ -17,6 +17,7 @@ export const edit = async (req, res, next) => {
 
     const updateData = {
       ...(status !== undefined && { status }),
+      ...(cod_status !== undefined && { cod_status }),
       ...(note !== undefined && { note }),
       ...(city_id !== undefined && { city_id }),
       ...(state_id !== undefined && { state_id }),

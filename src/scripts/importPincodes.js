@@ -64,6 +64,11 @@ const STATE_ALIASES = {
 // A district name that doesn't match any city verbatim — strip these
 // administrative suffixes and retry once before giving up.
 const DISTRICT_SUFFIX_STRIP = [/ Urban$/i, / Rural$/i, / District$/i, /\s*\([^)]*\)\s*$/];
+const CITY_SUFFIX_STRIP = [
+  ...DISTRICT_SUFFIX_STRIP,
+  /\s+(East|West|North|South|Central)$/i,
+  /\s+(Division|Region)$/i,
+];
 
 // Source district names that are old/British-era or misspelled relative to
 // our geonames-based city collection — verified against the DB before
@@ -89,6 +94,35 @@ const CITY_ALIASES = {
   sundergarh: "Sundargarh",
   jajapur: "Jajpur",
   jhujhunu: "Jhunjhunun",
+  calcutta: "Kolkata",
+};
+
+const cleanSourceValue = (value) => {
+  const cleaned = String(value || "").trim();
+  return !cleaned || /^(NA|NULL)$/i.test(cleaned) ? null : cleaned;
+};
+
+const findCanonicalCity = (stateId, candidates, cityIdByStateAndName) => {
+  for (const original of candidates) {
+    const attempts = [original];
+    const alias = CITY_ALIASES[original.toLowerCase()];
+    if (alias) attempts.push(alias);
+    for (const regex of CITY_SUFFIX_STRIP) {
+      const stripped = original.replace(regex, "").trim();
+      if (stripped && stripped !== original) {
+        attempts.push(stripped);
+        const strippedAlias = CITY_ALIASES[stripped.toLowerCase()];
+        if (strippedAlias) attempts.push(strippedAlias);
+      }
+    }
+    for (const name of attempts) {
+      const id = cityIdByStateAndName.get(
+        `${stateId}|${name.toLowerCase()}`,
+      );
+      if (id) return { id, name };
+    }
+  }
+  return null;
 };
 
 const readCsvRows = () =>
@@ -115,10 +149,28 @@ const run = async () => {
     const district = (row.Districtname || "").trim();
     if (!/^\d{6}$/.test(pincode) || stateSource === "NULL" || !district) continue;
 
-    if (!byPincode.has(pincode)) byPincode.set(pincode, new Map());
+    if (!byPincode.has(pincode)) {
+      byPincode.set(pincode, {
+        districtStateCounts: new Map(),
+        cityCandidateCounts: new Map(),
+      });
+    }
     const key = `${district}|${stateSource}`;
-    const counts = byPincode.get(pincode);
-    counts.set(key, (counts.get(key) || 0) + 1);
+    const entry = byPincode.get(pincode);
+    entry.districtStateCounts.set(
+      key,
+      (entry.districtStateCounts.get(key) || 0) + 1,
+    );
+
+    [row.Taluk, row.divisionname, row.regionname]
+      .map(cleanSourceValue)
+      .filter(Boolean)
+      .forEach((candidate) => {
+        entry.cityCandidateCounts.set(
+          candidate,
+          (entry.cityCandidateCounts.get(candidate) || 0) + 1,
+        );
+      });
   }
 
   console.log(`${byPincode.size} unique pincodes after cleanup.`);
@@ -143,8 +195,10 @@ const run = async () => {
   const unresolvedStates = new Set();
 
   const ops = [];
-  for (const [pincode, counts] of byPincode) {
-    const [topKey] = [...counts.entries()].sort((a, b) => b[1] - a[1])[0];
+  for (const [pincode, entry] of byPincode) {
+    const [topKey] = [...entry.districtStateCounts.entries()].sort(
+      (a, b) => b[1] - a[1],
+    )[0];
     const [district, stateSource] = topKey.split("|");
 
     const stateName = STATE_ALIASES[stateSource];
@@ -152,27 +206,21 @@ const run = async () => {
     if (!state_id) unresolvedStates.add(stateSource);
 
     let city_id = null;
+    let source_city_name = null;
     if (state_id) {
-      city_id = cityIdByStateAndName.get(`${state_id}|${district.toLowerCase()}`) ?? null;
-
-      if (!city_id) {
-        const aliased = CITY_ALIASES[district.toLowerCase()];
-        if (aliased) city_id = cityIdByStateAndName.get(`${state_id}|${aliased.toLowerCase()}`) ?? null;
-      }
-
-      if (!city_id) {
-        for (const re of DISTRICT_SUFFIX_STRIP) {
-          const stripped = district.replace(re, "").trim();
-          if (stripped !== district) {
-            city_id = cityIdByStateAndName.get(`${state_id}|${stripped.toLowerCase()}`) ?? null;
-            if (!city_id) {
-              const aliased = CITY_ALIASES[stripped.toLowerCase()];
-              if (aliased) city_id = cityIdByStateAndName.get(`${state_id}|${aliased.toLowerCase()}`) ?? null;
-            }
-            if (city_id) break;
-          }
-        }
-      }
+      const rankedSourceCandidates = [
+        district,
+        ...[...entry.cityCandidateCounts.entries()]
+          .sort((a, b) => b[1] - a[1])
+          .map(([name]) => name),
+      ];
+      const canonical = findCanonicalCity(
+        state_id,
+        rankedSourceCandidates,
+        cityIdByStateAndName,
+      );
+      city_id = canonical?.id ?? null;
+      source_city_name = canonical?.name ?? rankedSourceCandidates[0] ?? null;
     }
 
     if (city_id && state_id) resolvedBoth += 1;
@@ -186,6 +234,7 @@ const run = async () => {
           $set: {
             district,
             source_state_name: stateSource,
+            source_city_name,
             city_id,
             state_id,
             country_id: INDIA_COUNTRY_ID,

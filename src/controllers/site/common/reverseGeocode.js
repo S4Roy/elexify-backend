@@ -1,6 +1,17 @@
 import axios from "axios";
 import { resolvePincode } from "../../../services/shipping/resolvePincode.js";
 import { StatusError } from "../../../config/index.js";
+import City from "../../../models/City.js";
+
+const escapeRegex = (value = "") =>
+  String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+const normalizeCityCandidate = (value) =>
+  String(value || "")
+    .replace(/\b(metropolitan|metro)\s+(area|region)\b/gi, "")
+    .replace(/\b(city|district|county)\b/gi, "")
+    .replace(/\s+/g, " ")
+    .trim();
 
 // "Use current location" on the address form: browser gives us lat/lng, we
 // reverse-geocode server-side (OpenStreetMap Nominatim — free, no API key,
@@ -57,15 +68,79 @@ export const reverseGeocode = async (req, res, next) => {
       ? await resolvePincode(postcode)
       : { pincode: postcode, found: false, serviceable: false };
 
-    const line1 = [address.house_number, address.road]
+    // Nominatim may return a valid delivery locality (for example "New
+    // Town") that is intentionally more granular than our canonical City
+    // master. Try progressively broader administrative names and map them to
+    // an existing city ID; never create master data during checkout.
+    if (!resolved.city && resolved.state?.id) {
+      const candidates = [
+        address.city,
+        address.town,
+        address.municipality,
+        address.county,
+        address.state_district,
+      ]
+        .flatMap((value) => [value, normalizeCityCandidate(value)])
+        .map((value) => String(value || "").trim())
+        .filter(Boolean);
+
+      const uniqueCandidates = [...new Set(candidates)];
+      if (uniqueCandidates.length) {
+        const canonicalCity = await City.findOne({
+          state_id: resolved.state.id,
+          status: "active",
+          $or: uniqueCandidates.map((name) => ({
+            name: { $regex: `^${escapeRegex(name)}$`, $options: "i" },
+          })),
+        })
+          .select("id name")
+          .lean();
+
+        if (canonicalCity) {
+          resolved.city = {
+            id: canonicalCity.id,
+            name: canonicalCity.name,
+          };
+        }
+      }
+    }
+
+    const streetAddress = [address.house_number, address.road]
       .filter(Boolean)
       .join(" ");
+    // GPS results frequently omit house_number/road (especially for large
+    // complexes and New Town-style action areas). In that case promote the
+    // most specific locality to required Address Line 1 rather than filling
+    // only optional Address Line 2 and leaving the form invalid.
+    const line1 =
+      streetAddress ||
+      address.building ||
+      address.amenity ||
+      address.residential ||
+      address.neighbourhood ||
+      address.suburb ||
+      "";
     const line2 = [
-      address.suburb || address.neighbourhood,
+      line1 === address.suburb || line1 === address.neighbourhood
+        ? null
+        : address.suburb || address.neighbourhood,
+      address.city &&
+      address.city.toLowerCase() !== resolved.city?.name?.toLowerCase()
+        ? address.city
+        : null,
       address.city_district,
     ]
       .filter(Boolean)
       .join(", ");
+
+    const suggestedCityName =
+      resolved.city?.name ||
+      address.city ||
+      address.town ||
+      address.municipality ||
+      address.village ||
+      address.county ||
+      null;
 
     res.status(200).json({
       status: "success",
@@ -78,6 +153,9 @@ export const reverseGeocode = async (req, res, next) => {
         ...resolved,
         suggested_address_line_1: line1 || null,
         suggested_address_line_2: line2 || null,
+        suggested_city_name: suggestedCityName,
+        latitude: lat,
+        longitude: lng,
       },
     });
   } catch (error) {

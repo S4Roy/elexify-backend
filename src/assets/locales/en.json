@@ -192,5 +192,7 @@
 	"Media uploaded successfully": "Media uploaded successfully",
 	"Pincode updated successfully": "Pincode updated successfully",
 	"Page not found": "Page not found",
-	"FAQ Deleted successfully": "FAQ Deleted successfully"
+	"FAQ Deleted successfully": "FAQ Deleted successfully",
+	"TempCart cleared": "TempCart cleared",
+	"Unauthorized": "Unauthorized"
 }

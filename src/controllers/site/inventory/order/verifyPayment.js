@@ -7,6 +7,7 @@ import Coupon from "../../../../models/Coupon.js";
 import CouponUsage from "../../../../models/CouponUsage.js";
 import Product from "../../../../models/Product.js";
 import ProductVariation from "../../../../models/ProductVariation.js";
+import StockTransaction from "../../../../models/StockTransaction.js";
 import { inventoryService } from "../../../../services/index.js";
 import User from "../../../../models/User.js";
 
@@ -82,6 +83,7 @@ export const verifyPayment = async (req, res, next) => {
           ...instrument,
         },
         paid_at: new Date(),
+        stock_reserved: true,
       },
       { new: true }
     );
@@ -135,6 +137,16 @@ export const verifyPayment = async (req, res, next) => {
           { $inc: { stock_quantity: -item.quantity } }
         );
       }
+      await StockTransaction.create({
+        product: item.product_id,
+        variation: item.variation_id || null,
+        type: "sale",
+        quantity: item.quantity,
+        reference_id: order._id,
+        reference_type: "order",
+        mrp: item.regular_price || 0,
+        selling_price: item.unit_price || 0,
+      });
     }
     await inventoryService.cartService.clearCarts(order.user);
     return res.status(200).json({

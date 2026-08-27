@@ -26,6 +26,7 @@ import { v1UserRouter } from "./routes/user/index.js";
 import { v1AdminRouter } from "./routes/admin/index.js";
 import { v1SiteRouter } from "./routes/site/index.js";
 import { v1WebhookRouter } from "./routes/webhook/index.js";
+import { razorpayWebhookRouter } from "./routes/payments/razorpayWebhook.js";
 
 // import indexRoutes from "./routes/index.js";
 import { fileURLToPath } from "url";
@@ -109,7 +110,18 @@ const allowedOrigins = buildAllowedOrigins(
   "https://api.elexify.online",
 );
 app.use(cors(buildCorsOptions(allowedOrigins)));
-app.use(express.json({ limit: "5mb" }));
+app.use(
+  express.json({
+    limit: "5mb",
+    // Preserves the exact raw request bytes alongside the parsed body, so
+    // the Razorpay webhook handler can verify its HMAC signature against
+    // the bytes Razorpay actually signed (a re-serialized JSON.stringify of
+    // req.body would not reliably match).
+    verify: (req, res, buf) => {
+      req.rawBody = buf;
+    },
+  })
+);
 app.use(express.urlencoded({ limit: "5mb", extended: true }));
 app.use(fileUpload());
 app.use(express.static("public"));
@@ -157,6 +169,7 @@ app.use(
   v1AuthRouter,
 );
 app.use(`${envs.basePath}/callback`, v1CallBackRouter);
+app.use(`${envs.basePath}/api/v1/payments/razorpay`, razorpayWebhookRouter);
 
 app.use(
   `${envs.basePath}/api/v1/admin`,

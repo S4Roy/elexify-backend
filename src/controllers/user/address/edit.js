@@ -24,6 +24,8 @@ export const edit = async (req, res, next) => {
       state,
       country,
       postcode,
+      latitude,
+      longitude,
       address_type,
       purpose,
       is_default,
@@ -68,6 +70,8 @@ export const edit = async (req, res, next) => {
     if (state !== undefined) address.state = state;
     if (country !== undefined) address.country = country;
     if (postcode !== undefined) address.postcode = postcode;
+    if (latitude !== undefined) address.latitude = latitude;
+    if (longitude !== undefined) address.longitude = longitude;
     if (address_type !== undefined) address.address_type = address_type;
     if (purpose !== undefined) address.purpose = purpose;
     if (typeof is_default === "boolean") address.is_default = is_default;

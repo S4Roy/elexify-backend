@@ -22,7 +22,7 @@ export const resolvePincode = async (pincode) => {
     return { pincode, found: true, serviceable: false };
   }
 
-  const [city, state, country] = await Promise.all([
+  const [cityById, state, country] = await Promise.all([
     record.city_id
       ? City.findOne({ id: record.city_id }).select("id name").lean()
       : null,
@@ -31,6 +31,23 @@ export const resolvePincode = async (pincode) => {
       : null,
     Country.findOne({ id: record.country_id }).select("id name").lean(),
   ]);
+
+  // `source_city_name` lets re-imported pincode rows recover gracefully if
+  // a city master ID is replaced while preserving the canonical name.
+  const city =
+    cityById ||
+    (record.source_city_name && state?.id
+      ? await City.findOne({
+          state_id: state.id,
+          status: "active",
+          name: {
+            $regex: `^${String(record.source_city_name).replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`,
+            $options: "i",
+          },
+        })
+          .select("id name")
+          .lean()
+      : null);
 
   return {
     pincode,

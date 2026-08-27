@@ -4,10 +4,15 @@ export const cartManage = celebrate({
   body: Joi.object({
     product_id: Joi.string()
       .regex(/^[0-9a-fA-F]{24}$/)
-      .required()
+      .when("quantity", {
+        is: 0,
+        then: Joi.optional(),
+        otherwise: Joi.required(),
+      })
       .messages({
         "string.empty": "Product ID is required",
         "string.pattern.base": "Invalid Product ID format",
+        "any.required": "Product ID is required",
       }),
     variation_id: Joi.string()
       .pattern(/^[0-9a-fA-F]{24}$/)

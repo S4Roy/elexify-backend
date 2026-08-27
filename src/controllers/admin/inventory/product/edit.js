@@ -39,6 +39,8 @@ export const edit = async (req, res, next) => {
       width,
       height,
       shipping_class,
+      cod_status = "use_global",
+      prepaid_only = false,
       quantity_discounts = [],
 
       regular_price,
@@ -122,6 +124,8 @@ export const edit = async (req, res, next) => {
       weight,
       dimensions: { length, width, height },
       shipping_class: shipping_class || null,
+      cod_status,
+      prepaid_only,
       quantity_discounts,
 
       regular_price: product_type === "simple" ? regular_price : undefined,
@@ -250,6 +254,8 @@ export const edit = async (req, res, next) => {
             height: v.height || 0,
           },
           shipping_class: v.shipping_class || null,
+          cod_status: v.cod_status || "use_global",
+          prepaid_only: Boolean(v.prepaid_only),
           attributes: v.attributes || [],
           images: foundVariationImages.map((m) => m._id),
           status: "active",

@@ -23,6 +23,8 @@ export const add = async (req, res, next) => {
       state,
       country,
       postcode,
+      latitude,
+      longitude,
       address_type,
       purpose,
       is_default,
@@ -34,7 +36,6 @@ export const add = async (req, res, next) => {
     await assertPincodeServiceable(postcode, country || 101);
 
     const addressFilter = {
-      user: user_id,
       user: user_id,
       full_name: `${first_name} ${last_name}`,
       phone_code,
@@ -48,11 +49,39 @@ export const add = async (req, res, next) => {
       country: country || 101,
       postcode,
       address_type: address_type || "home",
+      deleted_at: null,
     };
 
     let addressExist = await Address.findOne(addressFilter);
     if (addressExist) {
-      throw StatusError.badRequest("Address already exist");
+      let changed = false;
+      if (latitude != null && addressExist.latitude !== latitude) {
+        addressExist.latitude = latitude;
+        changed = true;
+      }
+      if (longitude != null && addressExist.longitude !== longitude) {
+        addressExist.longitude = longitude;
+        changed = true;
+      }
+      if (is_default && !addressExist.is_default) {
+        await Address.updateMany(
+          { user: user_id, deleted_at: null, _id: { $ne: addressExist._id } },
+          { is_default: false },
+        );
+        addressExist.is_default = true;
+        changed = true;
+      }
+      if (changed) {
+        addressExist.updated_by = user_id;
+        addressExist.updated_at = Date.now();
+        await addressExist.save();
+      }
+      return res.status(200).json({
+        status: "success",
+        message: req.__("Address already saved"),
+        data: addressExist,
+        existing: true,
+      });
     }
     // If is_default is true, unset others
     if (is_default) {
@@ -75,6 +104,8 @@ export const add = async (req, res, next) => {
       state,
       country: country || 101,
       postcode,
+      latitude: latitude ?? null,
+      longitude: longitude ?? null,
       address_type: address_type || "home",
       purpose: purpose || "shipping",
       is_default: is_default || false,

@@ -20,5 +20,11 @@ orderRouter.post(
   // inventoryValidation.orderValidation.place,
   inventoryController.orderController.verifyPayment
 );
+orderRouter.post(
+  "/cancel",
+  inventoryValidation.orderValidation.cancel,
+  inventoryController.orderController.cancel
+);
+orderRouter.get("/invoice", inventoryController.orderController.invoice);
 
 export { orderRouter };
