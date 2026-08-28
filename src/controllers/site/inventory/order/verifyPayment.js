@@ -87,6 +87,18 @@ export const verifyPayment = async (req, res, next) => {
       },
       { new: true }
     );
+
+    // Razorpay can retry the verification request, and the client can also
+    // submit it more than once. In either case the guarded update above returns
+    // null once the order is already processing. Treat that as an idempotent
+    // success before reading any fields from the order.
+    if (!order) {
+      return res.status(200).json({
+        status: "success",
+        message: "Order already processed or not found",
+      });
+    }
+
     // If coupon was used, record its usage
     const couponCode = order.coupon_code;
     const user = { _id: order.user };
@@ -112,13 +124,6 @@ export const verifyPayment = async (req, res, next) => {
           { $inc: { total_used: 1 } }
         );
       }
-    }
-
-    if (!order) {
-      return res.status(200).json({
-        status: "success",
-        message: "Order already processed or not found",
-      });
     }
 
     // 4️⃣ Get order items
