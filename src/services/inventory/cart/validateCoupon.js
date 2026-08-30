@@ -70,13 +70,14 @@ export const validateCoupon = async ({
       throw StatusError.badRequest("Login required to apply this coupon");
     }
 
-    if (coupon.applicable_for === "user" && user.role !== "customer") {
+    const effectiveRole = userData?.role || user.role;
+    if (coupon.applicable_for === "user" && effectiveRole !== "customer") {
       throw StatusError.badRequest("Coupon not applicable for this user");
     }
 
     if (
       coupon.applicable_for === "channel_partner" &&
-      user.role !== "channel_partner"
+      effectiveRole !== "channel_partner"
     ) {
       throw StatusError.badRequest("Coupon not applicable for this user");
     }

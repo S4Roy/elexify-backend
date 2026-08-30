@@ -20,7 +20,7 @@ export const counts = async (req, res, next) => {
     const baseMatch = {
       deleted_at: null,
       ...(user_id
-        ? { user: mongoose.Types.ObjectId(String(user_id)) }
+        ? { user: new mongoose.Types.ObjectId(String(user_id)) }
         : { guest_id }),
     };
 

@@ -32,10 +32,12 @@ import { razorpayWebhookRouter } from "./routes/payments/razorpayWebhook.js";
 import { fileURLToPath } from "url";
 import { envs } from "./config/index.js";
 import { buildAllowedOrigins, buildCorsOptions } from "./config/corsOptions.js";
+import { validateProductionEnv } from "./config/validateProductionEnv.js";
 import { errors } from "celebrate";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
+validateProductionEnv();
 // Initialize i18n before using it
 i18n.configure({
   locales: ["en"],
@@ -123,7 +125,12 @@ app.use(
   })
 );
 app.use(express.urlencoded({ limit: "5mb", extended: true }));
-app.use(fileUpload());
+app.use(fileUpload({
+  limits: { fileSize: 50 * 1024 * 1024 },
+  abortOnLimit: true,
+  safeFileNames: true,
+  preserveExtension: 5,
+}));
 app.use(express.static("public"));
 app.use(bearerToken());
 app.use(StatusSuccess);

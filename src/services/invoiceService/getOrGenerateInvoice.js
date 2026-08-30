@@ -44,7 +44,15 @@ const buildItemSnapshot = async (item, gstPerItem) => {
     0,
     (item.regular_price || unitPrice) * quantity - total,
   );
-  const itemGst = gstPerItem(total);
+  const hasStoredFinancials = item.final_line_total != null && item.final_line_total !== 0;
+  const itemGst = hasStoredFinancials ? {
+    taxableAmount: item.taxable_amount,
+    taxRate: item.tax_rate,
+    taxAmount: item.tax_amount,
+    cgst: item.cgst,
+    sgst: item.sgst,
+    igst: item.igst,
+  } : gstPerItem(total);
 
   return {
     product_name: productName,
@@ -52,14 +60,20 @@ const buildItemSnapshot = async (item, gstPerItem) => {
     variation_name: variationName,
     quantity,
     unit_price: unitPrice,
-    discount: Number(discount.toFixed(2)),
+    discount: hasStoredFinancials
+      ? Number(((item.sale_discount || 0) + (item.quantity_discount || 0) + (item.coupon_discount || 0)).toFixed(2))
+      : Number(discount.toFixed(2)),
+    sale_discount: item.sale_discount || 0,
+    quantity_discount: item.quantity_discount || 0,
+    coupon_discount: item.coupon_discount || 0,
+    shipping_allocation: item.shipping_allocation || 0,
     taxable_amount: itemGst.taxableAmount,
     tax_rate: itemGst.taxRate,
     tax_amount: itemGst.taxAmount,
     cgst: itemGst.cgst,
     sgst: itemGst.sgst,
     igst: itemGst.igst,
-    total,
+    total: hasStoredFinancials ? item.final_line_total : total,
   };
 };
 
@@ -154,6 +168,9 @@ export const getOrGenerateInvoice = async ({ orderId, actorType }) => {
     company,
   });
   const itemCount = orderItems.length || 1;
+  const hasStoredFinancials = orderItems.length > 0 && orderItems.every(
+    (item) => item.final_line_total != null && item.final_line_total !== 0,
+  );
   // Distribute the order-level tax evenly across items for line-level
   // display only — the authoritative tax figure is the order-level total
   // computed once above, never re-summed from these per-item shares.
@@ -174,17 +191,22 @@ export const getOrGenerateInvoice = async ({ orderId, actorType }) => {
     orderItems.map((item) => buildItemSnapshot(item, gstPerItem)),
   );
 
-  const productDiscount = Number(
-    items.reduce((sum, i) => sum + (i.discount || 0), 0).toFixed(2),
-  );
+  const productDiscount = Number(items.reduce(
+    (sum, item) => sum + (hasStoredFinancials
+      ? (item.sale_discount || 0) + (item.quantity_discount || 0)
+      : (item.discount || 0)), 0,
+  ).toFixed(2));
+  const storedTaxTotal = Number(items.reduce((sum, item) => sum + (item.tax_amount || 0), 0).toFixed(2));
+  const storedCouponTotal = Number(items.reduce((sum, item) => sum + (item.coupon_discount || 0), 0).toFixed(2));
+  const storedShippingTotal = Number(items.reduce((sum, item) => sum + (item.shipping_allocation || 0), 0).toFixed(2));
 
   const totals = {
     subtotal: order.total_amount || 0,
     product_discount: productDiscount,
-    coupon_discount: order.discount || 0,
-    shipping: order.shipping || 0,
+    coupon_discount: hasStoredFinancials ? storedCouponTotal : order.discount || 0,
+    shipping: hasStoredFinancials ? storedShippingTotal : order.shipping || 0,
     cod_fee: order.cod_fee || 0,
-    tax_total: gst.isGstApplicable ? gst.taxAmount : 0,
+    tax_total: hasStoredFinancials ? storedTaxTotal : (gst.isGstApplicable ? gst.taxAmount : 0),
     grand_total: order.grand_total,
     amount_in_words: amountInWords(order.grand_total),
   };
@@ -210,7 +232,9 @@ export const getOrGenerateInvoice = async ({ orderId, actorType }) => {
 
     items,
     totals,
-    is_gst_applicable: gst.isGstApplicable,
+    is_gst_applicable: hasStoredFinancials
+      ? items.some((item) => Number(item.tax_rate) > 0)
+      : gst.isGstApplicable,
   });
 
   await Order.updateOne(

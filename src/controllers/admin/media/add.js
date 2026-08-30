@@ -4,6 +4,7 @@ import { s3Handler } from "../../../services/s3Handler/s3Handler.js";
 import path from "path";
 import MediaResource from "../../../resources/MediaResource.js";
 import mime from "mime-types"; // npm i mime-types
+import { validateMediaUpload } from "../../../helpers/validateMediaUpload.js";
 
 // OPTIONAL: uncomment / install these if you want thumbnails
 // import sharp from "sharp";            // npm i sharp
@@ -14,7 +15,6 @@ const ALLOWED_IMAGE_MIMES = [
   "image/png",
   "image/webp",
   "image/gif",
-  "image/svg+xml",
   "image/avif",
 ];
 const ALLOWED_VIDEO_MIMES = [
@@ -41,8 +41,9 @@ export const add = async (req, res, next) => {
     }
 
     // determine mimetype & size (file object shape may vary by uploader)
-    const mimetype = file.mimetype || file.type || mime.lookup(file.name) || "";
-    const size = file.size ?? file.data?.length ?? null;
+    const validated = await validateMediaUpload(file);
+    const mimetype = validated.mime;
+    const size = validated.size;
 
     // detect type: image or video
     const isImage = mimetype.startsWith("image/");

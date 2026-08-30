@@ -1,6 +1,8 @@
 import Order from "../../../models/Order.js";
 import OrderScans from "../../../models/OrderScans.js";
 import moment from "moment-timezone";
+import { normalizeOrderStatus } from "../../../helpers/order/normalizeOrderStatus.js";
+import { orderService } from "../../../services/index.js";
 
 /**
  * Shiprocket webhook -> update order status + save scans
@@ -59,7 +61,10 @@ export const updateOrderStatus = async (req, res, next) => {
       .trim()
       .toLowerCase();
 
-    const newStatus = incoming;
+    const newStatus = normalizeOrderStatus(incoming.replace(/\s+/g, "_"));
+    if (!newStatus) {
+      return res.status(422).json({ status: "error", message: "Unsupported shipment status" });
+    }
     const eventTimestamp = current_timestamp
       ? new Date(current_timestamp)
       : new Date();
@@ -112,9 +117,6 @@ export const updateOrderStatus = async (req, res, next) => {
         .toString()
         .toLowerCase();
       if (currentOrderStatus !== newStatus) {
-        if ("order_status" in order) order.order_status = newStatus;
-        else order.status = newStatus;
-
         // Stamp the timestamp for the stage the order just entered
         if (newStatus === "processing") {
           order.processing_at = eventTimestamp;
@@ -182,6 +184,11 @@ export const updateOrderStatus = async (req, res, next) => {
 
     // Save the updated order (meta + status)
     await order.save();
+    order = await orderService.transitionOrder({
+      orderId: order._id,
+      orderStatus: newStatus,
+      source: "carrier",
+    });
 
     // Respond 200 (Shiprocket expects success).
     return res.status(200).json({
@@ -194,10 +201,10 @@ export const updateOrderStatus = async (req, res, next) => {
       },
     });
   } catch (err) {
-    // Log and respond 200 to avoid webhook retries, or 500 if you want retries
+    // Return a retryable failure. A 200 here would silently discard a carrier
+    // transition that never reached the order state machine.
     console.error("Shiprocket webhook processing error:", err);
-    // return 200 to acknowledge receipt so Shiprocket won't keep retrying
-    return res.status(200).json({
+    return res.status(500).json({
       status: "error",
       message: "Failed to process webhook, logged for review",
       error: err?.message || err,

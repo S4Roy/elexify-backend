@@ -186,5 +186,7 @@ export const place = celebrate({
     }),
     isDirectCheckout: Joi.boolean().optional().default(false),
     coupon_code: Joi.string().optional().allow("", null),
+    idempotency_key: Joi.string().trim().min(16).max(128).required(),
+    expected_total: Joi.number().precision(2).min(0).optional(),
   }),
 });

@@ -17,7 +17,7 @@ export const envs = {
   base_url: process.env.BASE_URL || "", // Set the base URL from the environment variable
   pms_url: process.env.PMS_URL || "", // Set the base URL from the environment variable
   apiKey: process.env.API_KEY || "",
-  MONGODB_URI: `mongodb://${process.env.MONGODB_HOST}:${process.env.MONGODB_PORT}/${process.env.MONGODB_DATABASE}`,
+  MONGODB_URI: process.env.MONGODB_URI || `mongodb://${process.env.MONGODB_HOST}:${process.env.MONGODB_PORT}/${process.env.MONGODB_DATABASE}`,
   passwordSalt: Number(process.env.PASSWORD_SALT_ROUND) || 12,
   jwt: {
     accessToken: {
@@ -54,6 +54,12 @@ export const envs = {
     key_id: process.env.RAZORPAY_KEY_ID,
     key_secret: process.env.RAZORPAY_KEY_SECRET,
     webhook_secret: process.env.RAZORPAY_WEBHOOK_SECRET,
+    account_id: process.env.RAZORPAY_ACCOUNT_ID || "",
+  },
+  operationalAlerts: {
+    webhookUrl: process.env.OPERATIONS_ALERT_WEBHOOK_URL || "",
+    cooldownSeconds: Math.max(60, Number(process.env.OPERATIONS_ALERT_COOLDOWN_SECONDS) || 900),
+    transactionAbortThreshold: Math.max(1, Number(process.env.OPERATIONS_TRANSACTION_ABORT_THRESHOLD) || 3),
   },
   paypal: {
     client_id: process.env.PAYPAL_CLIENT_ID,

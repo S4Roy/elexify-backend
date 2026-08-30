@@ -4,6 +4,7 @@ import { envs } from "../../config/index.js";
 import Order from "../../models/Order.js";
 import { getPayPalToken } from "./getPayPalToken.js";
 import { inventoryService } from "../index.js";
+import { transitionOrder } from "../orderService/transitionOrder.js";
 
 /**
  * Capture a PayPal order server-side and update local Order.
@@ -91,11 +92,13 @@ export const capturePayPalOrder = async (orderID, dbOrderIdentifier = null) => {
     }
 
     // Update local order (returns null if not found)
-    const updatedOrder = await Order.findOneAndUpdate(
-      lookup,
-      { $set: setPatch },
-      { new: true }
-    );
+    const currentOrder = await Order.findOne(lookup);
+    const updatedOrder = currentOrder ? await transitionOrder({
+      orderId: currentOrder._id,
+      orderStatus: setPatch.order_status,
+      paymentStatus: setPatch.payment_status,
+      set: Object.fromEntries(Object.entries(setPatch).filter(([key]) => !["order_status", "payment_status"].includes(key))),
+    }) : null;
     if (updatedOrder) {
       await inventoryService.cartService.clearCarts(updatedOrder.user);
     }

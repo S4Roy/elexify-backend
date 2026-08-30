@@ -1,12 +1,20 @@
 import mongoose from "mongoose";
 const { Schema, model } = mongoose;
 import mongooseAggregatePaginate from "mongoose-aggregate-paginate-v2";
+import {
+  ORDER_STATUS_VALUES,
+  PAYMENT_STATUS_VALUES,
+  PAYMENT_METHOD_VALUES,
+} from "../constants/orderStatus.js";
 
 // Main order schema
 const OrderSchema = new Schema(
   {
     id: {
       type: String,
+      required: true,
+      unique: true,
+      index: true,
     },
     user: {
       type: mongoose.Types.ObjectId,
@@ -30,20 +38,13 @@ const OrderSchema = new Schema(
 
     payment_status: {
       type: String,
-      // enum: ["pending", "paid", "failed"],
+      enum: PAYMENT_STATUS_VALUES,
       default: "pending",
     },
 
     order_status: {
       type: String,
-      // enum: [
-      //   "pending",
-      //   "confirmed",
-      //   "packed",
-      //   "shipped",
-      //   "delivered",
-      //   "cancelled",
-      // ],
+      enum: ORDER_STATUS_VALUES,
       default: "pending",
     },
 
@@ -56,10 +57,13 @@ const OrderSchema = new Schema(
 
     payment_method: {
       type: String,
-      // enum: ["cod", "online"],
+      enum: PAYMENT_METHOD_VALUES,
       required: false,
     },
     transaction_id: { type: String },
+    idempotency_key: { type: String, default: null },
+    idempotency_fingerprint: { type: String, default: null },
+    idempotency_fingerprint_version: { type: Number, default: 1 },
     payment_meta: { type: Object, default: {} }, // optional Razorpay response etc.
 
     coupon_code: { type: String },
@@ -68,7 +72,7 @@ const OrderSchema = new Schema(
     paid_at: { type: Date, default: null },
     deleted_at: { type: Date, default: null },
     currency: { type: String, default: "INR" },
-    exchnage_rate: { type: Number, default: 1 },
+    exchange_rate: { type: Number, default: 1 },
     awb: { type: String },
     etd: { type: String },
     courier_name: { type: String },
@@ -156,6 +160,10 @@ OrderSchema.index({ "products.product": 1 });
 // this they fell back to a full collection scan of every order.
 OrderSchema.index({ deleted_at: 1, created_at: -1 });
 OrderSchema.index({ billing_address: 1 });
+OrderSchema.index(
+  { user: 1, idempotency_key: 1 },
+  { unique: true, partialFilterExpression: { idempotency_key: { $type: "string" } } },
+);
 
 // Apply pagination plugin
 OrderSchema.plugin(mongooseAggregatePaginate);

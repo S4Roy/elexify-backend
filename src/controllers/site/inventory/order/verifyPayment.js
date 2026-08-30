@@ -1,166 +1,34 @@
 import crypto from "crypto";
 import Razorpay from "razorpay";
 import { envs, StatusError } from "../../../../config/index.js";
-import Order from "../../../../models/Order.js";
-import OrderItem from "../../../../models/OrderItem.js";
-import Coupon from "../../../../models/Coupon.js";
-import CouponUsage from "../../../../models/CouponUsage.js";
-import Product from "../../../../models/Product.js";
-import ProductVariation from "../../../../models/ProductVariation.js";
-import StockTransaction from "../../../../models/StockTransaction.js";
-import { inventoryService } from "../../../../services/index.js";
-import User from "../../../../models/User.js";
+import { orderService } from "../../../../services/index.js";
 
-const razorpay = new Razorpay({
-  key_id: envs.razorpay.key_id,
-  key_secret: envs.razorpay.key_secret,
-});
-
-// Best-effort fetch of the instrument actually used (card/upi/netbanking/
-// wallet) so the order confirmation can show it — never let this block
-// checkout if Razorpay's API hiccups.
-const fetchPaymentInstrument = async (paymentId) => {
-  try {
-    const payment = await razorpay.payments.fetch(paymentId);
-    return {
-      method: payment.method || null,
-      card: payment.card
-        ? {
-            last4: payment.card.last4 || null,
-            network: payment.card.network || null,
-            type: payment.card.type || null,
-            issuer: payment.card.issuer || null,
-          }
-        : null,
-      vpa: payment.vpa || null,
-      bank: payment.bank || null,
-      wallet: payment.wallet || null,
-    };
-  } catch (err) {
-    console.warn("Razorpay payment instrument fetch failed:", err?.message || err);
-    return {};
-  }
-};
+const razorpay = new Razorpay({ key_id: envs.razorpay.key_id, key_secret: envs.razorpay.key_secret });
 
 export const verifyPayment = async (req, res, next) => {
   try {
-    const {
-      razorpay_payment_id,
-      razorpay_order_id,
-      razorpay_signature,
-      order_id,
-    } = req.body;
+    const { razorpay_payment_id, razorpay_order_id, razorpay_signature, order_id } = req.body;
+    const userId = req.auth?.user_id;
+    if (!userId) throw StatusError.unauthorized("Login required to verify payment");
+    const expected = crypto.createHmac("sha256", envs.razorpay.key_secret)
+      .update(`${razorpay_order_id}|${razorpay_payment_id}`).digest("hex");
+    if (expected !== razorpay_signature) throw StatusError.badRequest("Payment signature mismatch");
 
-    // 1️⃣ Basic validation
-    if (!razorpay_payment_id || !razorpay_order_id || !razorpay_signature) {
-      throw StatusError.badRequest("Missing Razorpay credentials");
+    const payment = await razorpay.payments.fetch(razorpay_payment_id);
+    if (payment?.order_id !== razorpay_order_id) {
+      throw StatusError.badRequest("Payment does not match Razorpay order");
     }
-
-    // 2️⃣ Verify payment signature
-    const hmac = crypto
-      .createHmac("sha256", envs.razorpay.key_secret)
-      .update(`${razorpay_order_id}|${razorpay_payment_id}`)
-      .digest("hex");
-
-    if (hmac !== razorpay_signature) {
-      throw StatusError.badRequest("Payment signature mismatch");
-    }
-
-    // 3️⃣ Fetch which instrument (card/upi/netbanking/wallet) was actually used
-    const instrument = await fetchPaymentInstrument(razorpay_payment_id);
-
-    // 4️⃣ Update order only if not already processing
-    const order = await Order.findOneAndUpdate(
-      { id: order_id, order_status: { $ne: "processing" } },
-      {
-        order_status: "processing",
-        payment_status: "paid",
-        payment_meta: {
-          payment_provider: "razorpay",
-          razorpay_order_id,
-          razorpay_payment_id,
-          razorpay_signature,
-          ...instrument,
-        },
-        paid_at: new Date(),
-        stock_reserved: true,
-      },
-      { new: true }
-    );
-
-    // Razorpay can retry the verification request, and the client can also
-    // submit it more than once. In either case the guarded update above returns
-    // null once the order is already processing. Treat that as an idempotent
-    // success before reading any fields from the order.
-    if (!order) {
-      return res.status(200).json({
-        status: "success",
-        message: "Order already processed or not found",
-      });
-    }
-
-    // If coupon was used, record its usage
-    const couponCode = order.coupon_code;
-    const user = { _id: order.user };
-    const currency = order.currency;
-    const appliedDiscount = order.discount || 0;
-
-    if (couponCode && appliedDiscount > 0) {
-      const coupon = await Coupon.findOne({ code: couponCode }).exec();
-      if (coupon) {
-        const userData = await User.findById(order.user).exec();
-        await CouponUsage.create({
-          coupon: coupon._id,
-          user: user._id,
-          email: userData.email,
-          order: order._id,
-          discount_amount: appliedDiscount,
-          currency,
-        });
-
-        // atomic counter increment
-        await Coupon.updateOne(
-          { _id: coupon._id },
-          { $inc: { total_used: 1 } }
-        );
-      }
-    }
-
-    // 4️⃣ Get order items
-    const items = await OrderItem.find({ order_id: order?._id });
-
-    // 5️⃣ Reduce stock
-    for (const item of items) {
-      if (item.variation_id) {
-        await ProductVariation.updateOne(
-          { _id: item.variation_id },
-          { $inc: { stock_quantity: -item.quantity } }
-        );
-      } else {
-        await Product.updateOne(
-          { _id: item.product_id },
-          { $inc: { stock_quantity: -item.quantity } }
-        );
-      }
-      await StockTransaction.create({
-        product: item.product_id,
-        variation: item.variation_id || null,
-        type: "sale",
-        quantity: item.quantity,
-        reference_id: order._id,
-        reference_type: "order",
-        mrp: item.regular_price || 0,
-        selling_price: item.unit_price || 0,
-      });
-    }
-    await inventoryService.cartService.clearCarts(order.user);
+    const result = await orderService.finalizeCapturedPayment({
+      orderId: order_id, paymentData: payment, source: "browser", userId,
+    });
     return res.status(200).json({
       status: "success",
-      message: "Payment verified, order confirmed, and stock reduced",
-      payment_id: razorpay_payment_id,
+      message: result.alreadyFinalized ? "Payment already verified" : "Payment verified and order finalized",
+      payment_id: payment.id,
+      data: { order: result.order },
     });
   } catch (error) {
-    console.error("❌ verifyPayment error:", error);
+    console.error("❌ verifyPayment error:", error?.message || error);
     next(error);
   }
 };

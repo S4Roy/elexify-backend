@@ -8,6 +8,7 @@ import Media from "../../../models/Media.js";
 import { StatusError } from "../../../config/index.js";
 import { s3Handler } from "../../../services/s3Handler/s3Handler.js";
 import MediaResource from "../../../resources/MediaResource.js";
+import { validateMediaUpload } from "../../../helpers/validateMediaUpload.js";
 
 ffmpeg.setFfmpegPath(ffmpegStatic);
 
@@ -87,8 +88,8 @@ export const upload = async (req, res, next) => {
     const created = [];
 
     for (const file of files) {
-      const mimetype =
-        file.mimetype || file.type || mime.lookup(file.name) || "";
+      const validated = await validateMediaUpload(file);
+      const mimetype = validated.mime;
       const isImage = mimetype.startsWith("image/");
       const isVideo = mimetype.startsWith("video/");
 

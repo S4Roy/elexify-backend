@@ -1,6 +1,7 @@
 import Order from "../../models/Order.js";
 import { PAYMENT_STATUS } from "../../constants/orderStatus.js";
-import { refundRazorpayPayment, fetchRazorpayPayment } from "../paymentService/index.js";
+import { refundRazorpayPayment, fetchRazorpayPayment } from "../paymentService/refundRazorpayPayment.js";
+import { recordOperationalEvent } from "../observability/recordOperationalEvent.js";
 
 // Shared by cancelOrder (first attempt) and retryRefund (admin retry).
 // Idempotent: never issues a second Razorpay refund for an order that
@@ -110,6 +111,11 @@ export const attemptRefund = async (order) => {
         },
       }
     );
+    await recordOperationalEvent({
+      eventType: "refund_failed", correlationId: claimed.id,
+      summary: "Razorpay refund attempt failed",
+      metadata: { order_id: claimed.id, reason: err?.message || "Refund could not be initiated" },
+    }).catch(() => undefined);
     return Order.findById(order._id);
   }
 };

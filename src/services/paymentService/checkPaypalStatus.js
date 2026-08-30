@@ -3,6 +3,7 @@ import axios from "axios";
 import { envs } from "../../config/index.js";
 import Order from "../../models/Order.js";
 import { getPayPalToken } from "./getPayPalToken.js";
+import { transitionOrder } from "../orderService/transitionOrder.js";
 
 /**
  * Check PayPal order status (GET) and update only the local Order record.
@@ -104,11 +105,13 @@ export const checkPaypalStatus = async (orderID, dbOrderIdentifier = null) => {
     }
 
     // Update local Order document
-    const updatedOrder = await Order.findOneAndUpdate(
-      lookup,
-      { $set: setPatch },
-      { new: true }
-    );
+    const currentOrder = await Order.findOne(lookup);
+    const updatedOrder = currentOrder ? await transitionOrder({
+      orderId: currentOrder._id,
+      orderStatus: setPatch.order_status,
+      paymentStatus: setPatch.payment_status,
+      set: Object.fromEntries(Object.entries(setPatch).filter(([key]) => !["order_status", "payment_status"].includes(key))),
+    }) : null;
     console.log(updatedOrder?.id ?? null);
 
     return {

@@ -5,20 +5,17 @@ const mongoDBUrl = `${envs.MONGODB_URI}`;
 
 mongoose.Promise = global.Promise;
 
-const connectDB = async () => {
+export const connectDB = async () => {
   try {
-    await mongoose.connect(mongoDBUrl, {
-      useUnifiedTopology: true,
-      useNewUrlParser: true,
-      useFindAndModify: false,
-      useCreateIndex: true,
-    });
+    await mongoose.connect(mongoDBUrl);
     console.log(`Database Connected at ${mongoDBUrl}`);
   } catch (error) {
     console.error("Database connection error:", error);
   }
 };
 
-connectDB();
+// Export the startup promise so scripts/tests can wait for the connection
+// instead of racing an unawaited module side effect against disconnect().
+export const mongooseConnection = connectDB();
 
 export default mongoose;

@@ -17,7 +17,7 @@ orderRouter.post(
 );
 orderRouter.post(
   "/verify-payment",
-  // inventoryValidation.orderValidation.place,
+  inventoryValidation.orderValidation.verifyPayment,
   inventoryController.orderController.verifyPayment
 );
 orderRouter.post(

@@ -26,6 +26,7 @@ import { topbarRouter } from "./topbar.js";
 import { headerConfigRouter } from "./header-config.js";
 import { navigationMenuRouter } from "./navigation-menu.js";
 import { adminNavigationRouter } from "./navigation.js";
+import { operationsRouter } from "./operations.js";
 
 const v1AdminRouter = Router();
 // All routes go here
@@ -57,5 +58,6 @@ v1AdminRouter.use("/topbar", topbarRouter);
 v1AdminRouter.use("/header-config", headerConfigRouter);
 v1AdminRouter.use("/navigation-menu", navigationMenuRouter);
 v1AdminRouter.use("/navigation", adminNavigationRouter);
+v1AdminRouter.use("/operations", operationsRouter);
 
 export { v1AdminRouter };

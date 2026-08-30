@@ -73,6 +73,10 @@ const StockTransactionSchema = new Schema(
   },
   { versionKey: false }
 );
+StockTransactionSchema.index(
+  { reference_id: 1, product: 1, variation: 1, type: 1 },
+  { unique: true, partialFilterExpression: { reference_type: "order" } },
+);
 StockTransactionSchema.plugin(mongooseAggregatePaginate);
 
 const StockTransaction = model("stock_transactions", StockTransactionSchema);

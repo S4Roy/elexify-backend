@@ -36,7 +36,7 @@ export const list = async (req, res, next) => {
       matchFilter.slug = slug;
     }
     if (_id) {
-      matchFilter._id = mongoose.Types.ObjectId(_id);
+      matchFilter._id = new mongoose.Types.ObjectId(_id);
     }
     if (status) {
       matchFilter.status = { $in: status.split(",") };

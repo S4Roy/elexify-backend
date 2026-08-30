@@ -1,6 +1,5 @@
 import Handlebars from "handlebars";
 import nodemailer from "nodemailer";
-import smtpTransport from "nodemailer-smtp-transport";
 import { emailTemplateService } from "../index.js";
 import { envs } from "../../config/index.js";
 import path from "path";
@@ -57,18 +56,20 @@ export const sendEmail = async (
       },
     });
 
-    // Configure SMTP transport
-    const transporter = nodemailer.createTransport(
-      smtpTransport({
-        host: envs.smtp.host,
-        port: envs.smtp.port,
-        secure: envs.smtp.secure,
-        auth: {
-          user: envs.smtp.email,
-          pass: envs.smtp.password,
-        },
-      })
-    );
+    // Configure SMTP transport — nodemailer has had SMTP support built in
+    // since v6; the separate nodemailer-smtp-transport package (a
+    // nodemailer@2.x-era plugin, itself the root of several critical
+    // advisories via its own smtp-connection/httpntlm/underscore chain) is
+    // no longer needed or installed.
+    const transporter = nodemailer.createTransport({
+      host: envs.smtp.host,
+      port: envs.smtp.port,
+      secure: envs.smtp.secure,
+      auth: {
+        user: envs.smtp.email,
+        pass: envs.smtp.password,
+      },
+    });
 
     // Mail details
     const mailOptions = {

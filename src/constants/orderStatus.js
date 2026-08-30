@@ -17,7 +17,10 @@ export const ORDER_STATUS = {
   CANCELLED: "cancelled",
   RETURN_REQUESTED: "return_requested",
   RETURNED: "returned",
+  FAILED: "failed",
 };
+
+export const ORDER_STATUS_VALUES = Object.values(ORDER_STATUS);
 
 export const PAYMENT_STATUS = {
   PENDING: "pending",
@@ -28,6 +31,24 @@ export const PAYMENT_STATUS = {
   REFUNDED: "refunded",
   REFUND_FAILED: "refund_failed",
 };
+export const PAYMENT_STATUS_VALUES = Object.values(PAYMENT_STATUS);
+
+export const PAYMENT_METHOD = { COD: "cod", RAZORPAY: "razorpay", PAYPAL: "paypal" };
+export const PAYMENT_METHOD_VALUES = Object.values(PAYMENT_METHOD);
+
+const ALLOWED_TRANSITIONS = {
+  pending: ["confirmed", "processing", "cancelled", "failed"],
+  confirmed: ["processing", "packed", "cancelled"],
+  processing: ["packed", "shipped", "cancelled"],
+  packed: ["shipped", "cancelled"],
+  shipped: ["out_for_delivery", "delivered"],
+  out_for_delivery: ["delivered"],
+  delivered: ["return_requested"],
+  return_requested: ["returned"],
+};
+
+export const canTransitionOrder = (from, to) =>
+  from === to || Boolean(ALLOWED_TRANSITIONS[from]?.includes(to));
 
 // Orders in these order_status values may be cancelled unconditionally.
 export const CANCELLABLE_ORDER_STATUSES = [

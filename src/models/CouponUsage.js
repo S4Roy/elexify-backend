@@ -57,6 +57,7 @@ const CouponUsageSchema = new Schema(
 
 // Helps enforce usage_per_email
 CouponUsageSchema.index({ coupon: 1, email: 1 });
+CouponUsageSchema.index({ order: 1 }, { unique: true });
 
 /* =========================
    PLUGINS

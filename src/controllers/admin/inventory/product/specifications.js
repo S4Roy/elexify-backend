@@ -20,7 +20,7 @@ export const specifications = async (req, res, next) => {
     const pipeline = [
       {
         $match: {
-          product_id: mongoose.Types.ObjectId(String(product._id)),
+          product_id: new mongoose.Types.ObjectId(String(product._id)),
           deleted_at: null,
         },
       },

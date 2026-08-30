@@ -4,16 +4,19 @@ import User from "../../../../models/User.js";
 import Address from "../../../../models/Address.js";
 import { StatusError } from "../../../../config/index.js";
 import mongoose from "mongoose";
-import { zohoService } from "../../../../services/index.js";
+import { zohoService, orderService } from "../../../../services/index.js";
 import { derivePaymentStatus } from "../../../../helpers/order/derivePaymentStatus.js";
+import { normalizeOrderStatus } from "../../../../helpers/order/normalizeOrderStatus.js";
 
 export const updateStatus = async (req, res, next) => {
   try {
     let data = {};
     const { order_id, status, transaction_id, payment_meta } = req.body;
 
+    const normalizedStatus = normalizeOrderStatus(status);
+    if (!normalizedStatus) throw StatusError.badRequest("Unsupported order status");
     const updateFields = {
-      order_status: status,
+      order_status: normalizedStatus,
       payment_status: derivePaymentStatus(status),
     };
     // Only overwrite with real values — don't clobber a good value from
@@ -25,11 +28,13 @@ export const updateStatus = async (req, res, next) => {
     }
 
     // Find and update the order by external ID
-    const orderDoc = await Order.findOneAndUpdate(
-      { id: String(order_id) },
-      updateFields,
-      { new: true }
-    );
+    const currentOrder = await Order.findOne({ id: String(order_id) });
+    const orderDoc = currentOrder && await orderService.transitionOrder({
+      orderId: currentOrder._id,
+      orderStatus: updateFields.order_status,
+      paymentStatus: updateFields.payment_status,
+      set: Object.fromEntries(Object.entries(updateFields).filter(([key]) => !["order_status", "payment_status"].includes(key))),
+    });
 
     if (!orderDoc) {
       throw new StatusError(404, "Order not found");

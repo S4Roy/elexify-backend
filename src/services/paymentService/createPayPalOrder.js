@@ -2,7 +2,6 @@
 import axios from "axios";
 import { envs } from "../../config/index.js";
 import { getPayPalToken } from "./getPayPalToken.js";
-const { accessToken, base } = await getPayPalToken();
 
 /**
  * Strict create PayPal order helper with validation and verbose error logging.
@@ -14,6 +13,9 @@ export const createPayPalOrder = async (
   items = []
 ) => {
   try {
+    // Resolve credentials at request time. A module-level token lookup runs
+    // before the application has connected Mongoose and can prevent startup.
+    const { accessToken, base } = await getPayPalToken();
     // normalize and validate currency
     currency = String(currency || "USD").toUpperCase();
 

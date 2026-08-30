@@ -2,7 +2,7 @@ import moment from "moment";
 import User from "../../models/User.js";
 import OtpVerification from "../../models/OtpVerification.js";
 import UserResource from "../../resources/UserResource.js";
-import { StatusError } from "../../config/index.js";
+import { StatusError, envs } from "../../config/index.js";
 import { userService, inventoryService } from "../../services/index.js";
 import { generalHelper } from "../../helpers/index.js";
 import { normalizeMobile } from "../../helpers/mobileHelper.js";
@@ -42,6 +42,7 @@ export const verifyUserOtp = async (req, res, next) => {
       purpose,
       verified_at: null,
       expired_at: null,
+      attempts: { $lt: envs.otp.max_attempts },
     }).sort({ created_at: -1 });
 
     if (!otpRecord) {
@@ -55,10 +56,32 @@ export const verifyUserOtp = async (req, res, next) => {
 
     const isOtpValid = await generalHelper.bcryptCheck(otp, otpRecord.otp);
     if (!isOtpValid) {
+      const failed = await OtpVerification.findOneAndUpdate(
+        {
+          _id: otpRecord._id,
+          verified_at: null,
+          expired_at: null,
+          attempts: { $lt: envs.otp.max_attempts },
+        },
+        { $inc: { attempts: 1 } },
+        { new: true },
+      );
+      if (!failed || failed.attempts >= envs.otp.max_attempts) {
+        await OtpVerification.updateOne(
+          { _id: otpRecord._id, verified_at: null },
+          { $set: { expired_at: new Date() } },
+        );
+        throw StatusError.tooManyRequests(req.__("OTP attempt limit exceeded. Request a new code."));
+      }
       throw StatusError.badRequest(req.__("Invalid OTP"));
     }
 
-    await otpRecord.updateOne({ verified_at: new Date() });
+    const consumed = await OtpVerification.findOneAndUpdate(
+      { _id: otpRecord._id, verified_at: null, expired_at: null },
+      { $set: { verified_at: new Date() } },
+      { new: true },
+    );
+    if (!consumed) throw StatusError.badRequest(req.__("OTP already used or expired"));
 
     // ── Find or create user ───────────────────────────────────────────────────
     let user = null;

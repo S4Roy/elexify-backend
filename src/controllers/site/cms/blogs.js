@@ -32,7 +32,7 @@ export const blogs = async (req, res, next) => {
       matchFilter.slug = slug;
     }
     if (_id) {
-      matchFilter._id = mongoose.Types.ObjectId(_id);
+      matchFilter._id = new mongoose.Types.ObjectId(_id);
     }
     let idsArray = [];
 

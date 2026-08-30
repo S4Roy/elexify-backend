@@ -482,7 +482,7 @@ export const list = async (req, res, next) => {
       const specifications_pipeline = [
         {
           $match: {
-            product_id: mongoose.Types.ObjectId(String(productDoc._id)),
+            product_id: new mongoose.Types.ObjectId(String(productDoc._id)),
             deleted_at: null,
             value: { $ne: null },
             status: "active",

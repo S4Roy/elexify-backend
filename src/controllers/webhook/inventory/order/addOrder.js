@@ -8,9 +8,10 @@ import Country from "../../../../models/Country.js";
 import State from "../../../../models/State.js";
 import City from "../../../../models/City.js";
 import { StatusError } from "../../../../config/index.js";
-import { zohoService } from "../../../../services/index.js";
+import { zohoService, orderService } from "../../../../services/index.js";
 import { derivePaymentStatus } from "../../../../helpers/order/derivePaymentStatus.js";
 import { snapshotAddress } from "../../../../services/invoiceService/snapshotAddress.js";
+import { normalizeOrderStatus } from "../../../../helpers/order/normalizeOrderStatus.js";
 
 export const addOrder = async (req, res, next) => {
   try {
@@ -31,6 +32,8 @@ export const addOrder = async (req, res, next) => {
       payment_meta,
       items,
     } = req.body;
+    const normalizedStatus = normalizeOrderStatus(status);
+    if (!normalizedStatus) throw StatusError.badRequest("Unsupported order status");
 
     console.log(`🚀 Received order: ${order_id}`);
 
@@ -39,7 +42,7 @@ export const addOrder = async (req, res, next) => {
     if (existingOrder) {
       console.warn(`⚠️ Duplicate order attempt: ${order_id}`);
       const updatePayload = {
-        order_status: status,
+        order_status: normalizedStatus,
         payment_status: derivePaymentStatus(status),
       };
       // Only overwrite with real values — a retry that couldn't find
@@ -84,10 +87,12 @@ export const addOrder = async (req, res, next) => {
         }
       }
 
-      await Order.updateOne(
-        { _id: existingOrder._id },
-        { $set: updatePayload }
-      );
+      await orderService.transitionOrder({
+        orderId: existingOrder._id,
+        orderStatus: updatePayload.order_status,
+        paymentStatus: updatePayload.payment_status,
+        set: Object.fromEntries(Object.entries(updatePayload).filter(([key]) => !["order_status", "payment_status"].includes(key))),
+      });
 
       // Stamp paid_at the first time this order flips to paid — the
       // `paid_at: null` filter means this is a no-op on every later status
@@ -269,7 +274,7 @@ export const addOrder = async (req, res, next) => {
       billing_address_snapshot: snapshotAddress(billingAddress),
       shipping_address_snapshot: snapshotAddress(shippingAddress),
       payment_status: orderPaymentStatus,
-      order_status: status,
+      order_status: normalizedStatus,
       total_amount: sub_total,
       discount: discountAmount,
       item_count: orderItems.length,

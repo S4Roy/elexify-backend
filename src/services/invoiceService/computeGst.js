@@ -22,10 +22,13 @@ export const computeGst = ({ grandTotal, shippingState, company }) => {
   const taxableAmount = Number((grandTotal / (1 + gstRate / 100)).toFixed(2));
   const taxAmount = Number((grandTotal - taxableAmount).toFixed(2));
 
-  const isIntraState =
-    companyState &&
-    shippingState &&
-    companyState.trim().toLowerCase() === shippingState.trim().toLowerCase();
+  const normalizedCompanyState = String(companyState || "").trim().toLowerCase();
+  const normalizedShippingState = String(shippingState || "").trim().toLowerCase();
+  const isIntraState = Boolean(
+    normalizedCompanyState &&
+    normalizedShippingState &&
+    normalizedCompanyState === normalizedShippingState,
+  );
 
   return {
     isGstApplicable: true,

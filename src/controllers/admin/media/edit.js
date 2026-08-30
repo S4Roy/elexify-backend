@@ -3,13 +3,13 @@ import { StatusError } from "../../../config/index.js";
 import { s3Handler } from "../../../services/s3Handler/s3Handler.js";
 import MediaResource from "../../../resources/MediaResource.js";
 import mime from "mime-types";
+import { validateMediaUpload } from "../../../helpers/validateMediaUpload.js";
 
 const ALLOWED_IMAGE_MIMES = [
   "image/jpeg",
   "image/png",
   "image/webp",
   "image/gif",
-  "image/svg+xml",
   "image/avif",
 ];
 const ALLOWED_VIDEO_MIMES = ["video/mp4", "video/webm"];
@@ -40,7 +40,8 @@ export const edit = async (req, res, next) => {
     }
 
     if (file) {
-      const mimetype = file.mimetype || mime.lookup(file.name) || "";
+      const validated = await validateMediaUpload(file);
+      const mimetype = validated.mime;
       const allowed =
         media.type === "video" ? ALLOWED_VIDEO_MIMES : ALLOWED_IMAGE_MIMES;
       if (!allowed.includes(mimetype)) {

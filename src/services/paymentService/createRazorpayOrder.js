@@ -1,11 +1,25 @@
 import { envs } from "../../config/index.js";
 import Razorpay from "razorpay";
-import Order from "../../models/Order.js";
 
 const razorpay = new Razorpay({
   key_id: envs.razorpay.key_id,
   key_secret: envs.razorpay.key_secret,
 });
+
+export const findRazorpayOrderByReceipt = async ({ receipt, amount, currency }) => {
+  const response = await razorpay.orders.all({ receipt, count: 100 });
+  const candidates = (response?.items || []).filter((order) =>
+    order.receipt === receipt &&
+    order.amount === Math.round(Number(amount) * 100) &&
+    order.currency === String(currency).toUpperCase(),
+  );
+  if (candidates.length > 1) {
+    const error = new Error("Multiple Razorpay orders match the checkout receipt; manual reconciliation required");
+    error.code = "AMBIGUOUS_PROVIDER_ORDERS";
+    throw error;
+  }
+  return candidates[0] || null;
+};
 
 export const createRazorpayOrder = async (totalAmount, currency, receipt) => {
   try {
@@ -19,21 +33,6 @@ export const createRazorpayOrder = async (totalAmount, currency, receipt) => {
     return order;
   } catch (err) {
     console.error("❌ Razorpay Order Creation Error:", err);
-    const order = await Order.findOneAndUpdate(
-      { id: receipt },
-      {
-        order_status: "failed",
-        payment_status: "failed",
-        payment_meta: {
-          payment_provider: "razorpay",
-          razorpay_order_id: null,
-          razorpay_payment_id: null,
-          razorpay_signature: null,
-        },
-        paid_at: new Date(),
-      },
-      { new: true }
-    );
     throw err;
   }
 };
