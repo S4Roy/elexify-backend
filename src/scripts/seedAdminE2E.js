@@ -9,6 +9,8 @@ import OrderItem from "../models/OrderItem.js";
 import Page from "../models/Page.js";
 import Product from "../models/Product.js";
 import User from "../models/User.js";
+import NotificationJob from "../models/NotificationJob.js";
+import NotificationLog from "../models/NotificationLog.js";
 
 const uri = process.env.E2E_MONGODB_URI || "mongodb://127.0.0.1:27139/elexify_e2e_admin?replicaSet=elexifyAdminE2ERs";
 assertSafeE2EDatabase(uri);
@@ -36,6 +38,58 @@ const admin = await User.create({
   password: adminPasswordHash,
   status: "active",
   email_verified_at: new Date(),
+});
+
+// A lower-privileged admin — used by the Phase 2 notification/customer
+// admin E2E spec to prove customer.notification.retry and
+// customer.verification.override are actually blocked for a role that
+// doesn't hold them (constants/adminPermissions.js: only
+// superadmin/manager have those).
+const staffAdmin = await User.create({
+  role: "staff",
+  name: "E2E Staff",
+  email: "e2e.staff@example.com",
+  password: adminPasswordHash,
+  status: "active",
+  email_verified_at: new Date(),
+});
+
+// A customer with a verified email, an unverified mobile, and a pending
+// email change — so the Phase 2 customer-details page has real
+// verification-badge/pending-state data to assert against.
+const customer = await User.create({
+  role: "customer",
+  name: "E2E Notification Customer",
+  email: "e2e.notification.customer@example.com",
+  email_verified_at: new Date(),
+  pending_email: "e2e.pending-new-email@example.com",
+  status: "active",
+});
+
+const dlLog = await NotificationLog.create({
+  user_id: customer._id,
+  event: "ORDER_SHIPPED",
+  channel: "email",
+  destination_masked: "e***@example.com",
+  template_id: "order_shipped",
+  provider: "smtp",
+  status: "DEAD_LETTER",
+  attempt_count: 3,
+  last_error_safe: "simulated provider timeout (seeded for E2E)",
+});
+await NotificationJob.create({
+  user_id: customer._id,
+  event: "ORDER_SHIPPED",
+  channel: "email",
+  template_id: "order_shipped",
+  destination_masked: "e***@example.com",
+  provider: "smtp",
+  status: "DEAD_LETTER",
+  attempts: 3,
+  max_attempts: 3,
+  error_class: "TRANSIENT",
+  last_error_safe: "simulated provider timeout (seeded for E2E)",
+  notification_log_id: dlLog._id,
 });
 
 const category = await Category.create({
@@ -126,6 +180,8 @@ await OrderItem.create({
 console.log(JSON.stringify({
   database: mongoose.connection.name,
   admin: { email: admin.email },
+  staffAdmin: { email: staffAdmin.email },
+  customer: { id: String(customer._id), email: customer.email },
   category: category.slug,
   brand: brand.slug,
   products: Object.fromEntries(products.map((p) => [p.slug, String(p._id)])),

@@ -20,6 +20,7 @@ import cron from "node-cron";
 // import pusherConfig from "./config/pusher.js";
 import { seed } from "./controllers/DbSeedingController.js";
 import * as CronJobs from "./controllers/cronjobs/index.js";
+import { notificationService } from "./services/index.js";
 import { v1AuthRouter } from "./routes/auth/index.js";
 import { v1CallBackRouter } from "./routes/callback/index.js";
 import { v1UserRouter } from "./routes/user/index.js";
@@ -166,6 +167,19 @@ cron.schedule("0 */6 * * *", async () => {
     await CronJobs.generateGoogleFeed(); // ✅ invoke the function
   } catch (e) {
     console.error("generateGoogleFeed Cron Failed", e);
+  }
+});
+
+// Drains queued/retrying NotificationJob rows (email/SMS/WhatsApp) — see
+// services/notification/processNotificationQueue.js. Runs every minute so
+// user-facing notifications (order confirmation, OTP-adjacent security
+// alerts) go out promptly without ever blocking the request that enqueued
+// them.
+cron.schedule("* * * * *", async () => {
+  try {
+    await notificationService.processNotificationQueue();
+  } catch (e) {
+    console.error("processNotificationQueue Cron Failed", e);
   }
 });
 

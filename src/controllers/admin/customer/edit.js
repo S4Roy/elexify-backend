@@ -65,17 +65,20 @@ export const edit = async (req, res, next) => {
       updated_at: new Date(),
     };
 
-    // Email changed — update and mark verified (admin action)
+    // Email/mobile changed — update the value, but do NOT silently mark it
+    // verified. An admin correcting a typo or a support-driven change must
+    // not casually flip verification status; use the dedicated, permission-
+    // gated, audited POST /admin/customers/:id/verification-override for
+    // that (routes/admin/customers.js).
     if (email && email.trim().toLowerCase() !== customer.email) {
       updateData.email = email.trim().toLowerCase();
-      updateData.email_verified_at = new Date();
+      updateData.email_verified_at = null;
     }
 
-    // Mobile changed — update and mark verified (admin action)
     if (mobile && mobile.trim() !== customer.mobile) {
       updateData.mobile = mobile.trim();
       updateData.phone_code = phone_code ?? customer.phone_code ?? "91";
-      updateData.mobile_verified_at = new Date();
+      updateData.mobile_verified_at = null;
     }
 
     // Password — hash only if provided

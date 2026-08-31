@@ -20,7 +20,30 @@ const AuditLogSchema = new Schema(
         "MOBILE_CHANGED",
         "NOTIFICATION_PREFERENCES_CHANGED",
         "PASSWORD_CHANGED",
+        "CONTACT_VERIFICATION_OVERRIDE",
+        "NOTIFICATION_MANUAL_RETRY",
+        "NOTIFICATION_PREFERENCE_ADMIN_CHANGE",
       ],
+    },
+    // Set for admin-initiated events (verification override, manual retry,
+    // admin preference change) — the admin user who performed the action.
+    // user_id above always identifies the customer the action concerns.
+    actor_id: {
+      type: Types.ObjectId,
+      ref: "users",
+      default: null,
+    },
+    // Required by the admin UI for verification overrides; optional
+    // elsewhere. Never contains OTP or other secrets.
+    reason: {
+      type: String,
+      default: null,
+    },
+    // Safe, structured context (e.g. { channel, previous_state, new_state }
+    // for a verification override). Never OTP/tokens/provider secrets.
+    metadata: {
+      type: Schema.Types.Mixed,
+      default: null,
     },
     ip: {
       type: String,

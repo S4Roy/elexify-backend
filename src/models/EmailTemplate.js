@@ -7,6 +7,13 @@ const EmailTemplateSchema = new Schema({
   site_language: { type: String, required: true },
   subject: { type: String, required: true },
   body: { type: String, required: true },
+  // getTemplate.js already filters on this — it was missing here, so every
+  // lookup silently matched zero documents regardless of what existed.
+  status: {
+    type: String,
+    enum: ["active", "inactive"],
+    default: "active",
+  },
   created_at: {
     type: Date,
     default: Date.now,
@@ -24,6 +31,10 @@ const EmailTemplateSchema = new Schema({
     default: null,
   },
 });
+
+// One template per (action, language) — this is also the seed script's
+// upsert key (src/scripts/seedEmailTemplates.js).
+EmailTemplateSchema.index({ action: 1, site_language: 1 }, { unique: true });
 
 const EmailTemplate = model("email_templates", EmailTemplateSchema);
 

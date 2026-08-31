@@ -2,6 +2,7 @@ import Order from "../../models/Order.js";
 import { PAYMENT_STATUS } from "../../constants/orderStatus.js";
 import { refundRazorpayPayment, fetchRazorpayPayment } from "../paymentService/refundRazorpayPayment.js";
 import { recordOperationalEvent } from "../observability/recordOperationalEvent.js";
+import { notificationService } from "../index.js";
 
 // Shared by cancelOrder (first attempt) and retryRefund (admin retry).
 // Idempotent: never issues a second Razorpay refund for an order that
@@ -44,6 +45,15 @@ export const attemptRefund = async (order) => {
     return Order.findById(order._id);
   }
 
+  notificationService
+    .sendNotification({
+      userId: claimed.user,
+      event: "REFUND_INITIATED",
+      data: { order_id: claimed.id },
+      dedupeKey: `${claimed.id}:REFUND_INITIATED`,
+    })
+    .catch(() => {});
+
   const razorpayPaymentId = claimed.payment_meta?.razorpay_payment_id;
 
   try {
@@ -84,6 +94,14 @@ export const attemptRefund = async (order) => {
           },
         }
       );
+      notificationService
+        .sendNotification({
+          userId: claimed.user,
+          event: "REFUND_COMPLETED",
+          data: { order_id: claimed.id },
+          dedupeKey: `${claimed.id}:REFUND_COMPLETED`,
+        })
+        .catch(() => {});
     } else {
       await Order.updateOne(
         { _id: claimed._id },

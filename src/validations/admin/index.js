@@ -30,8 +30,10 @@ import * as topBarValidation from "./topbar/index.js";
 import * as headerConfigValidation from "./header-config/index.js";
 import * as navigationMenuValidation from "./navigation-menu/index.js";
 import * as navigationMenuItemValidation from "./navigation-menu-item/index.js";
+import * as customerAccountValidation from "./customerAccount/index.js";
 
 export {
+  customerAccountValidation,
   inventoryValidation,
   masterValidation,
   mediaValidation,

@@ -1,7 +1,7 @@
 import crypto from "crypto";
 import Razorpay from "razorpay";
 import { envs, StatusError } from "../../../../config/index.js";
-import { orderService } from "../../../../services/index.js";
+import { orderService, notificationService } from "../../../../services/index.js";
 
 const razorpay = new Razorpay({ key_id: envs.razorpay.key_id, key_secret: envs.razorpay.key_secret });
 
@@ -19,6 +19,16 @@ export const verifyPayment = async (req, res, next) => {
     const result = await orderService.finalizeCapturedPayment({
       orderId: order_id, paymentData: payment, source: "admin_verification",
     });
+    if (!result.alreadyFinalized) {
+      notificationService
+        .sendNotification({
+          userId: result.order.user,
+          event: "PAYMENT_SUCCESS",
+          data: { order_id: result.order.id },
+          dedupeKey: `${result.order.id}:PAYMENT_SUCCESS`,
+        })
+        .catch(() => {});
+    }
     return res.status(200).json({
       status: "success",
       message: result.alreadyFinalized ? "Payment already verified" : "Payment verified and order finalized",

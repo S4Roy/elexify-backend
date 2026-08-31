@@ -197,5 +197,11 @@
 	"Unauthorized": "Unauthorized",
 	"We're unable to use this mobile number right now. Please try a different one.": "We're unable to use this mobile number right now. Please try a different one.",
 	"Notification preferences fetched successfully": "Notification preferences fetched successfully",
-	"OTP sent to your new email address": "OTP sent to your new email address"
+	"OTP sent to your new email address": "OTP sent to your new email address",
+	"Notification summary fetched successfully": "Notification summary fetched successfully",
+	"Dead-letter notifications fetched successfully": "Dead-letter notifications fetched successfully",
+	"Notification preferences updated successfully": "Notification preferences updated successfully",
+	"Customer details fetched successfully": "Customer details fetched successfully",
+	"Notification history fetched successfully": "Notification history fetched successfully",
+	"Notification queued for retry": "Notification queued for retry"
 }

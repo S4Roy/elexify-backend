@@ -12,6 +12,7 @@ import ShippingSettings from "../models/ShippingSettings.js";
 import ShippingZone from "../models/ShippingZone.js";
 import SiteSetting from "../models/SiteSetting.js";
 import User from "../models/User.js";
+import EmailTemplate from "../models/EmailTemplate.js";
 
 const uri = process.env.E2E_MONGODB_URI || "mongodb://127.0.0.1:27129/elexify_e2e?replicaSet=elexifyE2ERs";
 assertSafeE2EDatabase(uri);
@@ -76,6 +77,14 @@ await SiteSetting.create([
   { slug: "company_state", value: "West Bengal", label: "Company state", type: "text" },
   { slug: "company_gstin", value: "19ABCDE1234F1Z5", label: "GSTIN", type: "text" },
   { slug: "company_gst_rate", value: "18", label: "GST rate", type: "number" },
+]);
+
+// Without this, OTP-dependent E2E specs (login-by-OTP, email/mobile change)
+// hit the same "zero EmailTemplate rows" bootstrap gap Phase 2 fixed for
+// every other environment — see src/scripts/seedEmailTemplates.js.
+await EmailTemplate.create([
+  { action: "otp", site_language: "en", subject: "Your OTP Code", body: "<p>{{name}}, your OTP is {{otp}}</p>", status: "active" },
+  { action: "email_changed", site_language: "en", subject: "Your account email was changed", body: "<p>{{name}}, your email was changed.</p>", status: "active" },
 ]);
 
 console.log(JSON.stringify({

@@ -31,8 +31,12 @@ import * as headerConfigController from "./header-config/index.js";
 import * as navigationMenuController from "./navigation-menu/index.js";
 import * as navigationMenuItemController from "./navigation-menu-item/index.js";
 import * as navigationPreviewController from "./navigation/index.js";
+import * as customerAccountController from "./customerAccount/index.js";
+import * as notificationController from "./notification/index.js";
 
 export {
+  customerAccountController,
+  notificationController,
   inventoryController,
   masterController,
   mediaController,

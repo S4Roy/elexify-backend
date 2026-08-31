@@ -47,7 +47,7 @@ export const sendEmail = async (
     const mergedSubstitutions = { ...defaultSubstitutions, ...substitutions };
 
     // Compile the template using Handlebars
-    const template = Handlebars.compile(emailTemplate.content);
+    const template = Handlebars.compile(emailTemplate.body);
     const content = template(mergedSubstitutions, {
       data: {
         intl: {

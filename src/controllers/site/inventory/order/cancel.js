@@ -1,4 +1,4 @@
-import { orderService } from "../../../../services/index.js";
+import { orderService, notificationService } from "../../../../services/index.js";
 import { StatusError } from "../../../../config/index.js";
 
 export const cancel = async (req, res, next) => {
@@ -17,6 +17,15 @@ export const cancel = async (req, res, next) => {
       reason,
       comment,
     });
+
+    notificationService
+      .sendNotification({
+        userId: order.user,
+        event: "ORDER_CANCELLED",
+        data: { order_id: order.id },
+        dedupeKey: `${order.id}:ORDER_CANCELLED`,
+      })
+      .catch(() => {});
 
     return res.status(200).json({
       status: "success",

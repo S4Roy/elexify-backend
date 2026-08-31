@@ -92,6 +92,16 @@ export const envs = {
     sender_id: "ELXFY",
     route: "dlt",
   },
+  whatsapp: {
+    // Meta WhatsApp Business Cloud API (graph.facebook.com). Unset in every
+    // environment today — services/notification/whatsapp.provider.js treats
+    // a missing accessToken as "not configured" and never makes a network
+    // call, so this is a real integration waiting on credentials, not a
+    // stub.
+    phoneNumberId: process.env.WHATSAPP_PHONE_NUMBER_ID || "",
+    accessToken: process.env.WHATSAPP_ACCESS_TOKEN || "",
+    apiVersion: process.env.WHATSAPP_API_VERSION || "v21.0",
+  },
   NO_IMAGE: `https://${process.env.S3_BUCKET_NAME}.s3.${process.env.S3_REGION}.amazonaws.com/noimage.svg`,
   DEFAULT_LANGUAGE: process.env.DEFAULT_LANGUAGE || "en",
   maxFileUploadSize: process.env.maxFileUploadSize || 20,

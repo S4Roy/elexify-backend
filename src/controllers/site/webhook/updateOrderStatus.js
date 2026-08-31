@@ -2,7 +2,14 @@ import Order from "../../../models/Order.js";
 import OrderScans from "../../../models/OrderScans.js";
 import moment from "moment-timezone";
 import { normalizeOrderStatus } from "../../../helpers/order/normalizeOrderStatus.js";
-import { orderService } from "../../../services/index.js";
+import { orderService, notificationService } from "../../../services/index.js";
+import { ORDER_STATUS } from "../../../constants/orderStatus.js";
+
+const SHIPMENT_STATUS_EVENTS = {
+  [ORDER_STATUS.SHIPPED]: "ORDER_SHIPPED",
+  [ORDER_STATUS.OUT_FOR_DELIVERY]: "ORDER_OUT_FOR_DELIVERY",
+  [ORDER_STATUS.DELIVERED]: "ORDER_DELIVERED",
+};
 
 /**
  * Shiprocket webhook -> update order status + save scans
@@ -189,6 +196,18 @@ export const updateOrderStatus = async (req, res, next) => {
       orderStatus: newStatus,
       source: "carrier",
     });
+
+    const shipmentEvent = SHIPMENT_STATUS_EVENTS[newStatus];
+    if (shipmentEvent) {
+      notificationService
+        .sendNotification({
+          userId: order.user,
+          event: shipmentEvent,
+          data: { order_id: order.id },
+          dedupeKey: `${order.id}:${shipmentEvent}`,
+        })
+        .catch(() => {});
+    }
 
     // Respond 200 (Shiprocket expects success).
     return res.status(200).json({

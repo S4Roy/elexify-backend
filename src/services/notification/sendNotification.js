@@ -1,10 +1,9 @@
 import User from "../../models/User.js";
 import NotificationPreference from "../../models/NotificationPreference.js";
 import NotificationLog from "../../models/NotificationLog.js";
+import NotificationJob from "../../models/NotificationJob.js";
 import { getNotificationEvent } from "../../constants/notificationEvents.js";
 import { getPreferenceValue } from "./preferencePath.js";
-import { emailService, smsService } from "../index.js";
-import * as whatsappProvider from "./whatsapp.provider.js";
 import { generalHelper } from "../../helpers/index.js";
 
 const getOrCreatePreferences = async (userId) => {
@@ -14,65 +13,75 @@ const getOrCreatePreferences = async (userId) => {
   return created.toObject();
 };
 
-const logAttempt = async ({ userId, event, channel, destination, templateKey, status, error }) => {
-  const destination_masked =
-    channel === "email"
-      ? generalHelper.maskEmail(destination)
-      : generalHelper.maskMobile(destination);
+const maskDestination = (channel, user) =>
+  channel === "email"
+    ? generalHelper.maskEmail(user.email)
+    : generalHelper.maskMobile(user.mobile, user.phone_code);
 
-  await NotificationLog.create({
-    user_id: userId,
-    event,
-    channel,
-    destination_masked,
-    template_id: templateKey,
-    provider: channel === "email" ? "smtp" : channel === "sms" ? "fast2sms" : "whatsapp",
-    status,
-    attempt_count: 1,
-    last_error_safe: error || null,
-    sent_at: status === "SENT" ? new Date() : null,
-  });
-};
+/**
+ * enqueue — creates one NotificationJob + one NotificationLog(QUEUED) row
+ * for a single eligible channel. Idempotent on (user_id, event, channel,
+ * dedupe_key) via NotificationJob's partial unique index — a duplicate
+ * enqueue for the same dedupeKey is a silent no-op, not an error.
+ */
+const providerFor = (channel) =>
+  channel === "email" ? "smtp" : channel === "sms" ? "fast2sms" : "whatsapp_cloud_api";
 
-const deliverByChannel = {
-  email: async ({ user, templateKey, data }) => {
-    if (!user.email) return { success: false, error: "no_email_on_file" };
-    const ok = await emailService.sendEmail(
-      user.email,
-      templateKey,
-      undefined,
-      "en",
-      { name: user.name, ...data }
-    );
-    return ok ? { success: true } : { success: false, error: "template_or_delivery_failed" };
-  },
-  sms: async ({ user, templateKey, data }) => {
-    if (!user.mobile) return { success: false, error: "no_mobile_on_file" };
-    const identifier = `${user.phone_code || "91"}${user.mobile}`;
-    const result = await smsService.sendSMS({
-      to: identifier,
-      message: templateKey,
-      variables: [user.name || "Customer", ...(data?.smsVariables || [])],
+const enqueue = async ({ userId, event, channel, templateId, data, dedupeKey }) => {
+  try {
+    const user = await User.findById(userId).lean();
+    const destination_masked = user ? maskDestination(channel, user) : null;
+    const provider = providerFor(channel);
+
+    const job = await NotificationJob.create({
+      user_id: userId,
+      event,
+      channel,
+      template_id: templateId,
+      destination_masked,
+      provider,
+      data,
+      dedupe_key: dedupeKey ?? null,
     });
-    return result?.success ? { success: true } : { success: false, error: "delivery_failed" };
-  },
-  whatsapp: async ({ templateKey, data }) => {
-    const result = await whatsappProvider.sendTemplate({ templateKey, data });
-    return result?.success ? { success: true } : { success: false, error: result?.error || "delivery_failed" };
-  },
+
+    const log = await NotificationLog.create({
+      user_id: userId,
+      job_id: job._id,
+      event,
+      channel,
+      destination_masked,
+      template_id: templateId,
+      provider,
+      status: "QUEUED",
+    });
+
+    await NotificationJob.updateOne({ _id: job._id }, { $set: { notification_log_id: log._id } });
+
+    return { channel, queued: true };
+  } catch (error) {
+    // 11000 = duplicate key on the (user_id, event, channel, dedupe_key)
+    // index — this exact notification is already queued/handled. Any other
+    // error is logged but still swallowed (see sendNotification's own
+    // try/catch) — enqueue failures must never break the caller.
+    if (error?.code !== 11000) {
+      console.error("notification enqueue error:", error.message);
+    }
+    return { channel, queued: false, duplicate: error?.code === 11000 };
+  }
 };
 
 /**
- * sendNotification({ userId, event, data })
+ * sendNotification({ userId, event, data, dedupeKey })
  *
- * Centralized notification dispatch: loads the user + their preferences,
- * resolves eligible channels (preference AND verified-contact AND, for a
- * `mandatory` event, always-on regardless of preference), delivers via the
- * existing per-channel provider, and logs one NotificationLog row per
- * channel attempted. Never throws — a provider outage must not break the
- * caller's business transaction (e.g. order placement).
+ * Resolves eligible channels (preference AND verified-contact AND, for a
+ * `mandatory` event, always-on regardless of preference) and enqueues one
+ * NotificationJob per eligible channel for services/notification/
+ * processNotificationQueue.js (run on a cron tick) to actually deliver.
+ * Never throws, and never does any network I/O itself — callers can treat
+ * this as a fire-and-forget, near-instant call safe to leave un-awaited
+ * after a business transaction has already committed.
  */
-export const sendNotification = async ({ userId, event, data = {} }) => {
+export const sendNotification = async ({ userId, event, data = {}, dedupeKey = null }) => {
   try {
     const eventMeta = getNotificationEvent(event);
     if (!eventMeta) {
@@ -88,43 +97,25 @@ export const sendNotification = async ({ userId, event, data = {} }) => {
     const results = [];
 
     for (const channel of eventMeta.channels) {
-      const isVerified = channel === "email" ? !!user.email_verified_at : channel === "sms" ? !!user.mobile_verified_at : false;
-
-      // WhatsApp has no live provider yet — never counts as eligible.
-      if (channel === "whatsapp" && !eventMeta.mandatory) {
-        const preferred = getPreferenceValue(preferences, eventMeta.preferenceKey, channel);
-        if (!preferred) continue;
-      }
-
-      if (!isVerified && channel !== "whatsapp") continue;
+      // email is gated on email_verified_at; sms and whatsapp are both
+      // mobile-based channels, gated on mobile_verified_at.
+      const isVerified = channel === "email" ? !!user.email_verified_at : !!user.mobile_verified_at;
+      if (!isVerified) continue;
 
       if (!eventMeta.mandatory) {
         const preferred = getPreferenceValue(preferences, eventMeta.preferenceKey, channel);
         if (preferred === false) continue;
       }
 
-      const deliver = deliverByChannel[channel];
-      if (!deliver) continue;
-
-      let outcome;
-      try {
-        outcome = await deliver({ user, templateKey: eventMeta.templateKey, data });
-      } catch (err) {
-        outcome = { success: false, error: "delivery_exception" };
-      }
-
-      const destination = channel === "email" ? user.email : user.mobile;
-      await logAttempt({
+      const outcome = await enqueue({
         userId,
         event,
         channel,
-        destination,
-        templateKey: eventMeta.templateKey,
-        status: outcome.success ? "SENT" : "FAILED",
-        error: outcome.success ? null : outcome.error,
+        templateId: eventMeta.templateKey,
+        data,
+        dedupeKey,
       });
-
-      results.push({ channel, ...outcome });
+      results.push(outcome);
     }
 
     return { success: true, results };

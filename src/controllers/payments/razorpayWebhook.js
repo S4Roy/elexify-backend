@@ -3,7 +3,7 @@ import { envs } from "../../config/index.js";
 import Order from "../../models/Order.js";
 import WebhookEvent from "../../models/WebhookEvent.js";
 import { PAYMENT_STATUS } from "../../constants/orderStatus.js";
-import { orderService } from "../../services/index.js";
+import { orderService, notificationService } from "../../services/index.js";
 import { recordOperationalEvent } from "../../services/observability/recordOperationalEvent.js";
 
 const MAX_WEBHOOK_ATTEMPTS = 5;
@@ -17,9 +17,19 @@ const processEvent = async (event) => {
   if (event?.event === "payment.captured" && payment) {
     const order = await Order.findOne({ "payment_meta.razorpay_order_id": payment.order_id });
     if (!order) throw new Error("No local order matches captured payment");
-    await orderService.finalizeCapturedPayment({
+    const result = await orderService.finalizeCapturedPayment({
       orderId: order.id, paymentData: payment, source: "webhook",
     });
+    if (!result.alreadyFinalized) {
+      notificationService
+        .sendNotification({
+          userId: result.order.user,
+          event: "PAYMENT_SUCCESS",
+          data: { order_id: result.order.id },
+          dedupeKey: `${result.order.id}:PAYMENT_SUCCESS`,
+        })
+        .catch(() => {});
+    }
   } else if (event?.event === "refund.processed" && (refundId || paymentId)) {
     const order = await Order.findOne({
       $or: [{ "refund.razorpay_refund_id": refundId }, { "payment_meta.razorpay_payment_id": paymentId }],
@@ -34,6 +44,14 @@ const processEvent = async (event) => {
         "refund.completed_at": new Date(),
       },
     });
+    notificationService
+      .sendNotification({
+        userId: order.user,
+        event: "REFUND_COMPLETED",
+        data: { order_id: order.id },
+        dedupeKey: `${order.id}:REFUND_COMPLETED`,
+      })
+      .catch(() => {});
   } else if (event?.event === "refund.failed" && (refundId || paymentId)) {
     const order = await Order.findOne({
       $or: [{ "refund.razorpay_refund_id": refundId }, { "payment_meta.razorpay_payment_id": paymentId }],

@@ -27,6 +27,7 @@ import { computeGst } from "../../../../services/invoiceService/computeGst.js";
 import { reconcileProviderOrderAttempt } from "../../../../services/paymentService/reconcileProviderOrderAttempt.js";
 import { recordOperationalEvent } from "../../../../services/observability/recordOperationalEvent.js";
 import { injectPlacementFault } from "../../../../services/orderService/injectPlacementFault.js";
+import { notificationService } from "../../../../services/index.js";
 
 export const add = async (req, res, next) => {
   let dbSession = null;
@@ -609,6 +610,17 @@ const address = await Address.findOne({
     await dbSession.endSession();
     dbSession = null;
     await injectPlacementFault(req, "after_commit");
+
+    // Fire-and-forget — the order is already committed; a notification
+    // provider being slow/down must never affect this response.
+    notificationService
+      .sendNotification({
+        userId: order.user,
+        event: "ORDER_PLACED",
+        data: { order_id: order.id },
+        dedupeKey: `${order.id}:ORDER_PLACED`,
+      })
+      .catch(() => {});
 
     // ── Response ─────────────────────────────────────────────────────────────
     return res.status(200).json({

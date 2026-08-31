@@ -5,13 +5,15 @@ import { MANDATORY_LOCKED_PATHS, getPreferencesDoc } from "../../../services/not
 
 export const getNotificationPreferences = async (req, res, next) => {
   try {
-    const user_id = req.auth?.user_id;
-    if (!user_id) throw StatusError.unauthorized("Invalid access token.");
+    const { id } = req.params;
+    const user = await User.findOne({
+      _id: id,
+      role: { $in: ["user", "customer"] },
+      deleted_at: null,
+    }).lean();
+    if (!user) throw StatusError.notFound(req.__("Customer not found"));
 
-    const user = await User.findOne({ _id: user_id, deleted_at: null }).lean();
-    if (!user) throw StatusError.notFound("Profile not found");
-
-    const preferences = await getPreferencesDoc(user_id);
+    const preferences = await getPreferencesDoc(id);
 
     res.status(200).json({
       status: "success",
@@ -28,17 +30,25 @@ export const getNotificationPreferences = async (req, res, next) => {
   }
 };
 
+// Admin override — same mandatory-lock enforcement as the customer-facing
+// endpoint (controllers/user/account/notificationPreferences.js), never
+// silently overrides a customer's marketing opt-out either: this is a
+// PATCH like the self-service one, not a "reset to defaults" action.
 export const updateNotificationPreferences = async (req, res, next) => {
   try {
-    const user_id = req.auth?.user_id;
-    if (!user_id) throw StatusError.unauthorized("Invalid access token.");
+    const { id } = req.params;
+    const admin_id = req.auth?.user_id;
+
+    const user = await User.findOne({
+      _id: id,
+      role: { $in: ["user", "customer"] },
+      deleted_at: null,
+    }).lean();
+    if (!user) throw StatusError.notFound(req.__("Customer not found"));
 
     const { transactional, security, marketing, reminders } = req.body;
+    const preferences = await getPreferencesDoc(id);
 
-    const preferences = await getPreferencesDoc(user_id);
-
-    // Mandatory transactional/security toggles can't be turned off — reject
-    // rather than silently ignoring, so the UI/API contract is explicit.
     for (const [group, key] of MANDATORY_LOCKED_PATHS) {
       const incomingGroup = { transactional, security }[group];
       if (incomingGroup && incomingGroup[key] === false) {
@@ -51,18 +61,20 @@ export const updateNotificationPreferences = async (req, res, next) => {
       }
     }
 
+    const before = preferences.toObject();
     if (transactional) Object.assign(preferences.transactional, transactional);
     if (security) Object.assign(preferences.security, security);
     if (marketing) Object.assign(preferences.marketing, marketing);
     if (reminders) Object.assign(preferences.reminders, reminders);
     preferences.updated_at = new Date();
-
     await preferences.save();
 
     await auditService.recordAudit({
-      userId: user_id,
-      event: "NOTIFICATION_PREFERENCES_CHANGED",
+      userId: id,
+      event: "NOTIFICATION_PREFERENCE_ADMIN_CHANGE",
       req,
+      actorId: admin_id,
+      metadata: { before, after: preferences.toObject() },
     });
 
     res.status(200).json({

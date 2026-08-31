@@ -1,7 +1,7 @@
 import Order from "../../models/Order.js";
 import axios from "axios";
 import { envs } from "../../config/index.js";
-import { orderService } from "../../services/index.js";
+import { orderService, notificationService } from "../../services/index.js";
 
 export const updatePendingRazorpayPayments = async () => {
   const pendingOrders = await Order.find({
@@ -20,19 +20,45 @@ export const updatePendingRazorpayPayments = async () => {
       const payments = data.items || [];
       const captured = payments.find((payment) => payment.status === "captured");
       if (captured) {
-        await orderService.finalizeCapturedPayment({
+        const result = await orderService.finalizeCapturedPayment({
           orderId: order.id, paymentData: captured, source: "reconciliation",
         });
+        if (!result.alreadyFinalized) {
+          notificationService
+            .sendNotification({
+              userId: result.order.user,
+              event: "PAYMENT_SUCCESS",
+              data: { order_id: result.order.id },
+              dedupeKey: `${result.order.id}:PAYMENT_SUCCESS`,
+            })
+            .catch(() => {});
+        }
       } else if (payments.some((payment) => payment.status === "failed")) {
         await orderService.transitionOrder({
           orderId: order._id, paymentStatus: "failed", orderStatus: "failed",
         });
+        notificationService
+          .sendNotification({
+            userId: order.user,
+            event: "PAYMENT_FAILED",
+            data: { order_id: order.id },
+            dedupeKey: `${order.id}:PAYMENT_FAILED`,
+          })
+          .catch(() => {});
       } else if (!payments.length) {
         const createdAt = order.created_at || order._id.getTimestamp();
         if ((now - createdAt) / 60000 > 15) {
           await orderService.transitionOrder({
             orderId: order._id, paymentStatus: "failed", orderStatus: "failed",
           });
+          notificationService
+            .sendNotification({
+              userId: order.user,
+              event: "PAYMENT_FAILED",
+              data: { order_id: order.id },
+              dedupeKey: `${order.id}:PAYMENT_FAILED`,
+            })
+            .catch(() => {});
         }
       }
     } catch (error) {

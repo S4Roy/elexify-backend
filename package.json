@@ -10,6 +10,8 @@
     "test:http-checkout": "vitest run --no-file-parallelism src/services/orderService/httpCheckoutConcurrency.integration.test.js",
     "test:provider-http": "vitest run --no-file-parallelism src/services/orderService/providerBackedHttp.integration.test.js",
     "import:pincodes": "node src/scripts/importPincodes.js",
+    "seed:email-templates": "node src/scripts/seedEmailTemplates.js",
+    "smoke:otp-email": "node src/scripts/smokeTestOtpEmail.js",
     "migrate:orders": "node src/scripts/migrateOrderSchema.js",
     "preflight:orders": "node src/scripts/preflightOrderMigration.js",
     "webhook:replay": "node src/scripts/replayRazorpayWebhook.js",
