@@ -17,8 +17,14 @@ import * as homepageService from "./homepage/index.js";
 import * as navigationService from "./navigation/index.js";
 import * as orderService from "./orderService/index.js";
 import * as invoiceService from "./invoiceService/index.js";
+import * as notificationService from "./notification/index.js";
+import * as auditService from "./audit/index.js";
+import * as otpService from "./otp/index.js";
 
 export {
+  notificationService,
+  auditService,
+  otpService,
   userService,
   userRoleService,
   emailService,

@@ -23,8 +23,11 @@ import { bcryptCheck } from "./bcryptCheck.js";
 import { importFileParse } from "./importFileParse.js";
 import { formatMoney } from "./formatMoney.js";
 import { generateOtp } from "./generateOtp.js";
+import { maskEmail, maskMobile } from "./maskContact.js";
 
 export {
+  maskEmail,
+  maskMobile,
   bcryptCheck,
   bcryptMake,
   // uuidv4,

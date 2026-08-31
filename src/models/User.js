@@ -74,6 +74,39 @@ const UserSchema = new Schema(
       type: Date,
       default: null,
     },
+    // Set while an email/mobile change is awaiting OTP confirmation.
+    // The verified `email`/`mobile` fields above are never overwritten
+    // until the OTP against the pending value succeeds — see
+    // controllers/user/account/{request,verify}{Email,Mobile}Change.js
+    pending_email: {
+      type: String,
+      required: false,
+      lowercase: true,
+      trim: true,
+      default: null,
+    },
+    pending_mobile: {
+      type: String,
+      required: false,
+      trim: true,
+      default: null,
+    },
+    pending_phone_code: {
+      type: String,
+      required: false,
+      default: null,
+    },
+    dob: {
+      type: Date,
+      required: false,
+      default: null,
+    },
+    gender: {
+      type: String,
+      required: false,
+      enum: ["male", "female", "other", null],
+      default: null,
+    },
     zoho_customer_id: {
       type: String,
       default: null,

@@ -2,34 +2,27 @@ import { celebrate, Joi } from "celebrate";
 
 export const edit = celebrate({
   body: Joi.object({
-    first_name: Joi.string().min(2).max(100).required().messages({
-      "string.base": "First name must be a string",
-      "string.empty": "First name is required",
+    first_name: Joi.string().min(2).max(100).optional().messages({
       "string.min": "First name must be at least 2 characters",
       "string.max": "First name cannot exceed 100 characters",
     }),
 
-    last_name: Joi.string().min(2).max(100).required().messages({
-      "string.base": "Last name must be a string",
-      "string.empty": "Last name is required",
-      "string.min": "Last name must be at least 2 characters",
+    last_name: Joi.string().min(1).max(100).optional().allow("").messages({
       "string.max": "Last name cannot exceed 100 characters",
     }),
 
-    email: Joi.string().email().required().messages({
-      "string.base": "Email must be a string",
-      "string.empty": "Email is required",
-      "string.email": "Email must be a valid email address",
+    dob: Joi.date().max("now").optional().allow(null, "").messages({
+      "date.max": "Date of birth cannot be in the future",
     }),
 
-    phone: Joi.string()
-      .pattern(/^[6-9]\d{9}$/)
+    gender: Joi.string()
+      .valid("male", "female", "other")
       .optional()
-      .allow(null, "")
-      .messages({
-        "string.pattern.base":
-          "Phone number must be a valid 10-digit Indian mobile number",
-      }),
+      .allow(null, ""),
+
+    profile_image: Joi.string().uri().optional().allow(null, ""),
+
+    current_password: Joi.string().optional().allow("", null),
 
     password: Joi.string().min(6).max(50).optional().allow("", null).messages({
       "string.min": "Password must be at least 6 characters long",
@@ -44,8 +37,7 @@ export const edit = celebrate({
       })
       .messages({
         "any.only": "Confirm password must match password",
-        "any.required":
-          "Confirm password is required when password is provided",
+        "any.required": "Confirm password is required when password is provided",
       }),
   }),
 });

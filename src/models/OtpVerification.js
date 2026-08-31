@@ -39,6 +39,8 @@ const OtpVerificationSchema = new Schema(
         "reset_password",
         "forgot_password",
         "update_contact",
+        "change_email",
+        "change_mobile",
       ],
     },
 

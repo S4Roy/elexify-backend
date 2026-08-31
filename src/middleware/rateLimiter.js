@@ -13,3 +13,15 @@ export const authRateLimiter = rateLimit({
   legacyHeaders: false,
   message: { message: "Too many requests. Please try again later." },
 });
+
+/**
+ * Limits requests to the logged-in email/mobile change + OTP-resend
+ * endpoints (per IP). /api/v1/user/* has no rate limiting otherwise.
+ */
+export const accountChangeRateLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: process.env.NODE_ENV === "test" ? 1_000 : 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { message: "Too many attempts. Please try again later." },
+});

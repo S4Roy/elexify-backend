@@ -194,5 +194,8 @@
 	"Page not found": "Page not found",
 	"FAQ Deleted successfully": "FAQ Deleted successfully",
 	"TempCart cleared": "TempCart cleared",
-	"Unauthorized": "Unauthorized"
+	"Unauthorized": "Unauthorized",
+	"We're unable to use this mobile number right now. Please try a different one.": "We're unable to use this mobile number right now. Please try a different one.",
+	"Notification preferences fetched successfully": "Notification preferences fetched successfully",
+	"OTP sent to your new email address": "OTP sent to your new email address"
 }
