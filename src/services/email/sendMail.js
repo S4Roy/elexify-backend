@@ -1,7 +1,7 @@
-import Handlebars from "handlebars";
 import nodemailer from "nodemailer";
 import { emailTemplateService } from "../index.js";
 import { envs } from "../../config/index.js";
+import { renderEmailTemplate } from "./renderEmailTemplate.js";
 import path from "path";
 
 export const sendEmail = async (
@@ -46,15 +46,24 @@ export const sendEmail = async (
     // Merge user-provided substitutions with default values
     const mergedSubstitutions = { ...defaultSubstitutions, ...substitutions };
 
-    // Compile the template using Handlebars
-    const template = Handlebars.compile(emailTemplate.body);
-    const content = template(mergedSubstitutions, {
-      data: {
-        intl: {
-          locales: "en-US",
-        },
-      },
-    });
+    // Render subject and body through the same Handlebars pass — a
+    // caller-supplied `subject` overrides the template's own subject, but
+    // either way it goes through the renderer, never sent raw.
+    const rendered = renderEmailTemplate(
+      { subject: subject || emailTemplate.subject, body: emailTemplate.body },
+      mergedSubstitutions
+    );
+
+    if (rendered.missingVariables.length > 0 || rendered.unresolvedFields.length > 0) {
+      // Never log the substitution values themselves (e.g. otp) — only the
+      // variable names and which field(s) failed to resolve.
+      console.error(
+        `❌ TEMPLATE_RENDER_ERROR type=${type} language=${language} missingVariables=[${rendered.missingVariables.join(", ")}] unresolvedFields=[${rendered.unresolvedFields.join(", ")}]`
+      );
+      return false;
+    }
+
+    const content = rendered.body;
 
     // Configure SMTP transport — nodemailer has had SMTP support built in
     // since v6; the separate nodemailer-smtp-transport package (a
@@ -78,7 +87,7 @@ export const sendEmail = async (
         address: envs.smtp.fromEmail,
       },
       to: email,
-      subject: subject || emailTemplate.subject,
+      subject: rendered.subject,
       html: content,
       // attachments: [
       //   {
