@@ -30,6 +30,7 @@ import { operationsRouter } from "./operations.js";
 import { customersRouter } from "./customers.js";
 import { notificationsRouter } from "./notifications.js";
 import { emailTemplatesRouter } from "./emailTemplates.js";
+import { dataOperationsRouter } from "./dataOperations.js";
 
 const v1AdminRouter = Router();
 // All routes go here
@@ -65,5 +66,6 @@ v1AdminRouter.use("/operations", operationsRouter);
 v1AdminRouter.use("/customers", customersRouter);
 v1AdminRouter.use("/notifications", notificationsRouter);
 v1AdminRouter.use("/email-templates", emailTemplatesRouter);
+v1AdminRouter.use("/data-operations", dataOperationsRouter);
 
 export { v1AdminRouter };

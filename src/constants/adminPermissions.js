@@ -16,6 +16,21 @@ export const PERMISSIONS = {
   // reset-to-default) — same superadmin+manager-only shape as the other
   // sensitive admin capabilities above.
   EMAIL_TEMPLATE_MANAGE: "email_template.manage",
+
+  // Centralized Data Operations (seeders/migrations/backfills/repairs) —
+  // see routes/admin/dataOperations.js and scripts/runner.js. View
+  // permissions are per operation-type so a role can be given visibility
+  // into, say, seeders without also seeing migrations; execute permissions
+  // are separate and deliberately not granted to any non-superadmin role
+  // by default (data-mutating, some CRITICAL-risk).
+  DATA_VIEW: "system.data.view",
+  SEEDER_VIEW: "system.seeder.view",
+  SEEDER_EXECUTE: "system.seeder.execute",
+  MIGRATION_VIEW: "system.migration.view",
+  MIGRATION_EXECUTE: "system.migration.execute",
+  REPAIR_VIEW: "system.repair.view",
+  REPAIR_EXECUTE: "system.repair.execute",
+  OPERATION_HISTORY_VIEW: "system.operation.history.view",
 };
 
 const ALL_PERMISSIONS = Object.values(PERMISSIONS);
@@ -26,6 +41,14 @@ const VIEW_ONLY = [
   PERMISSIONS.CUSTOMER_NOTIFICATION_VIEW,
 ];
 
+const DATA_OPERATIONS_VIEW_ONLY = [
+  PERMISSIONS.DATA_VIEW,
+  PERMISSIONS.SEEDER_VIEW,
+  PERMISSIONS.MIGRATION_VIEW,
+  PERMISSIONS.REPAIR_VIEW,
+  PERMISSIONS.OPERATION_HISTORY_VIEW,
+];
+
 export const ROLE_PERMISSIONS = {
   superadmin: ALL_PERMISSIONS,
   manager: [
@@ -34,6 +57,11 @@ export const ROLE_PERMISSIONS = {
     PERMISSIONS.CUSTOMER_NOTIFICATION_RETRY,
     PERMISSIONS.CUSTOMER_PREFERENCE_MANAGE,
     PERMISSIONS.EMAIL_TEMPLATE_MANAGE,
+    // View-only for Data Operations — no execute permissions, matching the
+    // existing "view-only for non-superadmin" pattern used elsewhere in
+    // this file. Adjustable later if a manager role needs to run LOW-risk
+    // seeders themselves.
+    ...DATA_OPERATIONS_VIEW_ONLY,
   ],
   supervisor: VIEW_ONLY,
   staff: VIEW_ONLY,

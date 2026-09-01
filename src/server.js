@@ -18,9 +18,9 @@ import cron from "node-cron";
 // import mail from "./config/mail.js";
 // import db from "./config/database.js";
 // import pusherConfig from "./config/pusher.js";
-import { seed } from "./controllers/DbSeedingController.js";
 import * as CronJobs from "./controllers/cronjobs/index.js";
 import { notificationService } from "./services/index.js";
+import SystemOperationLog from "./models/SystemOperationLog.js";
 import { v1AuthRouter } from "./routes/auth/index.js";
 import { v1CallBackRouter } from "./routes/callback/index.js";
 import { v1UserRouter } from "./routes/user/index.js";
@@ -136,7 +136,12 @@ app.use(express.static("public"));
 app.use(bearerToken());
 app.use(StatusSuccess);
 // Define API Routes
-app.get(`${envs.basePath}/debug/db-seeding`, seed);
+// NOTE: the legacy `GET ${basePath}/debug/db-seeding` route (zero auth,
+// controllers/DbSeedingController.js) has been removed — its seeding logic
+// now lives behind RBAC + audit logging as the `core-site-bootstrap` and
+// `order-total-items-backfill` data-operations registry entries (see
+// scripts/seeders/registry/operations/), run via the admin panel's Data
+// Operations screen or `npm run data:run <key>`.
 app.get(`${envs.basePath}/debug/currency`, CronJobs.exchangeRate);
 app.get(`${envs.basePath}/debug/google-feed`, CronJobs.generateGoogleFeed);
 cron.schedule("0 */12 * * *", async () => {
@@ -180,6 +185,22 @@ cron.schedule("* * * * *", async () => {
     await notificationService.processNotificationQueue();
   } catch (e) {
     console.error("processNotificationQueue Cron Failed", e);
+  }
+});
+
+// Cleans up SystemOperationLog rows (per-line data-operations execution
+// logs) older than SYSTEM_OPERATION_LOG_RETENTION_DAYS (default 30). Never
+// touches SystemOperationExecution summaries or AuditLog — those are the
+// long-retention, audit-purpose records per the data-operations plan; only
+// the verbose per-line logs are short-retention. Runs once a day.
+const SYSTEM_OPERATION_LOG_RETENTION_DAYS = Number(process.env.SYSTEM_OPERATION_LOG_RETENTION_DAYS) || 30;
+cron.schedule("30 2 * * *", async () => {
+  try {
+    const cutoff = new Date(Date.now() - SYSTEM_OPERATION_LOG_RETENTION_DAYS * 24 * 60 * 60 * 1000);
+    const result = await SystemOperationLog.deleteMany({ created_at: { $lt: cutoff } });
+    if (result.deletedCount) console.log(`SystemOperationLog retention cleanup: deleted ${result.deletedCount} log line(s) older than ${SYSTEM_OPERATION_LOG_RETENTION_DAYS} day(s).`);
+  } catch (e) {
+    console.error("SystemOperationLog retention cleanup Cron Failed", e);
   }
 });
 

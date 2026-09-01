@@ -34,11 +34,13 @@ import * as navigationPreviewController from "./navigation/index.js";
 import * as customerAccountController from "./customerAccount/index.js";
 import * as notificationController from "./notification/index.js";
 import * as emailTemplateController from "./emailTemplate/index.js";
+import * as dataOperationsController from "./dataOperations/index.js";
 
 export {
   customerAccountController,
   notificationController,
   emailTemplateController,
+  dataOperationsController,
   inventoryController,
   masterController,
   mediaController,
