@@ -206,5 +206,9 @@
 	"Notification queued for retry": "Notification queued for retry",
 	"Shipping Rate updated successfully": "Shipping Rate updated successfully",
 	"Email templates fetched successfully": "Email templates fetched successfully",
-	"Email template fetched successfully": "Email template fetched successfully"
+	"Email template fetched successfully": "Email template fetched successfully",
+	"Preview rendered successfully": "Preview rendered successfully",
+	"Test email sent successfully": "Test email sent successfully",
+	"Email template updated successfully": "Email template updated successfully",
+	"Email template reset to default": "Email template reset to default"
 }
