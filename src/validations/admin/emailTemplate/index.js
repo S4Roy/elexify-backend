@@ -22,9 +22,14 @@ export const sendTest = celebrate({
 });
 
 export const preview = celebrate({
+  // The editor's preview call sends `formGroup.getRawValue()` verbatim
+  // (subject/preheader/body/status) — status (and any other future form
+  // field) is harmless here since preview never persists anything, so
+  // unknown keys are allowed rather than requiring the frontend to strip
+  // fields before every preview request.
   body: Joi.object({
     subject: Joi.string().allow(""),
     preheader: Joi.string().allow(""),
     body: Joi.string().allow(""),
-  }),
+  }).unknown(true),
 });
