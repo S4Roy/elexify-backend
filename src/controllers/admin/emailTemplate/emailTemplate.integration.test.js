@@ -88,6 +88,27 @@ suite("admin email template API", () => {
     expect(payload.data[0].body).toBeUndefined();
   });
 
+  it("lists filter by status and is_marketing", async () => {
+    await seedTemplate({ action: "order_cancelled", status: "active", is_marketing: false });
+    await seedTemplate({ action: "promotional_offer", status: "inactive", is_marketing: true });
+
+    const inactiveReq = mockReq({ query: { status: "inactive" } });
+    const inactiveRes = mockRes();
+    await list(inactiveReq, inactiveRes, (err) => {
+      throw err;
+    });
+    const inactivePayload = inactiveRes.json.mock.calls[0][0];
+    expect(inactivePayload.data.map((t) => t.action)).toEqual(["promotional_offer"]);
+
+    const marketingReq = mockReq({ query: { is_marketing: "yes" } });
+    const marketingRes = mockRes();
+    await list(marketingReq, marketingRes, (err) => {
+      throw err;
+    });
+    const marketingPayload = marketingRes.json.mock.calls[0][0];
+    expect(marketingPayload.data.map((t) => t.action)).toEqual(["promotional_offer"]);
+  });
+
   it("returns full details by action", async () => {
     await seedTemplate();
     const req = mockReq({ params: { action: "order_cancelled" } });

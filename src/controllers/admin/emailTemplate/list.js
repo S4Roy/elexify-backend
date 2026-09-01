@@ -2,13 +2,19 @@ import EmailTemplate from "../../../models/EmailTemplate.js";
 
 export const list = async (req, res, next) => {
   try {
-    const { search = "" } = req.query;
+    const { search = "", status = "", is_marketing = "" } = req.query;
     const filter = { site_language: "en" };
     if (search) {
       filter.$or = [
         { action: { $regex: search, $options: "i" } },
         { subject: { $regex: search, $options: "i" } },
       ];
+    }
+    if (status) {
+      filter.status = { $in: status.split(",") };
+    }
+    if (is_marketing === "yes" || is_marketing === "no") {
+      filter.is_marketing = is_marketing === "yes";
     }
 
     const templates = await EmailTemplate.find(filter)
