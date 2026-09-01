@@ -19,13 +19,11 @@ export const cancel = async (req, res, next) => {
     });
 
     notificationService
-      .sendNotification({
-        userId: order.user,
+      .sendOrderNotification({
+        order,
         event: "ORDER_CANCELLED",
-        data: { order_id: order.id },
         dedupeKey: `${order.id}:ORDER_CANCELLED`,
-      })
-      .catch(() => {});
+      });
 
     return res.status(200).json({
       status: "success",

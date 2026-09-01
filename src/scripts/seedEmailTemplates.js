@@ -11,31 +11,37 @@
 
 import mongoose, { mongooseConnection } from "../config/mongoose.js";
 import EmailTemplate from "../models/EmailTemplate.js";
-import { TEMPLATES } from "../constants/emailTemplateDefaults.js";
+import { TEMPLATES, TEMPLATE_DEFAULTS_VERSION } from "../constants/emailTemplateDefaults.js";
 
 const LANGUAGE = "en";
 
-export { TEMPLATES };
+export { TEMPLATES, TEMPLATE_DEFAULTS_VERSION };
 
 const run = async () => {
   await mongooseConnection;
 
-  const ops = Object.entries(TEMPLATES).map(([action, { subject, body }]) => ({
-    updateOne: {
-      filter: { action, site_language: LANGUAGE },
-      update: {
-        $setOnInsert: {
-          action,
-          site_language: LANGUAGE,
-          subject,
-          body,
-          status: "active",
-          created_at: new Date(),
+  const ops = Object.entries(TEMPLATES).map(
+    ([action, { subject, preheader, body, required_variables, is_marketing }]) => ({
+      updateOne: {
+        filter: { action, site_language: LANGUAGE },
+        update: {
+          $setOnInsert: {
+            action,
+            site_language: LANGUAGE,
+            subject,
+            preheader: preheader || "",
+            body,
+            required_variables: required_variables || [],
+            is_marketing: Boolean(is_marketing),
+            template_version: TEMPLATE_DEFAULTS_VERSION,
+            status: "active",
+            created_at: new Date(),
+          },
         },
+        upsert: true,
       },
-      upsert: true,
-    },
-  }));
+    })
+  );
 
   const result = await EmailTemplate.bulkWrite(ops, { ordered: false });
   console.log(

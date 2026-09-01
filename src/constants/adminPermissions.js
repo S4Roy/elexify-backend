@@ -12,6 +12,10 @@ export const PERMISSIONS = {
   CUSTOMER_NOTIFICATION_VIEW: "customer.notification.view",
   CUSTOMER_NOTIFICATION_RETRY: "customer.notification.retry",
   CUSTOMER_PREFERENCE_MANAGE: "customer.preference.manage",
+  // Email-template design/content management (list/edit/preview/send-test/
+  // reset-to-default) — same superadmin+manager-only shape as the other
+  // sensitive admin capabilities above.
+  EMAIL_TEMPLATE_MANAGE: "email_template.manage",
 };
 
 const ALL_PERMISSIONS = Object.values(PERMISSIONS);
@@ -29,6 +33,7 @@ export const ROLE_PERMISSIONS = {
     PERMISSIONS.CUSTOMER_VERIFICATION_OVERRIDE,
     PERMISSIONS.CUSTOMER_NOTIFICATION_RETRY,
     PERMISSIONS.CUSTOMER_PREFERENCE_MANAGE,
+    PERMISSIONS.EMAIL_TEMPLATE_MANAGE,
   ],
   supervisor: VIEW_ONLY,
   staff: VIEW_ONLY,

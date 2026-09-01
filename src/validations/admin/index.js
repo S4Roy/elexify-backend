@@ -31,9 +31,11 @@ import * as headerConfigValidation from "./header-config/index.js";
 import * as navigationMenuValidation from "./navigation-menu/index.js";
 import * as navigationMenuItemValidation from "./navigation-menu-item/index.js";
 import * as customerAccountValidation from "./customerAccount/index.js";
+import * as emailTemplateValidation from "./emailTemplate/index.js";
 
 export {
   customerAccountValidation,
+  emailTemplateValidation,
   inventoryValidation,
   masterValidation,
   mediaValidation,

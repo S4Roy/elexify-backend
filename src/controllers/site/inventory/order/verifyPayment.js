@@ -23,13 +23,11 @@ export const verifyPayment = async (req, res, next) => {
     });
     if (!result.alreadyFinalized) {
       notificationService
-        .sendNotification({
-          userId: result.order.user,
+        .sendOrderNotification({
+          order: result.order,
           event: "PAYMENT_SUCCESS",
-          data: { order_id: result.order.id },
           dedupeKey: `${result.order.id}:PAYMENT_SUCCESS`,
-        })
-        .catch(() => {});
+        });
     }
     return res.status(200).json({
       status: "success",

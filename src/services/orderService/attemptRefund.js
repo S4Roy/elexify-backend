@@ -45,14 +45,11 @@ export const attemptRefund = async (order) => {
     return Order.findById(order._id);
   }
 
-  notificationService
-    .sendNotification({
-      userId: claimed.user,
-      event: "REFUND_INITIATED",
-      data: { order_id: claimed.id },
-      dedupeKey: `${claimed.id}:REFUND_INITIATED`,
-    })
-    .catch(() => {});
+  notificationService.sendOrderNotification({
+    order: claimed,
+    event: "REFUND_INITIATED",
+    dedupeKey: `${claimed.id}:REFUND_INITIATED`,
+  });
 
   const razorpayPaymentId = claimed.payment_meta?.razorpay_payment_id;
 
@@ -94,14 +91,12 @@ export const attemptRefund = async (order) => {
           },
         }
       );
-      notificationService
-        .sendNotification({
-          userId: claimed.user,
-          event: "REFUND_COMPLETED",
-          data: { order_id: claimed.id },
-          dedupeKey: `${claimed.id}:REFUND_COMPLETED`,
-        })
-        .catch(() => {});
+      notificationService.sendOrderNotification({
+        order: claimed,
+        event: "REFUND_COMPLETED",
+        data: { refund_amount: (refundResponse.amount ?? amountInPaise) / 100 },
+        dedupeKey: `${claimed.id}:REFUND_COMPLETED`,
+      });
     } else {
       await Order.updateOne(
         { _id: claimed._id },

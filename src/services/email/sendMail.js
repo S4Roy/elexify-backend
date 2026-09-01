@@ -1,8 +1,10 @@
 import nodemailer from "nodemailer";
 import { emailTemplateService } from "../index.js";
 import { envs } from "../../config/index.js";
+import { emailBrand } from "../../config/emailBrand.js";
 import { renderEmailTemplate } from "./renderEmailTemplate.js";
-import path from "path";
+import { renderEmailShell } from "./emailLayout.js";
+import { htmlToText } from "./htmlToText.js";
 
 export const sendEmail = async (
   email,
@@ -33,24 +35,32 @@ export const sendEmail = async (
       return false;
     }
 
-    // Default substitution values
+    // Default substitution values, available to every template body as
+    // flat vars (e.g. "contact {{support_email}}") in addition to the
+    // structured `brand` object the shared shell/components consume.
     const defaultSubstitutions = {
-      logo_url: envs.BACKEND_URL + "/public/images/logo/logo.png",
-      privacy_url: envs.FRONTEND_URL + "/page/privacy-policy",
-      unsubscribe_url: envs.BACKEND_URL + "/unsubscribe",
-      company_name: envs.PROJECT_NAME || "Your Company",
-      support_email: envs.smtp.fromEmail || "support@example.com",
+      logo_url: emailBrand.logoUrl,
+      privacy_url: emailBrand.privacyUrl,
+      company_name: emailBrand.brandName,
+      support_email: emailBrand.supportEmail,
+      account_url: emailBrand.accountUrl,
+      storefront_url: emailBrand.storefrontUrl,
       year: new Date().getFullYear(),
     };
 
     // Merge user-provided substitutions with default values
     const mergedSubstitutions = { ...defaultSubstitutions, ...substitutions };
 
-    // Render subject and body through the same Handlebars pass — a
+    // Render subject/preheader/body through the same Handlebars pass — a
     // caller-supplied `subject` overrides the template's own subject, but
     // either way it goes through the renderer, never sent raw.
     const rendered = renderEmailTemplate(
-      { subject: subject || emailTemplate.subject, body: emailTemplate.body },
+      {
+        subject: subject || emailTemplate.subject,
+        preheader: emailTemplate.preheader,
+        body: emailTemplate.body,
+        required_variables: emailTemplate.required_variables,
+      },
       mergedSubstitutions
     );
 
@@ -63,7 +73,14 @@ export const sendEmail = async (
       return false;
     }
 
-    const content = rendered.body;
+    const html = renderEmailShell({
+      subject: rendered.subject,
+      preheaderText: rendered.preheader,
+      brand: emailBrand,
+      contentHtml: rendered.body,
+      showPreferencesLink: Boolean(emailTemplate.is_marketing),
+    });
+    const text = `${htmlToText(rendered.body)}\n\n--\n${emailBrand.brandName}\nNeed help? ${emailBrand.supportEmail}\nMy Account: ${emailBrand.accountUrl}\nOrders: ${emailBrand.ordersUrl}`;
 
     // Configure SMTP transport — nodemailer has had SMTP support built in
     // since v6; the separate nodemailer-smtp-transport package (a
@@ -83,19 +100,13 @@ export const sendEmail = async (
     // Mail details
     const mailOptions = {
       from: {
-        name: envs.PROJECT_NAME || "No-Reply",
+        name: emailBrand.brandName,
         address: envs.smtp.fromEmail,
       },
       to: email,
       subject: rendered.subject,
-      html: content,
-      // attachments: [
-      //   {
-      //     filename: "logo.svg",
-      //     path: path.resolve("public/images/logo", "logo.svg"),
-      //     cid: "logoImage",
-      //   },
-      // ],
+      html,
+      text,
     };
 
     // Send email

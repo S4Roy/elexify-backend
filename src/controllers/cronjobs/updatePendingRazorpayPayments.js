@@ -24,41 +24,32 @@ export const updatePendingRazorpayPayments = async () => {
           orderId: order.id, paymentData: captured, source: "reconciliation",
         });
         if (!result.alreadyFinalized) {
-          notificationService
-            .sendNotification({
-              userId: result.order.user,
-              event: "PAYMENT_SUCCESS",
-              data: { order_id: result.order.id },
-              dedupeKey: `${result.order.id}:PAYMENT_SUCCESS`,
-            })
-            .catch(() => {});
+          notificationService.sendOrderNotification({
+            order: result.order,
+            event: "PAYMENT_SUCCESS",
+            dedupeKey: `${result.order.id}:PAYMENT_SUCCESS`,
+          });
         }
       } else if (payments.some((payment) => payment.status === "failed")) {
         await orderService.transitionOrder({
           orderId: order._id, paymentStatus: "failed", orderStatus: "failed",
         });
-        notificationService
-          .sendNotification({
-            userId: order.user,
-            event: "PAYMENT_FAILED",
-            data: { order_id: order.id },
-            dedupeKey: `${order.id}:PAYMENT_FAILED`,
-          })
-          .catch(() => {});
+        notificationService.sendOrderNotification({
+          order,
+          event: "PAYMENT_FAILED",
+          dedupeKey: `${order.id}:PAYMENT_FAILED`,
+        });
       } else if (!payments.length) {
         const createdAt = order.created_at || order._id.getTimestamp();
         if ((now - createdAt) / 60000 > 15) {
           await orderService.transitionOrder({
             orderId: order._id, paymentStatus: "failed", orderStatus: "failed",
           });
-          notificationService
-            .sendNotification({
-              userId: order.user,
-              event: "PAYMENT_FAILED",
-              data: { order_id: order.id },
-              dedupeKey: `${order.id}:PAYMENT_FAILED`,
-            })
-            .catch(() => {});
+          notificationService.sendOrderNotification({
+            order,
+            event: "PAYMENT_FAILED",
+            dedupeKey: `${order.id}:PAYMENT_FAILED`,
+          });
         }
       }
     } catch (error) {

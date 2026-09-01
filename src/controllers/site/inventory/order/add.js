@@ -613,14 +613,11 @@ const address = await Address.findOne({
 
     // Fire-and-forget — the order is already committed; a notification
     // provider being slow/down must never affect this response.
-    notificationService
-      .sendNotification({
-        userId: order.user,
-        event: "ORDER_PLACED",
-        data: { order_id: order.id },
-        dedupeKey: `${order.id}:ORDER_PLACED`,
-      })
-      .catch(() => {});
+    notificationService.sendOrderNotification({
+      order,
+      event: "ORDER_PLACED",
+      dedupeKey: `${order.id}:ORDER_PLACED`,
+    });
 
     // ── Response ─────────────────────────────────────────────────────────────
     return res.status(200).json({

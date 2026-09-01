@@ -33,10 +33,12 @@ import * as navigationMenuItemController from "./navigation-menu-item/index.js";
 import * as navigationPreviewController from "./navigation/index.js";
 import * as customerAccountController from "./customerAccount/index.js";
 import * as notificationController from "./notification/index.js";
+import * as emailTemplateController from "./emailTemplate/index.js";
 
 export {
   customerAccountController,
   notificationController,
+  emailTemplateController,
   inventoryController,
   masterController,
   mediaController,

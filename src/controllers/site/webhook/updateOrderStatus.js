@@ -200,13 +200,11 @@ export const updateOrderStatus = async (req, res, next) => {
     const shipmentEvent = SHIPMENT_STATUS_EVENTS[newStatus];
     if (shipmentEvent) {
       notificationService
-        .sendNotification({
-          userId: order.user,
+        .sendOrderNotification({
+          order,
           event: shipmentEvent,
-          data: { order_id: order.id },
           dedupeKey: `${order.id}:${shipmentEvent}`,
-        })
-        .catch(() => {});
+        });
     }
 
     // Respond 200 (Shiprocket expects success).

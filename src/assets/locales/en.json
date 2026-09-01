@@ -203,5 +203,8 @@
 	"Notification preferences updated successfully": "Notification preferences updated successfully",
 	"Customer details fetched successfully": "Customer details fetched successfully",
 	"Notification history fetched successfully": "Notification history fetched successfully",
-	"Notification queued for retry": "Notification queued for retry"
+	"Notification queued for retry": "Notification queued for retry",
+	"Shipping Rate updated successfully": "Shipping Rate updated successfully",
+	"Email templates fetched successfully": "Email templates fetched successfully",
+	"Email template fetched successfully": "Email template fetched successfully"
 }

@@ -22,13 +22,11 @@ const processEvent = async (event) => {
     });
     if (!result.alreadyFinalized) {
       notificationService
-        .sendNotification({
-          userId: result.order.user,
+        .sendOrderNotification({
+          order: result.order,
           event: "PAYMENT_SUCCESS",
-          data: { order_id: result.order.id },
           dedupeKey: `${result.order.id}:PAYMENT_SUCCESS`,
-        })
-        .catch(() => {});
+        });
     }
   } else if (event?.event === "refund.processed" && (refundId || paymentId)) {
     const order = await Order.findOne({
@@ -44,14 +42,12 @@ const processEvent = async (event) => {
         "refund.completed_at": new Date(),
       },
     });
-    notificationService
-      .sendNotification({
-        userId: order.user,
-        event: "REFUND_COMPLETED",
-        data: { order_id: order.id },
-        dedupeKey: `${order.id}:REFUND_COMPLETED`,
-      })
-      .catch(() => {});
+    notificationService.sendOrderNotification({
+      order,
+      event: "REFUND_COMPLETED",
+      data: refund?.amount ? { refund_amount: refund.amount / 100 } : {},
+      dedupeKey: `${order.id}:REFUND_COMPLETED`,
+    });
   } else if (event?.event === "refund.failed" && (refundId || paymentId)) {
     const order = await Order.findOne({
       $or: [{ "refund.razorpay_refund_id": refundId }, { "payment_meta.razorpay_payment_id": paymentId }],
