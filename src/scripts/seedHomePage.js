@@ -14,21 +14,16 @@
  * Usage:
  *   node src/scripts/seedHomePage.js
  */
-import mongoose from "../config/mongoose.js";
+import mongoose, { mongooseConnection } from "../config/mongoose.js";
 import HomePage from "../models/HomePage.js";
+import { createLogger } from "./shared/logger.js";
+import { buildResult } from "./shared/result.js";
 
-const run = async () => {
-  if (mongoose.connection.readyState !== 1) {
-    await new Promise((resolve, reject) => {
-      mongoose.connection.once("open", resolve);
-      mongoose.connection.once("error", reject);
-    });
-  }
-
+export const runSeedHomePage = async ({ logger = createLogger() } = {}) => {
   const homePage = await HomePage.getSingleton();
   if (homePage.sections.length) {
-    console.log("Homepage already has sections — nothing to seed.");
-    process.exit(0);
+    logger.info("Homepage already has sections — nothing to seed.");
+    return { logs: logger.logs, summary: { created: 0, skipped: 1 }, result: buildResult({ skipped: 1 }) };
   }
 
   homePage.sections.push(
@@ -111,11 +106,24 @@ const run = async () => {
   homePage.published_at = new Date();
   await homePage.save();
 
-  console.log(`Seeded and published ${homePage.sections.length} homepage sections.`);
-  process.exit(0);
+  logger.info(`Seeded and published ${homePage.sections.length} homepage sections.`);
+  return {
+    logs: logger.logs,
+    summary: { created: homePage.sections.length, skipped: 0 },
+    result: buildResult({ inserted: homePage.sections.length }),
+  };
 };
 
-run().catch((e) => {
-  console.error(e);
-  process.exit(1);
-});
+if (import.meta.url === `file://${process.argv[1]}`) {
+  const run = async () => {
+    await mongooseConnection;
+    const { logs } = await runSeedHomePage();
+    for (const { timestamp, level, message } of logs) console.log(`[${timestamp}] [${level}] ${message}`);
+    await mongoose.disconnect();
+    process.exit(0);
+  };
+  run().catch((e) => {
+    console.error(e);
+    process.exit(1);
+  });
+}

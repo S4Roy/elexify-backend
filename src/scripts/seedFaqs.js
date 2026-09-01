@@ -7,8 +7,10 @@
  * Usage:
  *   node src/scripts/seedFaqs.js
  */
-import mongoose from "../config/mongoose.js";
+import mongoose, { mongooseConnection } from "../config/mongoose.js";
 import FAQ from "../models/FAQ.js";
+import { createLogger } from "./shared/logger.js";
+import { buildResult } from "./shared/result.js";
 
 const faqs = [
   // Orders
@@ -150,26 +152,33 @@ const faqs = [
   },
 ].map((faq, index) => ({ ...faq, order: index, status: "active" }));
 
-const run = async () => {
-  if (mongoose.connection.readyState !== 1) {
-    await new Promise((resolve, reject) => {
-      mongoose.connection.once("open", resolve);
-      mongoose.connection.once("error", reject);
-    });
-  }
+// Exported so the registry's dry-run preview
+// (seeders/registry/operations/faqs.js) can report an accurate
+// wouldInsert count without hardcoding a copy of this number.
+export const FAQ_SEED_COUNT = faqs.length;
 
+export const runSeedFaqs = async ({ logger = createLogger() } = {}) => {
   const existing = await FAQ.countDocuments({ deleted_at: null });
   if (existing > 0) {
-    console.log(`FAQs already has ${existing} active item(s) — nothing to seed.`);
-    process.exit(0);
+    logger.info(`FAQs already has ${existing} active item(s) — nothing to seed.`);
+    return { logs: logger.logs, summary: { total: faqs.length, created: 0, skipped: existing }, result: buildResult({ skipped: existing }) };
   }
 
   await FAQ.insertMany(faqs);
-  console.log(`Seeded ${faqs.length} FAQ items.`);
-  process.exit(0);
+  logger.info(`Seeded ${faqs.length} FAQ items.`);
+  return { logs: logger.logs, summary: { total: faqs.length, created: faqs.length, skipped: 0 }, result: buildResult({ inserted: faqs.length }) };
 };
 
-run().catch((e) => {
-  console.error(e);
-  process.exit(1);
-});
+if (import.meta.url === `file://${process.argv[1]}`) {
+  const run = async () => {
+    await mongooseConnection;
+    const { logs } = await runSeedFaqs();
+    for (const { timestamp, level, message } of logs) console.log(`[${timestamp}] [${level}] ${message}`);
+    await mongoose.disconnect();
+    process.exit(0);
+  };
+  run().catch((e) => {
+    console.error(e);
+    process.exit(1);
+  });
+}

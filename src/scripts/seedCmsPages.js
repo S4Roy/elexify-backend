@@ -9,11 +9,18 @@
  * page with empty content) by renaming it to the correct slug/content. Safe
  * to re-run.
  *
+ * Core logic lives in runSeedCmsPages() so it can be called identically
+ * from this CLI entry point, the data-operations registry
+ * (seeders/registry/operations/cms-pages.js), and tests — see
+ * services/emailTemplate/seedRunner.js for the pattern this generalizes.
+ *
  * Usage:
  *   node src/scripts/seedCmsPages.js
  */
-import mongoose from "../config/mongoose.js";
+import mongoose, { mongooseConnection } from "../config/mongoose.js";
 import Page from "../models/Page.js";
+import { createLogger } from "./shared/logger.js";
+import { buildResult } from "./shared/result.js";
 
 const CONTACT_EMAIL = "support@elexify.online";
 const CONTACT_PHONE_DISPLAY = "+91 9110976419";
@@ -117,13 +124,10 @@ const pages = [
   },
 ];
 
-const run = async () => {
-  if (mongoose.connection.readyState !== 1) {
-    await new Promise((resolve, reject) => {
-      mongoose.connection.once("open", resolve);
-      mongoose.connection.once("error", reject);
-    });
-  }
+export const runSeedCmsPages = async ({ logger = createLogger() } = {}) => {
+  let created = 0;
+  let skipped = 0;
+  let repaired = 0;
 
   // Repair the placeholder "terms-of-service" record left over from testing
   // (empty content, wrong slug) instead of leaving it as orphaned junk.
@@ -136,23 +140,41 @@ const run = async () => {
     legacyTerms.content = properTerms.content;
     legacyTerms.updated_at = new Date();
     await legacyTerms.save();
-    console.log("Repaired placeholder page -> terms-and-conditions");
+    repaired += 1;
+    logger.info("Repaired placeholder page -> terms-and-conditions");
   }
 
   for (const page of pages) {
     const exists = await Page.findOne({ slug: page.slug });
     if (exists) {
-      console.log(`Skipped (already exists): ${page.slug}`);
+      skipped += 1;
+      logger.info(`Skipped (already exists): ${page.slug}`);
       continue;
     }
     await Page.create({ ...page, status: "active" });
-    console.log(`Created page: ${page.slug}`);
+    created += 1;
+    logger.info(`Created page: ${page.slug}`);
   }
 
-  process.exit(0);
+  logger.info(`CMS pages seed complete: ${created} created, ${skipped} skipped, ${repaired} repaired.`);
+
+  return {
+    logs: logger.logs,
+    summary: { total: pages.length, created, skipped, repaired },
+    result: buildResult({ inserted: created, updated: repaired, skipped }),
+  };
 };
 
-run().catch((e) => {
-  console.error(e);
-  process.exit(1);
-});
+if (import.meta.url === `file://${process.argv[1]}`) {
+  const run = async () => {
+    await mongooseConnection;
+    const { logs } = await runSeedCmsPages();
+    for (const { timestamp, level, message } of logs) console.log(`[${timestamp}] [${level}] ${message}`);
+    await mongoose.disconnect();
+    process.exit(0);
+  };
+  run().catch((e) => {
+    console.error(e);
+    process.exit(1);
+  });
+}

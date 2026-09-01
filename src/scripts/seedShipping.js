@@ -7,25 +7,21 @@
  * Usage:
  *   node src/scripts/seedShipping.js
  */
-import mongoose from "../config/mongoose.js";
+import mongoose, { mongooseConnection } from "../config/mongoose.js";
 import ShippingClass from "../models/ShippingClass.js";
 import ShippingZone from "../models/ShippingZone.js";
 import ShippingRate from "../models/ShippingRate.js";
+import { createLogger } from "./shared/logger.js";
+import { buildResult } from "./shared/result.js";
 
-const run = async () => {
-  if (mongoose.connection.readyState !== 1) {
-    await new Promise((resolve, reject) => {
-      mongoose.connection.once("open", resolve);
-      mongoose.connection.once("error", reject);
-    });
-  }
-
+export const runSeedShipping = async ({ logger = createLogger() } = {}) => {
   const existingDefaultZone = await ShippingZone.findOne({ is_default: true });
   if (existingDefaultZone) {
-    console.log("A default shipping zone already exists — nothing to seed.");
-    process.exit(0);
+    logger.info("A default shipping zone already exists — nothing to seed.");
+    return { logs: logger.logs, summary: { created: 0, skipped: 1 }, result: buildResult({ skipped: 1 }) };
   }
 
+  let created = 0;
   let standardClass = await ShippingClass.findOne({ slug: "standard" });
   if (!standardClass) {
     standardClass = await ShippingClass.create({
@@ -35,7 +31,8 @@ const run = async () => {
       is_default: true,
       status: "active",
     });
-    console.log("Created default Shipping Class: Standard");
+    created += 1;
+    logger.info("Created default Shipping Class: Standard");
   }
 
   const zone = await ShippingZone.create({
@@ -46,7 +43,8 @@ const run = async () => {
     is_default: true,
     status: "active",
   });
-  console.log("Created default Shipping Zone: All India");
+  created += 1;
+  logger.info("Created default Shipping Zone: All India");
 
   await ShippingRate.create({
     zone: zone._id,
@@ -59,12 +57,22 @@ const run = async () => {
     max_delivery_days: 6,
     status: "active",
   });
-  console.log("Created default Shipping Rate for All India zone.");
+  created += 1;
+  logger.info("Created default Shipping Rate for All India zone.");
 
-  process.exit(0);
+  return { logs: logger.logs, summary: { created, skipped: 0 }, result: buildResult({ inserted: created }) };
 };
 
-run().catch((e) => {
-  console.error(e);
-  process.exit(1);
-});
+if (import.meta.url === `file://${process.argv[1]}`) {
+  const run = async () => {
+    await mongooseConnection;
+    const { logs } = await runSeedShipping();
+    for (const { timestamp, level, message } of logs) console.log(`[${timestamp}] [${level}] ${message}`);
+    await mongoose.disconnect();
+    process.exit(0);
+  };
+  run().catch((e) => {
+    console.error(e);
+    process.exit(1);
+  });
+}

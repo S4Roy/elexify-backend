@@ -12,7 +12,7 @@
 //   node src/scripts/fixProductContent.js             # apply
 //   node src/scripts/fixProductContent.js --dry-run    # report only, no writes
 
-import mongoose from "../config/mongoose.js";
+import mongoose, { mongooseConnection } from "../config/mongoose.js";
 import Product from "../models/Product.js";
 // Registered for side effects only — generateProductSEO() populates these
 // paths (brand/categories/sub_categories/images) and mongoose needs the
@@ -21,8 +21,8 @@ import "../models/Brand.js";
 import "../models/Category.js";
 import "../models/Media.js";
 import { seoService } from "../services/index.js";
-
-const DRY_RUN = process.argv.includes("--dry-run");
+import { createLogger } from "./shared/logger.js";
+import { buildResult } from "./shared/result.js";
 
 const cleanHtml = (html) => {
   if (!html) return html;
@@ -39,8 +39,11 @@ const cleanHtml = (html) => {
     .trim();
 };
 
-const run = async () => {
-  console.log(DRY_RUN ? "=== DRY RUN — no writes will be made ===\n" : "=== Applying fixes ===\n");
+// apply=false performs the same scan/diff phase with zero writes and skips
+// the SEO regeneration pass — the dry-run preview the data-operations
+// registry entry uses (see seeders/registry/operations/fix-product-content.js).
+export const runFixProductContent = async ({ apply = true, logger = createLogger() } = {}) => {
+  logger.info(apply ? "=== Applying fixes ===" : "=== DRY RUN — no writes will be made ===");
 
   // ── Phase 1: strip artifacts from description / short_description ──────
   const products = await Product.find({}).select("name description short_description").lean();
@@ -55,34 +58,48 @@ const run = async () => {
     if (!changed) continue;
 
     htmlFixed += 1;
-    const deltaDesc = (origDescription?.length || 0) - (cleanedDescription?.length || 0);
-    const deltaShort = (origShort?.length || 0) - (cleanedShort?.length || 0);
-    console.log(
-      `[html] ${DRY_RUN ? "would fix" : "fixed"}: ${p.name} (desc -${deltaDesc} chars, short -${deltaShort} chars)`,
-    );
-    if (!DRY_RUN) {
+    logger.info(`[html] ${apply ? "fixed" : "would fix"}: ${p.name}`);
+    if (apply) {
       await Product.updateOne(
         { _id: p._id },
         { $set: { description: cleanedDescription, short_description: cleanedShort } },
       );
     }
   }
-  console.log(`\nHTML cleanup: ${htmlFixed}/${products.length} products touched.\n`);
+  logger.info(`HTML cleanup: ${htmlFixed}/${products.length} products touched.`);
 
   // ── Phase 2: regenerate meta descriptions via the existing SEO template
   // generator — covers the whole catalog, skips manually-edited fields
   // automatically unless overwrite is set. ────────────────────────────────
-  if (DRY_RUN) {
-    console.log("(dry run) Skipping SEO regeneration — would run generateBulkProductSEO({ overwrite: true }) on the full catalog.");
+  let seoResult = null;
+  if (!apply) {
+    logger.info("(dry run) Skipping SEO regeneration — would run generateBulkProductSEO({ overwrite: true }) on the full catalog.");
   } else {
-    const result = await seoService.generateBulkProductSEO({ overwrite: true });
-    console.log("SEO regeneration result:", result);
+    seoResult = await seoService.generateBulkProductSEO({ overwrite: true });
+    logger.info(`SEO regeneration result: ${JSON.stringify(seoResult)}`);
   }
 
-  process.exit(0);
+  return {
+    logs: logger.logs,
+    summary: { totalProducts: products.length, htmlFixed, seoResult, applied: apply },
+    result: apply
+      ? buildResult({ updated: htmlFixed + (seoResult?.updated || 0) })
+      : buildResult({ warnings: [`Dry run: would touch ${htmlFixed} product(s) for HTML cleanup`] }),
+    dryRunPreview: !apply ? { wouldInsert: 0, wouldUpdate: htmlFixed, wouldSkip: products.length - htmlFixed, wouldDelete: 0 } : null,
+  };
 };
 
-run().catch((e) => {
-  console.error(e);
-  process.exit(1);
-});
+if (import.meta.url === `file://${process.argv[1]}`) {
+  const run = async () => {
+    await mongooseConnection;
+    const apply = !process.argv.includes("--dry-run");
+    const { logs } = await runFixProductContent({ apply });
+    for (const { timestamp, level, message } of logs) console.log(`[${timestamp}] [${level}] ${message}`);
+    await mongoose.disconnect();
+    process.exit(0);
+  };
+  run().catch((e) => {
+    console.error(e);
+    process.exit(1);
+  });
+}

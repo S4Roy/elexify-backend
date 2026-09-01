@@ -6,12 +6,14 @@
 //
 // Usage: node src/scripts/restrictCountriesToIndia.js
 
-import mongoose from "../config/mongoose.js";
+import mongoose, { mongooseConnection } from "../config/mongoose.js";
 import Country from "../models/Country.js";
+import { createLogger } from "./shared/logger.js";
+import { buildResult } from "./shared/result.js";
 
 const INDIA_ID = 101;
 
-const run = async () => {
+export const runRestrictCountriesToIndia = async ({ logger = createLogger() } = {}) => {
   const result = await Country.updateMany(
     { id: { $ne: INDIA_ID } },
     { $set: { status: "inactive" } },
@@ -19,12 +21,25 @@ const run = async () => {
   await Country.updateOne({ id: INDIA_ID }, { $set: { status: "active" } });
 
   const active = await Country.countDocuments({ status: "active" });
-  console.log(`Deactivated ${result.modifiedCount} countries. Active countries now: ${active}.`);
+  logger.info(`Deactivated ${result.modifiedCount} countries. Active countries now: ${active}.`);
 
-  process.exit(0);
+  return {
+    logs: logger.logs,
+    summary: { deactivated: result.modifiedCount, activeCount: active },
+    result: buildResult({ updated: result.modifiedCount }),
+  };
 };
 
-run().catch((e) => {
-  console.error(e);
-  process.exit(1);
-});
+if (import.meta.url === `file://${process.argv[1]}`) {
+  const run = async () => {
+    await mongooseConnection;
+    const { logs } = await runRestrictCountriesToIndia();
+    for (const { timestamp, level, message } of logs) console.log(`[${timestamp}] [${level}] ${message}`);
+    await mongoose.disconnect();
+    process.exit(0);
+  };
+  run().catch((e) => {
+    console.error(e);
+    process.exit(1);
+  });
+}

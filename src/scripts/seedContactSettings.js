@@ -7,8 +7,10 @@
  * Usage:
  *   node src/scripts/seedContactSettings.js
  */
-import mongoose from "../config/mongoose.js";
+import mongoose, { mongooseConnection } from "../config/mongoose.js";
 import SiteSetting from "../models/SiteSetting.js";
+import { createLogger } from "./shared/logger.js";
+import { buildResult } from "./shared/result.js";
 
 const settings = [
   {
@@ -37,29 +39,45 @@ const settings = [
   },
 ];
 
-const run = async () => {
-  if (mongoose.connection.readyState !== 1) {
-    await new Promise((resolve, reject) => {
-      mongoose.connection.once("open", resolve);
-      mongoose.connection.once("error", reject);
-    });
-  }
+// Registered as a REQUIRED_BOOTSTRAP data-op (see
+// seeders/registry/operations/contact-settings.js) — that requires
+// idempotent: true, so this now uses $setOnInsert like every other
+// bootstrap seeder, never overwriting a value an admin has since edited on
+// the Settings page. (Originally used $set, unconditionally overwriting on
+// every run — fixed as part of the data-operations migration.)
+export const runSeedContactSettings = async ({ logger = createLogger() } = {}) => {
+  let created = 0;
+  let skipped = 0;
 
   for (const setting of settings) {
     const result = await SiteSetting.updateOne(
       { slug: setting.slug },
-      { $set: { ...setting, updated_at: new Date() } },
+      { $setOnInsert: { ...setting, updated_at: new Date() } },
       { upsert: true },
     );
-    console.log(
-      `${result.upsertedCount ? "Created" : "Updated"} setting: ${setting.slug} = ${setting.value}`,
-    );
+    const wasCreated = result.upsertedCount || result.upserted?.length;
+    if (wasCreated) {
+      created += 1;
+      logger.info(`Created setting: ${setting.slug} = ${setting.value}`);
+    } else {
+      skipped += 1;
+      logger.info(`Already exists, left untouched: ${setting.slug}`);
+    }
   }
 
-  process.exit(0);
+  return { logs: logger.logs, summary: { total: settings.length, created, skipped }, result: buildResult({ inserted: created, skipped }) };
 };
 
-run().catch((e) => {
-  console.error(e);
-  process.exit(1);
-});
+if (import.meta.url === `file://${process.argv[1]}`) {
+  const run = async () => {
+    await mongooseConnection;
+    const { logs } = await runSeedContactSettings();
+    for (const { timestamp, level, message } of logs) console.log(`[${timestamp}] [${level}] ${message}`);
+    await mongoose.disconnect();
+    process.exit(0);
+  };
+  run().catch((e) => {
+    console.error(e);
+    process.exit(1);
+  });
+}

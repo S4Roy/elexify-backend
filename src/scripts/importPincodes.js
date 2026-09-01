@@ -13,8 +13,10 @@ import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import csv from "csv-parser";
-import mongoose from "../config/mongoose.js";
+import mongoose, { mongooseConnection } from "../config/mongoose.js";
 import Pincode from "../models/Pincode.js";
+import { createLogger } from "./shared/logger.js";
+import { buildResult } from "./shared/result.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const CSV_PATH = path.join(__dirname, "../assets/locales/india_pincodes.csv");
@@ -135,10 +137,10 @@ const readCsvRows = () =>
       .on("error", reject);
   });
 
-const run = async () => {
-  console.log("Reading CSV...");
+export const runImportPincodes = async ({ logger = createLogger() } = {}) => {
+  logger.info("Reading CSV...");
   const rows = await readCsvRows();
-  console.log(`${rows.length} post office rows read.`);
+  logger.info(`${rows.length} post office rows read.`);
 
   // Dedupe to one (district, state) per pincode by majority vote — a
   // handful of pincodes span two districts on the boundary.
@@ -173,7 +175,7 @@ const run = async () => {
       });
   }
 
-  console.log(`${byPincode.size} unique pincodes after cleanup.`);
+  logger.info(`${byPincode.size} unique pincodes after cleanup.`);
 
   // Load India's states/cities into memory once for fast lookup instead of
   // one query per pincode.
@@ -247,27 +249,43 @@ const run = async () => {
     });
   }
 
-  console.log("Writing to DB...");
+  logger.info("Writing to DB...");
   const BATCH = 1000;
+  let upserted = 0;
+  let modified = 0;
   for (let i = 0; i < ops.length; i += BATCH) {
-    await Pincode.bulkWrite(ops.slice(i, i + BATCH));
-    process.stdout.write(`\r${Math.min(i + BATCH, ops.length)}/${ops.length}`);
+    const batchResult = await Pincode.bulkWrite(ops.slice(i, i + BATCH));
+    upserted += batchResult.upsertedCount || 0;
+    modified += batchResult.modifiedCount || 0;
+    logger.info(`Progress: ${Math.min(i + BATCH, ops.length)}/${ops.length}`);
   }
-  console.log();
 
-  console.log("\n=== Import summary ===");
-  console.log(`Total pincodes:        ${byPincode.size}`);
-  console.log(`Resolved city + state: ${resolvedBoth}`);
-  console.log(`Resolved state only:   ${resolvedStateOnly}`);
-  console.log(`Resolved neither:      ${resolvedNeither}`);
+  logger.info("=== Import summary ===");
+  logger.info(`Total pincodes:        ${byPincode.size}`);
+  logger.info(`Resolved city + state: ${resolvedBoth}`);
+  logger.info(`Resolved state only:   ${resolvedStateOnly}`);
+  logger.info(`Resolved neither:      ${resolvedNeither}`);
   if (unresolvedStates.size) {
-    console.log("Unresolved source state names:", [...unresolvedStates]);
+    logger.warn(`Unresolved source state names: ${[...unresolvedStates].join(", ")}`);
   }
 
-  process.exit(0);
+  return {
+    logs: logger.logs,
+    summary: { total: byPincode.size, resolvedBoth, resolvedStateOnly, resolvedNeither, upserted, modified },
+    result: buildResult({ inserted: upserted, updated: modified }),
+  };
 };
 
-run().catch((e) => {
-  console.error(e);
-  process.exit(1);
-});
+if (import.meta.url === `file://${process.argv[1]}`) {
+  const run = async () => {
+    await mongooseConnection;
+    const { logs } = await runImportPincodes();
+    for (const { timestamp, level, message } of logs) console.log(`[${timestamp}] [${level}] ${message}`);
+    await mongoose.disconnect();
+    process.exit(0);
+  };
+  run().catch((e) => {
+    console.error(e);
+    process.exit(1);
+  });
+}

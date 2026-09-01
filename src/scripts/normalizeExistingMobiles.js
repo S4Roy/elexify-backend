@@ -11,31 +11,19 @@
  *   node src/scripts/normalizeExistingMobiles.js            # dry run
  *   node src/scripts/normalizeExistingMobiles.js --apply     # write changes
  */
-import mongoose from "../config/mongoose.js";
+import mongoose, { mongooseConnection } from "../config/mongoose.js";
 import User from "../models/User.js";
 import { normalizeMobile } from "../helpers/mobileHelper.js";
+import { createLogger } from "./shared/logger.js";
+import { buildResult } from "./shared/result.js";
 
-const APPLY = process.argv.includes("--apply");
-
-const run = async () => {
-  if (mongoose.connection.readyState !== 1) {
-    await new Promise((resolve, reject) => {
-      mongoose.connection.once("open", resolve);
-      mongoose.connection.once("error", reject);
-    });
-  }
-
+export const runNormalizeExistingMobiles = async ({ apply = false, logger = createLogger() } = {}) => {
   const users = await User.find({ mobile: { $type: "string" } })
     .select("_id name phone_code mobile")
     .lean();
 
-  console.log(`Checked ${users.length} users with a mobile number.`);
-  console.log(
-    APPLY
-      ? "APPLY MODE — writing changes"
-      : "DRY RUN — no changes (pass --apply to write)",
-  );
-  console.log("");
+  logger.info(`Checked ${users.length} users with a mobile number.`);
+  logger.info(apply ? "APPLY MODE — writing changes" : "DRY RUN — no changes");
 
   let changed = 0;
   let invalid = 0;
@@ -46,18 +34,14 @@ const run = async () => {
 
     if (normalized === null) {
       invalid += 1;
-      console.log(
-        `  INVALID  ${user._id}  "${user.name}"  phone_code=${phoneCode} mobile="${user.mobile}" — could not normalize, left as-is, needs manual review`,
-      );
+      logger.warn(`INVALID ${user._id} phone_code=${phoneCode} — could not normalize, needs manual review`);
       continue;
     }
 
     if (normalized !== user.mobile) {
       changed += 1;
-      console.log(
-        `  FIX      ${user._id}  "${user.name}"  "${user.mobile}" -> "${normalized}"`,
-      );
-      if (APPLY) {
+      logger.info(`FIX ${user._id}: normalized mobile value`);
+      if (apply) {
         await User.updateOne(
           { _id: user._id },
           { $set: { mobile: normalized } },
@@ -66,14 +50,29 @@ const run = async () => {
     }
   }
 
-  console.log("");
-  console.log(
-    `${APPLY ? "Fixed" : "Would fix"} ${changed} mobile value(s). ${invalid} could not be normalized (manual review needed).`,
-  );
-  process.exit(0);
+  logger.info(`${apply ? "Fixed" : "Would fix"} ${changed} mobile value(s). ${invalid} could not be normalized (manual review needed).`);
+
+  return {
+    logs: logger.logs,
+    summary: { checked: users.length, changed, invalid, applied: apply },
+    result: apply
+      ? buildResult({ updated: changed, warnings: invalid ? [`${invalid} mobile value(s) need manual review`] : [] })
+      : buildResult({ warnings: [`Dry run: would fix ${changed} mobile value(s), ${invalid} need manual review`] }),
+    dryRunPreview: !apply ? { wouldInsert: 0, wouldUpdate: changed, wouldSkip: invalid, wouldDelete: 0 } : null,
+  };
 };
 
-run().catch((e) => {
-  console.error(e);
-  process.exit(1);
-});
+if (import.meta.url === `file://${process.argv[1]}`) {
+  const run = async () => {
+    await mongooseConnection;
+    const apply = process.argv.includes("--apply");
+    const { logs } = await runNormalizeExistingMobiles({ apply });
+    for (const { timestamp, level, message } of logs) console.log(`[${timestamp}] [${level}] ${message}`);
+    await mongoose.disconnect();
+    process.exit(0);
+  };
+  run().catch((e) => {
+    console.error(e);
+    process.exit(1);
+  });
+}

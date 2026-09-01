@@ -18,42 +18,48 @@
  * Usage:
  *   node src/scripts/fixCartIndexes.js
  */
-import mongoose from "../config/mongoose.js";
+import mongoose, { mongooseConnection } from "../config/mongoose.js";
 import Cart from "../models/Cart.js";
+import { createLogger } from "./shared/logger.js";
+import { buildResult } from "./shared/result.js";
 
 const STALE_INDEXES = ["user_1_product_1", "guest_id_1_product_1"];
 
-const run = async () => {
-  if (mongoose.connection.readyState !== 1) {
-    await new Promise((resolve, reject) => {
-      mongoose.connection.once("open", resolve);
-      mongoose.connection.once("error", reject);
-    });
-  }
-
+export const runFixCartIndexes = async ({ logger = createLogger() } = {}) => {
   const carts = mongoose.connection.collection("carts");
   const existing = await carts.indexes();
   const names = existing.map((i) => i.name);
 
+  let dropped = 0;
   for (const indexName of STALE_INDEXES) {
     if (names.includes(indexName)) {
       await carts.dropIndex(indexName);
-      console.log(`Dropped stale index: ${indexName}`);
+      dropped += 1;
+      logger.info(`Dropped stale index: ${indexName}`);
     } else {
-      console.log(`Index not present (already clean): ${indexName}`);
+      logger.info(`Index not present (already clean): ${indexName}`);
     }
   }
 
   await Cart.syncIndexes();
-  console.log("Synced Cart indexes with current schema.");
+  logger.info("Synced Cart indexes with current schema.");
 
   const finalIndexes = await carts.indexes();
-  console.log("Final carts indexes:", JSON.stringify(finalIndexes, null, 2));
+  logger.info(`Final carts indexes: ${finalIndexes.map((i) => i.name).join(", ")}`);
 
-  process.exit(0);
+  return { logs: logger.logs, summary: { dropped }, result: buildResult({ deleted: dropped }) };
 };
 
-run().catch((e) => {
-  console.error(e);
-  process.exit(1);
-});
+if (import.meta.url === `file://${process.argv[1]}`) {
+  const run = async () => {
+    await mongooseConnection;
+    const { logs } = await runFixCartIndexes();
+    for (const { timestamp, level, message } of logs) console.log(`[${timestamp}] [${level}] ${message}`);
+    await mongoose.disconnect();
+    process.exit(0);
+  };
+  run().catch((e) => {
+    console.error(e);
+    process.exit(1);
+  });
+}

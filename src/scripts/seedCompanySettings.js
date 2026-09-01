@@ -10,8 +10,10 @@
  * Usage:
  *   node src/scripts/seedCompanySettings.js
  */
-import mongoose from "../config/mongoose.js";
+import mongoose, { mongooseConnection } from "../config/mongoose.js";
 import SiteSetting from "../models/SiteSetting.js";
+import { createLogger } from "./shared/logger.js";
+import { buildResult } from "./shared/result.js";
 
 const settings = [
   {
@@ -59,13 +61,9 @@ const settings = [
   },
 ];
 
-const run = async () => {
-  if (mongoose.connection.readyState !== 1) {
-    await new Promise((resolve, reject) => {
-      mongoose.connection.once("open", resolve);
-      mongoose.connection.once("error", reject);
-    });
-  }
+export const runSeedCompanySettings = async ({ logger = createLogger() } = {}) => {
+  let created = 0;
+  let skipped = 0;
 
   for (const setting of settings) {
     const result = await SiteSetting.updateOne(
@@ -77,17 +75,28 @@ const run = async () => {
     // ({upserted: [...]}), not v6+'s {upsertedCount} — check both so this
     // logs correctly regardless of mongoose version.
     const wasCreated = result.upsertedCount || result.upserted?.length;
-    console.log(
-      wasCreated
-        ? `Created setting: ${setting.slug}`
-        : `Already exists, left untouched: ${setting.slug}`,
-    );
+    if (wasCreated) {
+      created += 1;
+      logger.info(`Created setting: ${setting.slug}`);
+    } else {
+      skipped += 1;
+      logger.info(`Already exists, left untouched: ${setting.slug}`);
+    }
   }
 
-  process.exit(0);
+  return { logs: logger.logs, summary: { total: settings.length, created, skipped }, result: buildResult({ inserted: created, skipped }) };
 };
 
-run().catch((e) => {
-  console.error(e);
-  process.exit(1);
-});
+if (import.meta.url === `file://${process.argv[1]}`) {
+  const run = async () => {
+    await mongooseConnection;
+    const { logs } = await runSeedCompanySettings();
+    for (const { timestamp, level, message } of logs) console.log(`[${timestamp}] [${level}] ${message}`);
+    await mongoose.disconnect();
+    process.exit(0);
+  };
+  run().catch((e) => {
+    console.error(e);
+    process.exit(1);
+  });
+}
