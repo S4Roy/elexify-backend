@@ -21,6 +21,12 @@ export const sendTest = celebrate({
   }),
 });
 
+export const seedRun = celebrate({
+  body: Joi.object({
+    type: Joi.string().valid("seed", "upgrade").required(),
+  }),
+});
+
 export const preview = celebrate({
   // The editor's preview call sends `formGroup.getRawValue()` verbatim
   // (subject/preheader/body/status) — status (and any other future form

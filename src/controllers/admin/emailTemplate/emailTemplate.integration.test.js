@@ -21,6 +21,8 @@ const { update } = await import("./update.js");
 const { resetToDefault } = await import("./resetToDefault.js");
 const { preview } = await import("./preview.js");
 const { sendTest } = await import("./sendTest.js");
+const { seedRun } = await import("./seedRun.js");
+const { TEMPLATES } = await import("../../../constants/emailTemplateDefaults.js");
 const { requirePermission } = await import("../../../middleware/requirePermission.js");
 const { PERMISSIONS } = await import("../../../constants/adminPermissions.js");
 const EmailTemplate = (await import("../../../models/EmailTemplate.js")).default;
@@ -217,6 +219,63 @@ suite("admin email template API", () => {
     const audit = await AuditLog.findOne({ event: "EMAIL_TEMPLATE_TEST_SENT" });
     expect(audit).toBeTruthy();
     expect(audit.metadata.sent_to_masked).not.toBe("test-recipient@example.com");
+  });
+
+  it("seedRun type=seed creates missing templates, returns a structured leveled log, and audits the run", async () => {
+    const admin = await createAdmin();
+    const req = mockReq({ body: { type: "seed" }, auth: { user_id: admin._id } });
+    const res = mockRes();
+    await seedRun(req, res, (err) => {
+      throw err;
+    });
+
+    const payload = res.json.mock.calls[0][0];
+    expect(payload.data.type).toBe("seed");
+    expect(payload.data.summary.created).toBe(Object.keys(TEMPLATES).length);
+    expect(payload.data.logs.length).toBeGreaterThan(0);
+    for (const line of payload.data.logs) {
+      expect(["INFO", "WARN", "ERROR"]).toContain(line.level);
+      expect(typeof line.timestamp).toBe("string");
+      expect(typeof line.message).toBe("string");
+    }
+
+    const count = await EmailTemplate.countDocuments();
+    expect(count).toBe(Object.keys(TEMPLATES).length);
+
+    const audit = await AuditLog.findOne({ event: "EMAIL_TEMPLATE_SEED_RUN" });
+    expect(audit).toBeTruthy();
+    expect(audit.metadata.type).toBe("seed");
+  });
+
+  it("seedRun type=upgrade overwrites only templates below the current default version", async () => {
+    await seedTemplate({ action: "order_cancelled", subject: "Old Subject", template_version: 1 });
+    await seedTemplate({ action: "promotional_offer", subject: "Customized, already current", template_version: 999 });
+    const admin = await createAdmin();
+
+    const req = mockReq({ body: { type: "upgrade" }, auth: { user_id: admin._id } });
+    const res = mockRes();
+    await seedRun(req, res, (err) => {
+      throw err;
+    });
+
+    const payload = res.json.mock.calls[0][0];
+    expect(payload.data.summary.upgraded).toBe(1);
+
+    const upgraded = await EmailTemplate.findOne({ action: "order_cancelled" });
+    expect(upgraded.subject).not.toBe("Old Subject");
+
+    const untouched = await EmailTemplate.findOne({ action: "promotional_offer" });
+    expect(untouched.subject).toBe("Customized, already current");
+  });
+
+  it("seedRun rejects an unknown type", async () => {
+    const req = mockReq({ body: { type: "bogus" }, auth: {} });
+    const res = mockRes();
+    let caught;
+    await seedRun(req, res, (err) => {
+      caught = err;
+    });
+    expect(caught).toBeTruthy();
   });
 
   it("requirePermission blocks a role without email_template.manage (403)", () => {

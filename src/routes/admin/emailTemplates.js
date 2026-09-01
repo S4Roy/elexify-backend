@@ -12,6 +12,13 @@ emailTemplatesRouter.get(
   emailTemplateController.list
 );
 
+emailTemplatesRouter.post(
+  "/seed-run",
+  requirePermission(PERMISSIONS.EMAIL_TEMPLATE_MANAGE),
+  emailTemplateValidation.seedRun,
+  emailTemplateController.seedRun
+);
+
 emailTemplatesRouter.get(
   "/:action",
   requirePermission(PERMISSIONS.EMAIL_TEMPLATE_MANAGE),

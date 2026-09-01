@@ -13,46 +13,21 @@
 // that already had the pre-redesign plain-text defaults seeded. Going
 // forward, an admin can also re-apply a single template's default via the
 // admin "Reset to Default" action, which performs the same kind of
-// explicit, confirmed overwrite for one template at a time.
+// explicit, confirmed overwrite for one template at a time — or run this
+// same migration for every template at once from the admin panel's "Run
+// Seed" action (controllers/admin/emailTemplate/seedRun.js).
 //
 // Usage: node src/scripts/upgradeEmailTemplatesToV2.js
 
 import mongoose, { mongooseConnection } from "../config/mongoose.js";
-import EmailTemplate from "../models/EmailTemplate.js";
-import { TEMPLATES, TEMPLATE_DEFAULTS_VERSION } from "../constants/emailTemplateDefaults.js";
-
-const LANGUAGE = "en";
+import { runUpgradeEmailTemplatesToV2 } from "../services/emailTemplate/seedRunner.js";
+import { printRunLog } from "./_printRunLog.js";
 
 const run = async () => {
   await mongooseConnection;
 
-  let upgraded = 0;
-  let skipped = 0;
-
-  for (const [action, { subject, preheader, body, required_variables, is_marketing }] of Object.entries(TEMPLATES)) {
-    const result = await EmailTemplate.updateOne(
-      {
-        action,
-        site_language: LANGUAGE,
-        $or: [{ template_version: { $exists: false } }, { template_version: { $lt: TEMPLATE_DEFAULTS_VERSION } }],
-      },
-      {
-        $set: {
-          subject,
-          preheader: preheader || "",
-          body,
-          required_variables: required_variables || [],
-          is_marketing: Boolean(is_marketing),
-          template_version: TEMPLATE_DEFAULTS_VERSION,
-          updated_at: new Date(),
-        },
-      }
-    );
-    if (result.matchedCount > 0) upgraded += 1;
-    else skipped += 1;
-  }
-
-  console.log(`Email templates upgraded to v${TEMPLATE_DEFAULTS_VERSION}: ${upgraded}, skipped (already current or missing): ${skipped}.`);
+  const { logs, summary } = await runUpgradeEmailTemplatesToV2();
+  printRunLog("upgrade:email-templates-v2", logs, summary);
 
   await mongoose.disconnect();
   process.exit(0);

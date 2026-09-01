@@ -8,45 +8,23 @@
 // never touched.
 //
 // Usage: node src/scripts/seedEmailTemplates.js
+//
+// Same run logic backs the admin panel's "Run Seed" action
+// (controllers/admin/emailTemplate/seedRun.js) — see
+// services/emailTemplate/seedRunner.js.
 
 import mongoose, { mongooseConnection } from "../config/mongoose.js";
-import EmailTemplate from "../models/EmailTemplate.js";
 import { TEMPLATES, TEMPLATE_DEFAULTS_VERSION } from "../constants/emailTemplateDefaults.js";
-
-const LANGUAGE = "en";
+import { runSeedEmailTemplates } from "../services/emailTemplate/seedRunner.js";
+import { printRunLog } from "./_printRunLog.js";
 
 export { TEMPLATES, TEMPLATE_DEFAULTS_VERSION };
 
 const run = async () => {
   await mongooseConnection;
 
-  const ops = Object.entries(TEMPLATES).map(
-    ([action, { subject, preheader, body, required_variables, is_marketing }]) => ({
-      updateOne: {
-        filter: { action, site_language: LANGUAGE },
-        update: {
-          $setOnInsert: {
-            action,
-            site_language: LANGUAGE,
-            subject,
-            preheader: preheader || "",
-            body,
-            required_variables: required_variables || [],
-            is_marketing: Boolean(is_marketing),
-            template_version: TEMPLATE_DEFAULTS_VERSION,
-            status: "active",
-            created_at: new Date(),
-          },
-        },
-        upsert: true,
-      },
-    })
-  );
-
-  const result = await EmailTemplate.bulkWrite(ops, { ordered: false });
-  console.log(
-    `Email templates seeded: ${result.upsertedCount} created, ${ops.length - result.upsertedCount} already existed (untouched).`
-  );
+  const { logs, summary } = await runSeedEmailTemplates();
+  printRunLog("seed:email-templates", logs, summary);
 
   await mongoose.disconnect();
   process.exit(0);

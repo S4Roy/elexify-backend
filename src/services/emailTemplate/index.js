@@ -1,2 +1,3 @@
 import { getTemplate } from "./getTemplate.js";
-export { getTemplate };
+import { runSeedEmailTemplates, runUpgradeEmailTemplatesToV2 } from "./seedRunner.js";
+export { getTemplate, runSeedEmailTemplates, runUpgradeEmailTemplatesToV2 };

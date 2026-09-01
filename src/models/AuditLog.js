@@ -26,6 +26,7 @@ const AuditLogSchema = new Schema(
         "EMAIL_TEMPLATE_UPDATED",
         "EMAIL_TEMPLATE_RESET",
         "EMAIL_TEMPLATE_TEST_SENT",
+        "EMAIL_TEMPLATE_SEED_RUN",
       ],
     },
     // Set for admin-initiated events (verification override, manual retry,

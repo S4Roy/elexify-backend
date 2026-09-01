@@ -210,5 +210,6 @@
 	"Preview rendered successfully": "Preview rendered successfully",
 	"Test email sent successfully": "Test email sent successfully",
 	"Email template updated successfully": "Email template updated successfully",
-	"Email template reset to default": "Email template reset to default"
+	"Email template reset to default": "Email template reset to default",
+	"Seed run complete": "Seed run complete"
 }
