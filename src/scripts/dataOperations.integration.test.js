@@ -113,8 +113,8 @@ suite("data-operations: dry-run accuracy, health checks, audit fields (real regi
         operation_key: "faqs",
         version: 1,
         environment: outcome.environment,
-        execution_id: outcome.executionId,
-        dry_run: outcome.dryRun,
+        execution_id: outcome.execution_id,
+        dry_run: outcome.dry_run,
         result: outcome.result,
       },
     });
@@ -124,7 +124,7 @@ suite("data-operations: dry-run accuracy, health checks, audit fields (real regi
     expect(audit.user_id.toString()).toBe(adminId.toString());
     expect(audit.actor_id.toString()).toBe(adminId.toString());
     expect(audit.metadata.operation_key).toBe("faqs");
-    expect(audit.metadata.execution_id).toBe(outcome.executionId);
+    expect(audit.metadata.execution_id).toBe(outcome.execution_id);
     expect(audit.metadata.dry_run).toBe(false);
     expect(JSON.stringify(audit)).not.toMatch(/password|secret|token/i);
   });

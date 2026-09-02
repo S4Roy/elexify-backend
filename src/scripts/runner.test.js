@@ -167,7 +167,7 @@ suite("scripts/runner.js execute()", () => {
       },
     });
     const outcome = await execute(op.key, { triggerSource: "CLI" });
-    const logs = await SystemOperationLog.find({ execution_id: outcome.executionId }).lean();
+    const logs = await SystemOperationLog.find({ execution_id: outcome.execution_id }).lean();
     const allMessages = logs.map((l) => l.message).join("\n");
     expect(allMessages).not.toContain("SuperSecret123");
   });
@@ -180,11 +180,11 @@ suite("scripts/runner.js execute()", () => {
       },
     });
     const outcome = await execute(op.key, { triggerSource: "CLI" });
-    const logs = await SystemOperationLog.find({ execution_id: outcome.executionId }).sort({ timestamp: 1 }).lean();
+    const logs = await SystemOperationLog.find({ execution_id: outcome.execution_id }).sort({ timestamp: 1 }).lean();
     expect(logs.length).toBe(500);
     expect(logs[logs.length - 1].message).toMatch(/truncated/i);
 
-    const execution = await SystemOperationExecution.findById(outcome.executionId).lean();
+    const execution = await SystemOperationExecution.findById(outcome.execution_id).lean();
     expect(execution.log_truncated).toBe(true);
     expect(execution.log_line_count).toBe(500);
   });
@@ -192,7 +192,7 @@ suite("scripts/runner.js execute()", () => {
   it("records started_at/completed_at/duration_ms on every execution", async () => {
     const op = registerOp();
     const outcome = await execute(op.key, { triggerSource: "CLI" });
-    const execution = await SystemOperationExecution.findById(outcome.executionId).lean();
+    const execution = await SystemOperationExecution.findById(outcome.execution_id).lean();
     expect(execution.started_at).toBeTruthy();
     expect(execution.completed_at).toBeTruthy();
     expect(execution.duration_ms).toBeGreaterThanOrEqual(0);

@@ -49,8 +49,8 @@ export const run = async (req, res, next) => {
         operation_key: entry.key,
         version: entry.version,
         environment: outcome.environment,
-        execution_id: outcome.executionId,
-        dry_run: outcome.dryRun,
+        execution_id: outcome.execution_id,
+        dry_run: outcome.dry_run,
         result: outcome.result,
       },
     });

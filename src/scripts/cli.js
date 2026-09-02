@@ -70,8 +70,8 @@ const cmdRun = async (key, { dryRun }) => {
   }
   try {
     const outcome = await execute(key, { dryRun, triggerSource: "CLI" });
-    await printExecutionLogs(outcome.executionId);
-    console.log(`\n[${key}] status=${outcome.status} dryRun=${outcome.dryRun} environment=${outcome.environment}`);
+    await printExecutionLogs(outcome.execution_id);
+    console.log(`\n[${key}] status=${outcome.status} dryRun=${outcome.dry_run} environment=${outcome.environment}`);
     console.log(`[${key}] result: ${JSON.stringify(outcome.result)}`);
     if (outcome.error) console.error(`[${key}] error: ${JSON.stringify(outcome.error)}`);
     if (outcome.status === "SUCCESS") return 0;

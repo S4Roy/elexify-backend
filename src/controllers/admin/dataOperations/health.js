@@ -1,6 +1,7 @@
 import { StatusError } from "../../../config/index.js";
 import { getOperation } from "../../../scripts/seeders/registry/index.js";
 import { currentEnvironment } from "../../../scripts/runner.js";
+import { normalizeHealth } from "../../../scripts/shared/health.js";
 
 // Health status is computed entirely separately from execution status — a
 // health check never mutates data, and "ran successfully once" is not the
@@ -21,7 +22,7 @@ export const health = async (req, res, next) => {
       });
     }
 
-    const health = await entry.healthCheck({ environment });
+    const health = normalizeHealth(await entry.healthCheck({ environment }));
     res.status(200).json({ status: "success", message: req.__("Health check"), data: { key: entry.key, ...health } });
   } catch (error) {
     next(error);

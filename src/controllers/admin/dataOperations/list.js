@@ -1,5 +1,6 @@
 import { listOperations } from "../../../scripts/seeders/registry/index.js";
 import { currentEnvironment } from "../../../scripts/runner.js";
+import { normalizeHealth } from "../../../scripts/shared/health.js";
 import SystemOperationExecution from "../../../models/SystemOperationExecution.js";
 
 // Safe, serializable view of a registry entry — never exposes the
@@ -35,18 +36,39 @@ export const list = async (req, res, next) => {
     ]);
     const lastByKey = new Map(lastExecutions.map((row) => [row._id, row.lastExecution]));
 
-    const data = entries.map((entry) => ({
-      ...toSafeView(entry),
-      allowedInCurrentEnvironment: entry.allowedEnvironments.includes(environment),
-      lastExecution: lastByKey.has(entry.key)
-        ? {
-            id: String(lastByKey.get(entry.key)._id),
-            status: lastByKey.get(entry.key).status,
-            dryRun: lastByKey.get(entry.key).dry_run,
-            completedAt: lastByKey.get(entry.key).completed_at,
+    // Health is computed inline (parallel, only for entries that declare a
+    // real healthCheck) so the list screen's "Current Health" column is a
+    // single round trip — cheap since these are simple count queries, not
+    // a per-row waterfall of separate /health calls from the client.
+    const healthByKey = new Map(
+      await Promise.all(
+        entries.map(async (entry) => {
+          if (typeof entry.healthCheck !== "function") return [entry.key, { status: "NOT_APPLICABLE" }];
+          try {
+            return [entry.key, normalizeHealth(await entry.healthCheck({ environment }))];
+          } catch (e) {
+            return [entry.key, { status: "ERROR", detail: e.message }];
           }
-        : null,
-    }));
+        }),
+      ),
+    );
+
+    const data = entries.map((entry) => {
+      const last = lastByKey.get(entry.key);
+      return {
+        ...toSafeView(entry),
+        allowedInCurrentEnvironment: entry.allowedEnvironments.includes(environment),
+        health: healthByKey.get(entry.key) ?? { status: "NOT_APPLICABLE" },
+        lastExecution: last
+          ? {
+              execution_id: String(last._id),
+              status: last.status,
+              dry_run: last.dry_run,
+              completed_at: last.completed_at,
+            }
+          : null,
+      };
+    });
 
     res.status(200).json({ status: "success", message: req.__("Data operations listed"), data: { environment, operations: data } });
   } catch (error) {

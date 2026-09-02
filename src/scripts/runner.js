@@ -177,12 +177,16 @@ export const execute = async (key, { dryRun = false, triggerSource, triggeredBy 
   }
 
   return {
-    executionId: execution._id.toString(),
-    operationKey: key,
+    execution_id: execution._id.toString(),
+    operation_key: key,
     status,
-    dryRun,
+    dry_run: dryRun,
     environment,
     result,
     error,
+    // Redacted in-memory copy of this run's log lines, returned inline so
+    // admin/CLI callers can render them immediately without a second round
+    // trip to GET .../executions/:id/logs — same shape persisted there.
+    logs: logger.logs.map((line) => ({ ...line, message: redactMessage(line.message) })),
   };
 };

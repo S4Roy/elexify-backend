@@ -27,7 +27,12 @@ export const listExecutions = async (req, res, next) => {
     res.status(200).json({
       status: "success",
       message: req.__("Executions listed"),
-      data: { items, total, page: pageNum, limit: limitNum },
+      data: {
+        items: items.map((item) => ({ ...item, execution_id: String(item._id) })),
+        total,
+        page: pageNum,
+        limit: limitNum,
+      },
     });
   } catch (error) {
     next(error);
@@ -39,7 +44,11 @@ export const executionDetails = async (req, res, next) => {
   try {
     const execution = await SystemOperationExecution.findById(req.params.id).lean();
     if (!execution) throw StatusError.notFound(req.__("Execution not found"));
-    res.status(200).json({ status: "success", message: req.__("Execution detail"), data: execution });
+    res.status(200).json({
+      status: "success",
+      message: req.__("Execution detail"),
+      data: { ...execution, execution_id: String(execution._id) },
+    });
   } catch (error) {
     next(error);
   }
@@ -52,7 +61,7 @@ export const executionLogs = async (req, res, next) => {
     if (!execution) throw StatusError.notFound(req.__("Execution not found"));
 
     const logs = await SystemOperationLog.find({ execution_id: req.params.id }).sort({ timestamp: 1 }).lean();
-    res.status(200).json({ status: "success", message: req.__("Execution logs"), data: { executionId: req.params.id, logs } });
+    res.status(200).json({ status: "success", message: req.__("Execution logs"), data: { execution_id: req.params.id, logs } });
   } catch (error) {
     next(error);
   }
