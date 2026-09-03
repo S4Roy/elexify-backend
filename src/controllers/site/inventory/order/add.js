@@ -14,6 +14,7 @@ import Coupon from "../../../../models/Coupon.js";
 import CouponUsage from "../../../../models/CouponUsage.js";
 import ProviderOrderAttempt from "../../../../models/ProviderOrderAttempt.js";
 import { StatusError } from "../../../../config/index.js";
+import { getRazorpayConfig } from "../../../../services/integrationCredentials/razorpay.js";
 import { createRazorpayOrder } from "../../../../services/paymentService/createRazorpayOrder.js";
 import { createPayPalOrder } from "../../../../services/paymentService/createPayPalOrder.js";
 import { validateCoupon } from "../../../../services/inventory/cart/validateCoupon.js";
@@ -676,6 +677,9 @@ const address = await Address.findOne({
         if (existing.idempotency_fingerprint !== requestFingerprint) {
           return next(StatusError.conflict("Idempotency key was already used for a different checkout request"));
         }
+        const checkoutKeyId = existing.payment_meta?.razorpay_order_id
+          ? (await getRazorpayConfig()).key_id
+          : null;
         return res.status(200).json({
           status: "success",
           message: "Order already placed",
@@ -688,6 +692,7 @@ const address = await Address.findOne({
                 id: existing.payment_meta.razorpay_order_id,
                 amount: Math.round(existing.grand_total * 100),
                 currency: existing.currency,
+                checkout_key_id: checkoutKeyId,
               },
             } : null,
           },

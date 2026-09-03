@@ -1,15 +1,10 @@
-import { envs } from "../../config/index.js";
-import Razorpay from "razorpay";
-
-const razorpay = new Razorpay({
-  key_id: envs.razorpay.key_id,
-  key_secret: envs.razorpay.key_secret,
-});
+import { getRazorpayClient } from "../integrationCredentials/razorpay.js";
 
 // Fetches the actual captured amount for a payment rather than trusting any
 // locally recomputed figure — this is the backend-truth source refunds are
 // based on.
 export const fetchRazorpayPayment = async (razorpayPaymentId) => {
+  const razorpay = await getRazorpayClient();
   return razorpay.payments.fetch(razorpayPaymentId);
 };
 
@@ -20,6 +15,7 @@ export const fetchRazorpayPayment = async (razorpayPaymentId) => {
 // call more than once from our side even if the DB-level dedup check
 // (refund.razorpay_refund_id) somehow gets bypassed.
 export const refundRazorpayPayment = async (razorpayPaymentId, amountInPaise, idempotencyKey) => {
+  const razorpay = await getRazorpayClient();
   return razorpay.payments.refund(razorpayPaymentId, {
     amount: amountInPaise,
     speed: "optimum",

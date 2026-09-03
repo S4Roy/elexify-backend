@@ -27,6 +27,7 @@ import normalizeExistingMobiles from "./operations/normalize-existing-mobiles.js
 import e2eCleanup from "./operations/e2e-cleanup.js";
 import e2eSeed from "./operations/e2e-seed.js";
 import e2eSeedAdmin from "./operations/e2e-seed-admin.js";
+import integrationCredentials from "./operations/integration-credentials.js";
 
 const RAW_ENTRIES = [
   emailTemplates,
@@ -51,6 +52,7 @@ const RAW_ENTRIES = [
   e2eCleanup,
   e2eSeed,
   e2eSeedAdmin,
+  integrationCredentials,
 ];
 
 const VALID_TYPES = new Set(["SEEDER", "MIGRATION", "BACKFILL", "REPAIR"]);

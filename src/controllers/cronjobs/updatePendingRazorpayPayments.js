@@ -1,9 +1,10 @@
 import Order from "../../models/Order.js";
 import axios from "axios";
-import { envs } from "../../config/index.js";
 import { orderService, notificationService } from "../../services/index.js";
+import { getRazorpayConfig } from "../../services/integrationCredentials/razorpay.js";
 
 export const updatePendingRazorpayPayments = async () => {
+  const credentials = await getRazorpayConfig();
   const pendingOrders = await Order.find({
     order_status: "pending", payment_status: "pending", payment_method: "razorpay",
     "payment_meta.razorpay_order_id": { $ne: null },
@@ -15,7 +16,7 @@ export const updatePendingRazorpayPayments = async () => {
     try {
       const { data } = await axios.get(
         `https://api.razorpay.com/v1/orders/${providerOrderId}/payments`,
-        { auth: { username: envs.razorpay.key_id, password: envs.razorpay.key_secret } },
+        { auth: { username: credentials.key_id, password: credentials.key_secret } },
       );
       const payments = data.items || [];
       const captured = payments.find((payment) => payment.status === "captured");

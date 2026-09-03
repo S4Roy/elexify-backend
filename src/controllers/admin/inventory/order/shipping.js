@@ -2,6 +2,7 @@ import Order from "../../../../models/Order.js";
 import { StatusError, envs } from "../../../../config/index.js";
 import { shiprocket, inventoryService } from "../../../../services/index.js";
 import moment from "moment-timezone";
+import { getIntegrationConfig } from "../../../../services/integrationCredentials/index.js";
 
 export const shipping = async (req, res, next) => {
   try {
@@ -18,6 +19,8 @@ export const shipping = async (req, res, next) => {
 
     const order_data = await inventoryService.orderService.details(_id);
     if (!order_data) throw new StatusError(404, "Order not found");
+    const shiprocketConfig = await getIntegrationConfig("shiprocket", { channel_id: envs.shiprocket?.channel_id });
+    if (!shiprocketConfig) throw StatusError.serviceUnavailable("Shiprocket integration is disabled");
 
     // --- parse numeric inputs, fallback to null if not provided
     const lengthNum = qLength ? Number(qLength) : null;
@@ -98,7 +101,7 @@ export const shipping = async (req, res, next) => {
         .tz("Asia/Kolkata")
         .format("YYYY-MM-DD HH:mm"),
       pickup_location: envs.PROJECT_NAME,
-      channel_id: (envs.shiprocket && envs.shiprocket.channel_id) || "7990522",
+      channel_id: shiprocketConfig.channel_id || "7990522",
       comment: order_data.note || order_data.comment || "",
       billing_customer_name: billing.full_name,
       billing_last_name: billing.last_name || "",

@@ -11,6 +11,7 @@
     "test:provider-http": "vitest run --no-file-parallelism src/services/orderService/providerBackedHttp.integration.test.js",
     "import:pincodes": "node src/scripts/cli.js run pincodes",
     "seed:email-templates": "node src/scripts/cli.js run email-templates",
+    "seed:integration-credentials": "node src/scripts/cli.js run integration-credentials",
     "upgrade:email-templates-v2": "node src/scripts/cli.js run email-templates-upgrade",
     "smoke:otp-email": "node src/scripts/smokeTestOtpEmail.js",
     "smoke:email-template-rendering": "node src/scripts/smokeTestTemplateRendering.js",

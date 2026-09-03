@@ -1,10 +1,10 @@
 import crypto from "crypto";
-import { envs } from "../../config/index.js";
 import Order from "../../models/Order.js";
 import WebhookEvent from "../../models/WebhookEvent.js";
 import { PAYMENT_STATUS } from "../../constants/orderStatus.js";
 import { orderService, notificationService } from "../../services/index.js";
 import { recordOperationalEvent } from "../../services/observability/recordOperationalEvent.js";
+import { getRazorpayConfig } from "../../services/integrationCredentials/razorpay.js";
 
 const MAX_WEBHOOK_ATTEMPTS = 5;
 
@@ -100,7 +100,13 @@ export const replayRazorpayWebhook = async (eventId) => {
 
 export const razorpayWebhook = async (req, res) => {
   const signature = req.headers["x-razorpay-signature"];
-  const secret = envs.razorpay.webhook_secret;
+  let credentials;
+  try {
+    credentials = await getRazorpayConfig();
+  } catch {
+    return res.status(503).json({ status: "error", message: "Payment provider unavailable" });
+  }
+  const secret = credentials.webhook_secret;
   if (!signature || !secret || !req.rawBody) {
     return res.status(400).json({ status: "error", message: "Missing signature" });
   }

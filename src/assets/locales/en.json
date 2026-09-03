@@ -212,5 +212,12 @@
 	"Email template updated successfully": "Email template updated successfully",
 	"Email template reset to default": "Email template reset to default",
 	"Seed run complete": "Seed run complete",
-	"Data operations listed": "Data operations listed"
+	"Data operations listed": "Data operations listed",
+	"Operation detail": "Operation detail",
+	"Dry run complete": "Dry run complete",
+	"Operation run complete": "Operation run complete",
+	"Execution detail": "Execution detail",
+	"Execution logs": "Execution logs",
+	"A user with this mobile number already exists": "A user with this mobile number already exists",
+	"{{channel}} marked as verified": "{{channel}} marked as verified"
 }

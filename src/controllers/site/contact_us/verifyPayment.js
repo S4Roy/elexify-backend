@@ -1,6 +1,7 @@
 import crypto from "crypto";
-import { envs, StatusError } from "../../../config/index.js";
+import { StatusError } from "../../../config/index.js";
 import Consultation from "../../../models/Consultation.js";
+import { getRazorpayConfig } from "../../../services/integrationCredentials/razorpay.js";
 
 export const verifyPayment = async (req, res, next) => {
   try {
@@ -17,8 +18,9 @@ export const verifyPayment = async (req, res, next) => {
     }
 
     // 2️⃣ Verify payment signature
+    const credentials = await getRazorpayConfig();
     const hmac = crypto
-      .createHmac("sha256", envs.razorpay.key_secret)
+      .createHmac("sha256", credentials.key_secret)
       .update(`${razorpay_order_id}|${razorpay_payment_id}`)
       .digest("hex");
 

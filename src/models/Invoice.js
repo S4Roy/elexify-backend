@@ -70,6 +70,25 @@ const InvoiceSchema = new Schema(
     },
 
     is_gst_applicable: { type: Boolean, default: false },
+
+    // Operational projection of the external accounting copy. The local
+    // immutable invoice remains the legal/source snapshot; Zoho is a
+    // synchronized downstream record with an independently visible state.
+    zoho: {
+      sync_status: {
+        type: String,
+        enum: ["not_synced", "syncing", "synced", "failed"],
+        default: "not_synced",
+      },
+      invoice_id: { type: String, default: null },
+      invoice_number: { type: String, default: null },
+      status: { type: String, default: null },
+      invoice_url: { type: String, default: null },
+      attempts: { type: Number, default: 0 },
+      last_attempt_at: { type: Date, default: null },
+      synced_at: { type: Date, default: null },
+      last_error: { type: String, default: null },
+    },
   },
   {
     timestamps: false,

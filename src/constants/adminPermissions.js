@@ -16,6 +16,8 @@ export const PERMISSIONS = {
   // reset-to-default) — same superadmin+manager-only shape as the other
   // sensitive admin capabilities above.
   EMAIL_TEMPLATE_MANAGE: "email_template.manage",
+  INTEGRATION_CREDENTIAL_MANAGE: "integration_credential.manage",
+  ZOHO_INVOICE_MANAGE: "zoho_invoice.manage",
 
   // Centralized Data Operations (seeders/migrations/backfills/repairs) —
   // see routes/admin/dataOperations.js and scripts/runner.js. View
@@ -57,6 +59,7 @@ export const ROLE_PERMISSIONS = {
     PERMISSIONS.CUSTOMER_NOTIFICATION_RETRY,
     PERMISSIONS.CUSTOMER_PREFERENCE_MANAGE,
     PERMISSIONS.EMAIL_TEMPLATE_MANAGE,
+    PERMISSIONS.ZOHO_INVOICE_MANAGE,
     // View-only for Data Operations — no execute permissions, matching the
     // existing "view-only for non-superadmin" pattern used elsewhere in
     // this file. Adjustable later if a manager role needs to run LOW-risk

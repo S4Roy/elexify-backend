@@ -3,18 +3,24 @@ import axios from "axios";
 import qs from "qs";
 import moment from "moment-timezone";
 import Token from "../../models/Token.js";
+import { getIntegrationConfig } from "../integrationCredentials/index.js";
 
 const ZOHO_TOKEN_URL = "https://accounts.zoho.in/oauth/v2/token";
 
 export const getTokens = async () => {
+  const credentials = await getIntegrationConfig("zoho", {
+    org_id: envs.zoho.ORG_ID,
+    client_id: envs.zoho.CLIENT_ID,
+    client_secret: envs.zoho.CLIENT_SECRET,
+    refresh_token: envs.zoho.REFRESH_TOKEN,
+    base_url: envs.zoho.BASE_URL,
+  });
+  if (!credentials) throw new Error("Zoho integration is disabled");
   let tokenData = await Token.findOne({ provider: "zoho" });
 
   if (!tokenData) {
     tokenData = await Token.create({
       provider: "zoho",
-      client_id: envs.zoho.CLIENT_ID,
-      client_secret: envs.zoho.CLIENT_SECRET,
-      refresh_token: envs.zoho.REFRESH_TOKEN,
       access_token: null,
       expires_at: moment().subtract(1, "minute").tz("Asia/Kolkata").toDate(),
     });
@@ -31,9 +37,9 @@ export const getTokens = async () => {
   // Refresh token expired or no access_token
   try {
     const data = {
-      refresh_token: tokenData.refresh_token,
-      client_id: envs.zoho.CLIENT_ID,
-      client_secret: envs.zoho.CLIENT_SECRET,
+      refresh_token: credentials.refresh_token,
+      client_id: credentials.client_id,
+      client_secret: credentials.client_secret,
       grant_type: "refresh_token",
     };
 

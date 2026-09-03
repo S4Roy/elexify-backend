@@ -1,5 +1,14 @@
 import { config } from "dotenv";
-config();
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+// Optional ignored developer-only secrets. Production should inject these
+// through its secret manager/environment instead of deploying this file.
+const configDirectory = path.dirname(fileURLToPath(import.meta.url));
+const projectDirectory = path.resolve(configDirectory, "../..");
+config({ path: path.join(projectDirectory, ".env.credentials.local") });
+config({ path: path.join(projectDirectory, ".env") });
+
+const accessTokenSecret = process.env.ACCESS_TOKEN_SECRET || "";
 
 export const envs = {
   FRONTEND_URL: process.env.FRONTEND_URL || "",
@@ -17,11 +26,20 @@ export const envs = {
   base_url: process.env.BASE_URL || "", // Set the base URL from the environment variable
   pms_url: process.env.PMS_URL || "", // Set the base URL from the environment variable
   apiKey: process.env.API_KEY || "",
+  integrationCredentials: {
+    // A separate key is preferred. ACCESS_TOKEN_SECRET is a compatibility
+    // fallback for existing deployments; SHA-256 domain separation in the
+    // crypto utility ensures the AES key is not the raw JWT signing key.
+    encryptionKey:
+      process.env.INTEGRATION_CREDENTIALS_ENCRYPTION_KEY || accessTokenSecret,
+    usesAccessTokenFallback:
+      !process.env.INTEGRATION_CREDENTIALS_ENCRYPTION_KEY && Boolean(accessTokenSecret),
+  },
   MONGODB_URI: process.env.MONGODB_URI || `mongodb://${process.env.MONGODB_HOST}:${process.env.MONGODB_PORT}/${process.env.MONGODB_DATABASE}`,
   passwordSalt: Number(process.env.PASSWORD_SALT_ROUND) || 12,
   jwt: {
     accessToken: {
-      secret: process.env.ACCESS_TOKEN_SECRET || "",
+      secret: accessTokenSecret,
       expiry: Number(process.env.ACCESS_TOKEN_EXPIRED) || 3600,
     },
   },

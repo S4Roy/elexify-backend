@@ -3,19 +3,21 @@ import User from "../../models/User.js";
 import UserResource from "../../resources/UserResource.js";
 import { StatusError, envs } from "../../config/index.js";
 import { userService, inventoryService } from "../../services/index.js";
-
-const client = new OAuth2Client(envs.google.clientId);
+import { getIntegrationConfig } from "../../services/integrationCredentials/index.js";
 
 export const googleLogin = async (req, res, next) => {
   try {
     const { id_token } = req.body;
     const guest_id = req.auth?.guest_id || null;
+    const google = await getIntegrationConfig("google", { client_id: envs.google.clientId });
+    if (!google?.client_id) throw StatusError.serviceUnavailable("Google Sign-In is not configured");
+    const client = new OAuth2Client(google.client_id);
 
     let payload;
     try {
       const ticket = await client.verifyIdToken({
         idToken: id_token,
-        audience: envs.google.clientId,
+        audience: google.client_id,
       });
       payload = ticket.getPayload();
     } catch {

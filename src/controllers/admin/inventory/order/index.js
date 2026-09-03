@@ -11,6 +11,7 @@ import { shipping } from "./shipping.js";
 import { cancel } from "./cancel.js";
 import { retryRefund } from "./retryRefund.js";
 import { invoice } from "./invoice.js";
+import { zohoInvoiceStatus, syncZohoInvoice } from "./zohoInvoice.js";
 
 export {
   add,
@@ -26,4 +27,6 @@ export {
   cancel,
   retryRefund,
   invoice,
+  zohoInvoiceStatus,
+  syncZohoInvoice,
 };

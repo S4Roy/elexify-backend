@@ -9,12 +9,12 @@ import CouponUsage from "../../models/CouponUsage.js";
 import User from "../../models/User.js";
 import { envs, StatusError } from "../../config/index.js";
 import { ORDER_STATUS, PAYMENT_STATUS } from "../../constants/orderStatus.js";
+import { getRazorpayConfig } from "../integrationCredentials/razorpay.js";
 
 const normalize = (value) => String(value || "").toUpperCase();
 
-export const validateCapturedPayment = (order, payment) => {
+export const validateCapturedPayment = (order, payment, configuredAccount = envs.razorpay.account_id) => {
   const expectedAmount = Math.round(Number(order.grand_total) * 100);
-  const configuredAccount = envs.razorpay.account_id;
   if (
     !payment?.id ||
     payment.order_id !== order.payment_meta?.razorpay_order_id ||
@@ -42,7 +42,8 @@ export const finalizeCapturedPayment = async ({
 
   const existing = await Order.findOne(lookup);
   if (!existing) throw StatusError.notFound("Order not found");
-  validateCapturedPayment(existing, paymentData);
+  const credentials = await getRazorpayConfig();
+  validateCapturedPayment(existing, paymentData, credentials.account_id);
 
   if (existing.payment_status === PAYMENT_STATUS.PAID && existing.stock_reserved) {
     return { order: existing, alreadyFinalized: true };

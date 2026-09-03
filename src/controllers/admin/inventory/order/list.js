@@ -2,6 +2,7 @@ import Order from "../../../../models/Order.js";
 import { StatusError, envs } from "../../../../config/index.js";
 import mongoose from "mongoose";
 import OrderResource from "../../../../resources/OrderResource.js";
+import User from "../../../../models/User.js";
 
 export const list = async (req, res, next) => {
   try {
@@ -15,6 +16,7 @@ export const list = async (req, res, next) => {
       sort_by = "id",
       sort_order = -1,
       _id = null,
+      customer_id = null,
       payment_status = null,
       payment_method = null,
       from_date = null,
@@ -34,6 +36,8 @@ export const list = async (req, res, next) => {
     };
     if (req.auth.role == "customer") {
       matchFilter.user = new mongoose.Types.ObjectId(user_id);
+    } else if (customer_id) {
+      matchFilter.user = new mongoose.Types.ObjectId(customer_id);
     }
 
     if (slug) matchFilter.slug = slug;
@@ -530,6 +534,37 @@ export const list = async (req, res, next) => {
       const agg = Order.aggregate(pipeline);
       const result = await Order.aggregatePaginate(agg, options);
       result.docs = await OrderResource.collection(result.docs);
+
+      // Return safe context even when the customer has no orders, so the
+      // focused admin view can identify the selected customer on refresh.
+      if (customer_id) {
+        const customerFilter = {
+          deleted_at: null,
+          user: new mongoose.Types.ObjectId(customer_id),
+        };
+        const [customer, totalOrders, paidSummary, lastOrder] = await Promise.all([
+          User.findOne({ _id: customer_id, deleted_at: null })
+            .select("name email mobile phone_code status")
+            .lean(),
+          Order.countDocuments(customerFilter),
+          Order.aggregate([
+            { $match: { ...customerFilter, payment_status: "paid" } },
+            { $group: { _id: "$currency", orders: { $sum: 1 }, value: { $sum: "$grand_total" } } },
+            { $project: { _id: 0, currency: { $ifNull: ["$_id", "INR"] }, orders: 1, value: 1 } },
+          ]),
+          Order.findOne(customerFilter).sort({ created_at: -1 }).select("created_at").lean(),
+        ]);
+        if (!customer) throw StatusError.notFound(req.__("Customer not found"));
+        result.filter_context = {
+          customer,
+          summary: {
+            total_orders: totalOrders,
+            paid_orders: paidSummary.reduce((sum, row) => sum + row.orders, 0),
+            totals_by_currency: paidSummary,
+            last_order_at: lastOrder?.created_at || null,
+          },
+        };
+      }
 
       data = result;
     }

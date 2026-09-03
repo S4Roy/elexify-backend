@@ -3,12 +3,19 @@ import { envs } from "../../config/index.js";
 import axios from "axios";
 import moment from "moment-timezone";
 import Token from "../../models/Token.js"; // same model you used for Shiprocket tokens
+import { getIntegrationConfig } from "../integrationCredentials/index.js";
 
 /**
  * Get cached PayPal access token (provider: 'paypal') or request a new one.
  * Returns: { accessToken, base }
  */
 export const getPayPalToken = async () => {
+  const credentials = await getIntegrationConfig("paypal", {
+    client_id: envs.paypal?.client_id,
+    client_secret: envs.paypal?.secret,
+    environment: envs.paypal?.env || "sandbox",
+  });
+  if (!credentials) throw new Error("PayPal integration is disabled");
   // Ensure Token doc exists for provider 'paypal'
   let tokenDoc = await Token.findOne({ provider: "paypal" });
   if (!tokenDoc) {
@@ -27,7 +34,7 @@ export const getPayPalToken = async () => {
     return {
       accessToken: tokenDoc.access_token,
       base:
-        (envs.paypal?.env || "sandbox").toLowerCase() === "live"
+        (credentials.environment || "sandbox").toLowerCase() === "live"
           ? "https://api-m.paypal.com"
           : "https://api-m.sandbox.paypal.com",
     };
@@ -35,13 +42,13 @@ export const getPayPalToken = async () => {
 
   // Otherwise request a new token
   try {
-    const clientId = envs.paypal?.client_id;
-    const clientSecret = envs.paypal?.secret;
+    const clientId = credentials.client_id;
+    const clientSecret = credentials.client_secret;
     if (!clientId || !clientSecret) {
       throw new Error("Missing PayPal credentials in envs.paypal");
     }
 
-    const envName = (envs.paypal?.env || "sandbox").toLowerCase();
+    const envName = (credentials.environment || "sandbox").toLowerCase();
     const base =
       envName === "live"
         ? "https://api-m.paypal.com"

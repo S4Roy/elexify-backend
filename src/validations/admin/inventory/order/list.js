@@ -5,6 +5,11 @@ export const list = celebrate({
     page: Joi.number().optional(),
     limit: Joi.number().optional(),
     _id: Joi.string().optional().allow("", null),
+    customer_id: Joi.string()
+      .pattern(/^[0-9a-fA-F]{24}$/)
+      .optional()
+      .allow("", null)
+      .messages({ "string.pattern.base": "Invalid customer ID format" }),
     order_status: Joi.string().optional().allow("", null),
     payment_status: Joi.string().optional().allow("", null),
     payment_method: Joi.string().optional().allow("", null),

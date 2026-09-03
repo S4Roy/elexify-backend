@@ -2,6 +2,7 @@ import { envs } from "../../config/index.js";
 import axios from "axios";
 import moment from "moment-timezone";
 import Token from "../../models/Token.js";
+import { getIntegrationConfig } from "../integrationCredentials/index.js";
 
 const SHIPROCKET_AUTH_URL =
   "https://apiv2.shiprocket.in/v1/external/auth/login";
@@ -11,13 +12,18 @@ const SHIPROCKET_AUTH_URL =
  * Requires envs.shiprocket.EMAIL and envs.shiprocket.PASSWORD
  */
 export const getTokens = async () => {
+  const credentials = await getIntegrationConfig("shiprocket", {
+    email: envs.shiprocket?.email,
+    password: envs.shiprocket?.password,
+    channel_id: envs.shiprocket?.channel_id,
+  });
+  if (!credentials) throw new Error("Shiprocket integration is disabled");
   let tokenData = await Token.findOne({ provider: "shiprocket" });
 
   if (!tokenData) {
     tokenData = await Token.create({
       provider: "shiprocket",
       // optional: store identifying info but NOT password in plain text if you prefer
-      email: envs.shiprocket?.email || null,
       access_token: null,
       expires_at: moment().subtract(1, "minute").tz("Asia/Kolkata").toDate(),
     });
@@ -33,13 +39,13 @@ export const getTokens = async () => {
 
   // Need to fetch a new token
   try {
-    if (!envs.shiprocket?.email || !envs.shiprocket?.password) {
+    if (!credentials.email || !credentials.password) {
       throw new Error("Missing SHIPROCKET credentials in envs.shiprocket");
     }
 
     const payload = {
-      email: envs.shiprocket.email,
-      password: envs.shiprocket.password,
+      email: credentials.email,
+      password: credentials.password,
     };
 
     const response = await axios.post(SHIPROCKET_AUTH_URL, payload, {
