@@ -27,12 +27,23 @@ export const getCancellationEligibility = (order, actorType, policy) => {
 
 export const getOrderPolicy = () => ShippingSettings.getSingleton();
 
-export const getCustomerOrderCapabilities = (order, policy) => ({
-  cancellation: getCancellationEligibility(order, "customer", policy),
-  returns: {
-    enabled: Boolean(policy.returns_enabled),
-    window_days: policy.return_window_days,
-    require_images: Boolean(policy.return_require_images),
-    reasons: policy.return_reasons,
-  },
-});
+export const getCustomerOrderCapabilities = (order, policy) => {
+  const deliveredAt = order?.delivered_at ? new Date(order.delivered_at) : null;
+  const deadline = deliveredAt
+    ? new Date(deliveredAt.getTime() + policy.return_window_days * 86400000)
+    : null;
+  const returnAllowed = Boolean(policy.returns_enabled) &&
+    order?.order_status === ORDER_STATUS.DELIVERED &&
+    deadline && deadline.getTime() >= Date.now();
+  return {
+    cancellation: getCancellationEligibility(order, "customer", policy),
+    returns: {
+      enabled: Boolean(policy.returns_enabled),
+      allowed: Boolean(returnAllowed),
+      window_days: policy.return_window_days,
+      deadline,
+      require_images: Boolean(policy.return_require_images),
+      reasons: policy.return_reasons,
+    },
+  };
+};

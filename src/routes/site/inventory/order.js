@@ -26,5 +26,11 @@ orderRouter.post(
   inventoryController.orderController.cancel
 );
 orderRouter.get("/invoice", inventoryController.orderController.invoice);
+orderRouter.post(
+  "/return",
+  inventoryValidation.orderValidation.createReturn,
+  inventoryController.orderController.createReturn,
+);
+orderRouter.get("/returns", inventoryController.orderController.listReturns);
 
 export { orderRouter };

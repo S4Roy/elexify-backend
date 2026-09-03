@@ -73,6 +73,7 @@ async function generateVideoThumbnail(buffer, safeName, timestamp) {
  */
 export const upload = async (req, res, next) => {
   try {
+    const purpose = req.body?.purpose === "return" ? "return" : "rating";
     const rawFiles = req?.files?.files ?? null;
     if (!rawFiles) {
       throw StatusError.badRequest("At least one file is required.");
@@ -116,7 +117,7 @@ export const upload = async (req, res, next) => {
         .replace(/\s+/g, "_")
         .toLowerCase()
         .replace(/[^a-z0-9_\-\.]/g, "");
-      const key = `ratings/${timestamp}_${safeName}`;
+      const key = `${purpose === "return" ? "returns" : "ratings"}/${timestamp}_${safeName}`;
 
       const s3Upload = await s3Handler.uploadToS3(file, key);
       if (!s3Upload) {
@@ -146,7 +147,7 @@ export const upload = async (req, res, next) => {
 
       const media = new Media({
         reference_id: null,
-        reference_type: "ratings",
+        reference_type: purpose === "return" ? "return_requests" : "ratings",
         alt_text: file.name,
         url: key,
         type: isImage ? "image" : "video",

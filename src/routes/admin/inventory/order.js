@@ -54,5 +54,17 @@ orderRouter.post(
   requirePermission(PERMISSIONS.ZOHO_INVOICE_MANAGE),
   inventoryController.orderController.syncZohoInvoice,
 );
+orderRouter.get(
+  "/returns",
+  requirePermission(PERMISSIONS.RETURN_VIEW),
+  inventoryValidation.orderValidation.listReturns,
+  inventoryController.orderController.listReturns,
+);
+orderRouter.post(
+  "/returns/review",
+  requirePermission(PERMISSIONS.RETURN_REVIEW),
+  inventoryValidation.orderValidation.reviewReturn,
+  inventoryController.orderController.reviewReturn,
+);
 
 export { orderRouter };

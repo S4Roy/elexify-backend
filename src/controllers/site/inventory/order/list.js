@@ -3,6 +3,7 @@ import { StatusError, envs } from "../../../../config/index.js";
 import mongoose from "mongoose";
 import OrderResource from "../../../../resources/OrderResource.js";
 import { getCustomerOrderCapabilities, getOrderPolicy } from "../../../../services/orderService/orderPolicy.js";
+import ReturnRequest from "../../../../models/ReturnRequest.js";
 
 export const list = async (req, res, next) => {
   try {
@@ -568,6 +569,13 @@ export const list = async (req, res, next) => {
       data = new OrderResource(result[0]).exec();
       const policy = await getOrderPolicy();
       data.capabilities = getCustomerOrderCapabilities(result[0], policy);
+      const existingReturn = await ReturnRequest.findOne({ order_id: result[0]._id })
+        .select("_id request_number status requested_at review_note")
+        .lean();
+      if (existingReturn) {
+        data.capabilities.returns.allowed = false;
+        data.capabilities.returns.existing_request = existingReturn;
+      }
     } else {
       // Recalculate units for historical orders that stored the number of
       // distinct lines in total_items. This keeps list badges accurate without

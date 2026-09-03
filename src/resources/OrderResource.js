@@ -30,6 +30,7 @@ class OrderResource extends Resource {
         : null,
       order_items: (this.order_items || []).map((item) => {
         return {
+          _id: item._id || null,
           product_id: item.product?._id || null,
           variation_id: item.variation?._id || null,
           sku: item.product?.sku || item.variation?.sku,

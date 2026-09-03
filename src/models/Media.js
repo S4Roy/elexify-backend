@@ -27,6 +27,7 @@ const MediaSchema = new Schema(
         "mega_menus",
         "site-settings",
         "ratings",
+        "return_requests",
       ],
       required: true,
     },

@@ -4,5 +4,6 @@ import { order_details } from "./order_details.js";
 import { verifyPayment } from "./verifyPayment.js";
 import { cancel } from "./cancel.js";
 import { invoice } from "./invoice.js";
+import { createReturn, listReturns } from "./returnRequest.js";
 
-export { add, list, order_details, verifyPayment, cancel, invoice };
+export { add, list, order_details, verifyPayment, cancel, invoice, createReturn, listReturns };

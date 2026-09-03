@@ -18,6 +18,8 @@ export const PERMISSIONS = {
   EMAIL_TEMPLATE_MANAGE: "email_template.manage",
   INTEGRATION_CREDENTIAL_MANAGE: "integration_credential.manage",
   ZOHO_INVOICE_MANAGE: "zoho_invoice.manage",
+  RETURN_VIEW: "return.view",
+  RETURN_REVIEW: "return.review",
 
   // Centralized Data Operations (seeders/migrations/backfills/repairs) —
   // see routes/admin/dataOperations.js and scripts/runner.js. View
@@ -60,13 +62,15 @@ export const ROLE_PERMISSIONS = {
     PERMISSIONS.CUSTOMER_PREFERENCE_MANAGE,
     PERMISSIONS.EMAIL_TEMPLATE_MANAGE,
     PERMISSIONS.ZOHO_INVOICE_MANAGE,
+    PERMISSIONS.RETURN_VIEW,
+    PERMISSIONS.RETURN_REVIEW,
     // View-only for Data Operations — no execute permissions, matching the
     // existing "view-only for non-superadmin" pattern used elsewhere in
     // this file. Adjustable later if a manager role needs to run LOW-risk
     // seeders themselves.
     ...DATA_OPERATIONS_VIEW_ONLY,
   ],
-  supervisor: VIEW_ONLY,
+  supervisor: [...VIEW_ONLY, PERMISSIONS.RETURN_VIEW],
   staff: VIEW_ONLY,
   operator: VIEW_ONLY,
 };
