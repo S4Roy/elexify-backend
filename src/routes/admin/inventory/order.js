@@ -66,5 +66,23 @@ orderRouter.post(
   inventoryValidation.orderValidation.reviewReturn,
   inventoryController.orderController.reviewReturn,
 );
+orderRouter.post(
+  "/returns/receive",
+  requirePermission(PERMISSIONS.RETURN_REVIEW),
+  inventoryValidation.orderValidation.receiveReturn,
+  inventoryController.orderController.receiveReturn,
+);
+orderRouter.post(
+  "/returns/inspect",
+  requirePermission(PERMISSIONS.RETURN_REVIEW),
+  inventoryValidation.orderValidation.inspectReturn,
+  inventoryController.orderController.inspectReturn,
+);
+orderRouter.post(
+  "/returns/manual-refund/complete",
+  requirePermission(PERMISSIONS.RETURN_REVIEW),
+  inventoryValidation.orderValidation.completeManualRefund,
+  inventoryController.orderController.completeManualRefund,
+);
 
 export { orderRouter };

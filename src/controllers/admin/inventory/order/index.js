@@ -12,7 +12,7 @@ import { cancel } from "./cancel.js";
 import { retryRefund } from "./retryRefund.js";
 import { invoice } from "./invoice.js";
 import { zohoInvoiceStatus, syncZohoInvoice } from "./zohoInvoice.js";
-import { listReturns, reviewReturn } from "./returnRequest.js";
+import { listReturns, reviewReturn, receiveReturn, inspectReturn, completeManualRefund } from "./returnRequest.js";
 
 export {
   add,
@@ -32,4 +32,7 @@ export {
   syncZohoInvoice,
   listReturns,
   reviewReturn,
+  receiveReturn,
+  inspectReturn,
+  completeManualRefund,
 };

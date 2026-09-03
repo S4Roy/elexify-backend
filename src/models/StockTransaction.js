@@ -77,6 +77,10 @@ StockTransactionSchema.index(
   { reference_id: 1, product: 1, variation: 1, type: 1 },
   { unique: true, partialFilterExpression: { reference_type: "order" } },
 );
+StockTransactionSchema.index(
+  { reference_id: 1, product: 1, variation: 1, type: 1 },
+  { name: "unique_return_stock_movement", unique: true, partialFilterExpression: { reference_type: "return" } },
+);
 StockTransactionSchema.plugin(mongooseAggregatePaginate);
 
 const StockTransaction = model("stock_transactions", StockTransactionSchema);
