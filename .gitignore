@@ -34,5 +34,6 @@ build/
 # Uploads & Public Storage
 public/uploads/
 public/temp/
+public/**/Invoice-*.pdf
 uploads/
 tmp/
