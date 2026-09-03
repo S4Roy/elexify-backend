@@ -5,8 +5,9 @@ import Product from "../../models/Product.js";
 import ProductVariation from "../../models/ProductVariation.js";
 import StockTransaction from "../../models/StockTransaction.js";
 import { StatusError } from "../../config/index.js";
-import { CANCELLABLE_ORDER_STATUSES, isOrderCancellable, ORDER_STATUS } from "../../constants/orderStatus.js";
+import { ORDER_STATUS } from "../../constants/orderStatus.js";
 import { attemptRefund } from "./attemptRefund.js";
+import { getCancellationEligibility, getOrderPolicy } from "./orderPolicy.js";
 
 // Shared by both the customer-facing and admin-facing cancel endpoints, so
 // eligibility rules, inventory restoration, and refund initiation are
@@ -33,17 +34,18 @@ export const cancelOrder = async ({ orderId, actorType, actorId, reason, comment
     return order;
   }
 
-  if (!isOrderCancellable(order)) {
-    throw StatusError.badRequest(
-      "This order can no longer be cancelled. Once an order has shipped, please use the return process instead."
-    );
-  }
+  const policy = await getOrderPolicy();
+  const eligibility = getCancellationEligibility(order, actorType, policy);
+  if (!eligibility.allowed) throw StatusError.badRequest(eligibility.reason);
+  const allowedStatuses = actorType === "customer"
+    ? policy.customer_cancellation_statuses
+    : policy.admin_cancellation_statuses;
 
   // Claim: atomically flip to cancelled only if it's still in an eligible
   // status. If this loses a race to a concurrent cancel request, treat it
   // as an idempotent no-op rather than erroring.
   const cancelled = await Order.findOneAndUpdate(
-    { _id: order._id, order_status: { $in: [...CANCELLABLE_ORDER_STATUSES, ORDER_STATUS.PACKED] } },
+    { _id: order._id, order_status: { $in: allowedStatuses } },
     {
       $set: {
         order_status: ORDER_STATUS.CANCELLED,

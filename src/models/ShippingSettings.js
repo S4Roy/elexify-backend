@@ -30,6 +30,25 @@ const ShippingSettingsSchema = new Schema(
     cod_disallowed_shipping_classes: [{ type: Types.ObjectId, ref: "shipping_classes" }],
     cod_disallowed_zones: [{ type: Types.ObjectId, ref: "shipping_zones" }],
     cod_allowed_customer_types: { type: [String], default: [] },
+    customer_cancellation_enabled: { type: Boolean, default: true },
+    customer_cancellation_statuses: {
+      type: [String],
+      default: ["pending", "confirmed", "processing", "packed"],
+    },
+    customer_cancel_packed_before_dispatch: { type: Boolean, default: true },
+    admin_cancellation_enabled: { type: Boolean, default: true },
+    admin_cancellation_statuses: {
+      type: [String],
+      default: ["pending", "confirmed", "processing", "packed"],
+    },
+    returns_enabled: { type: Boolean, default: true },
+    return_window_days: { type: Number, min: 0, max: 365, default: 7 },
+    return_auto_approve: { type: Boolean, default: false },
+    return_require_images: { type: Boolean, default: false },
+    return_reasons: {
+      type: [String],
+      default: ["Damaged item", "Wrong item", "Defective item", "Not as described", "Other"],
+    },
     updated_at: {
       type: Date,
       default: null,

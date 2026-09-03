@@ -1,5 +1,7 @@
 import { celebrate, Joi } from "celebrate";
 
+const ORDER_STATUSES = ["pending", "confirmed", "processing", "packed"];
+
 export const edit = celebrate({
   body: Joi.object({
     processing_days_min: Joi.number().integer().min(0).optional(),
@@ -28,5 +30,15 @@ export const edit = celebrate({
     cod_disallowed_shipping_classes: Joi.array().items(Joi.string().hex().length(24)).optional(),
     cod_disallowed_zones: Joi.array().items(Joi.string().hex().length(24)).optional(),
     cod_allowed_customer_types: Joi.array().items(Joi.string()).optional(),
+    customer_cancellation_enabled: Joi.boolean().optional(),
+    customer_cancellation_statuses: Joi.array().items(Joi.string().valid(...ORDER_STATUSES)).unique().optional(),
+    customer_cancel_packed_before_dispatch: Joi.boolean().optional(),
+    admin_cancellation_enabled: Joi.boolean().optional(),
+    admin_cancellation_statuses: Joi.array().items(Joi.string().valid(...ORDER_STATUSES)).unique().optional(),
+    returns_enabled: Joi.boolean().optional(),
+    return_window_days: Joi.number().integer().min(0).max(365).optional(),
+    return_auto_approve: Joi.boolean().optional(),
+    return_require_images: Joi.boolean().optional(),
+    return_reasons: Joi.array().items(Joi.string().trim().min(2).max(100)).min(1).max(20).unique().optional(),
   }),
 });

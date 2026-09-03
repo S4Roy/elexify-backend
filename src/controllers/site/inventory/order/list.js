@@ -2,6 +2,7 @@ import Order from "../../../../models/Order.js";
 import { StatusError, envs } from "../../../../config/index.js";
 import mongoose from "mongoose";
 import OrderResource from "../../../../resources/OrderResource.js";
+import { getCustomerOrderCapabilities, getOrderPolicy } from "../../../../services/orderService/orderPolicy.js";
 
 export const list = async (req, res, next) => {
   try {
@@ -565,6 +566,8 @@ export const list = async (req, res, next) => {
       const result = await Order.aggregate(pipeline);
       if (!result.length) throw StatusError.notFound(req.__("Order not found"));
       data = new OrderResource(result[0]).exec();
+      const policy = await getOrderPolicy();
+      data.capabilities = getCustomerOrderCapabilities(result[0], policy);
     } else {
       // Recalculate units for historical orders that stored the number of
       // distinct lines in total_items. This keeps list badges accurate without
