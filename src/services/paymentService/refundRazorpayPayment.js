@@ -22,3 +22,8 @@ export const refundRazorpayPayment = async (razorpayPaymentId, amountInPaise, id
     receipt: idempotencyKey,
   });
 };
+
+export const fetchRazorpayRefund = async (refundId) => {
+  const razorpay = await getRazorpayClient();
+  return razorpay.refunds.fetch(refundId);
+};

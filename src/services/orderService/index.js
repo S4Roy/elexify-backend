@@ -2,7 +2,7 @@ import { cancelOrder } from "./cancelOrder.js";
 import { retryRefund } from "./retryRefund.js";
 import { finalizeCapturedPayment, validateCapturedPayment } from "./finalizeCapturedPayment.js";
 import { transitionOrder, canTransitionPayment } from "./transitionOrder.js";
-import { createReturnRequest, reviewReturnRequest, receiveReturnRequest, inspectReturnRequest, completeManualReturnRefund } from "./returnRequest.js";
+import { createReturnRequest, reviewReturnRequest, receiveReturnRequest, inspectReturnRequest, completeManualReturnRefund, updateReturnPickup } from "./returnRequest.js";
 
 export {
   cancelOrder, retryRefund, finalizeCapturedPayment, validateCapturedPayment,
@@ -10,4 +10,5 @@ export {
   createReturnRequest, reviewReturnRequest,
   receiveReturnRequest, inspectReturnRequest,
   completeManualReturnRefund,
+  updateReturnPickup,
 };

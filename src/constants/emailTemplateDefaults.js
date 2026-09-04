@@ -193,6 +193,36 @@ ${small("If you didn't request this, you can safely ignore this email.")}
     required_variables: ["name", "order_id", "order_number"],
     is_marketing: false,
   },
+  return_requested: {
+    subject: "Return Request Received — {{return_request_number}}",
+    preheader: "We received your return request for order {{order_id}}.",
+    body: orderShell({ heading: "Return Request Received", badgeLabel: "Under Review", message: "We received return request {{return_request_number}} and will notify you after review." }),
+    required_variables: ["name", "order_id", "order_number", "return_request_number"], is_marketing: false,
+  },
+  return_approved: {
+    subject: "Return Approved — {{return_request_number}}",
+    preheader: "Your return request has been approved.",
+    body: orderShell({ heading: "Return Approved", badgeLabel: "Approved", message: "Your return request has been approved. Pickup details will follow." }),
+    required_variables: ["name", "order_id", "order_number", "return_request_number"], is_marketing: false,
+  },
+  return_rejected: {
+    subject: "Return Request Update — {{return_request_number}}",
+    preheader: "There is an update on your return request.",
+    body: orderShell({ heading: "Return Request Update", badgeLabel: "Not Approved", badgeTone: "warn", message: "We could not approve this return request. Review the note in your account or contact support." }),
+    required_variables: ["name", "order_id", "order_number", "return_request_number"], is_marketing: false,
+  },
+  return_received: {
+    subject: "Return Received — {{return_request_number}}",
+    preheader: "Your returned items reached our warehouse.",
+    body: orderShell({ heading: "Return Received", badgeLabel: "Inspection Pending", message: "Your returned items reached our warehouse and are being inspected." }),
+    required_variables: ["name", "order_id", "order_number", "return_request_number"], is_marketing: false,
+  },
+  return_completed: {
+    subject: "Return Completed — {{return_request_number}}",
+    preheader: "Your return has been processed.",
+    body: orderShell({ heading: "Return Processed", badgeLabel: "Completed", message: "Your return has been processed. Any approved refund details are available in your account." }),
+    required_variables: ["name", "order_id", "order_number", "return_request_number"], is_marketing: false,
+  },
   account_login: {
     subject: "New login to your account",
     preheader: "We noticed a new login to your Elexify account.",

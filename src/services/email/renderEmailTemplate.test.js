@@ -24,6 +24,7 @@ const FIXTURE_DATA = {
   shipping: 40,
   grand_total: 988,
   refund_amount: 988,
+  return_request_number: "RET-TEST-001",
   shipping_address: {
     name: "Subhankar Roy",
     line1: "123 Main St",

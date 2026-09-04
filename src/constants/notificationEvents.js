@@ -75,6 +75,26 @@ export const NOTIFICATION_EVENTS = {
     channels: ["email", "sms"],
     templateKey: "refund_completed",
   },
+  RETURN_REQUESTED: {
+    category: "transactional", preferenceKey: "order", mandatory: true,
+    channels: ["email", "sms"], templateKey: "return_requested",
+  },
+  RETURN_APPROVED: {
+    category: "transactional", preferenceKey: "order", mandatory: true,
+    channels: ["email", "sms"], templateKey: "return_approved",
+  },
+  RETURN_REJECTED: {
+    category: "transactional", preferenceKey: "order", mandatory: true,
+    channels: ["email", "sms"], templateKey: "return_rejected",
+  },
+  RETURN_RECEIVED: {
+    category: "transactional", preferenceKey: "order", mandatory: true,
+    channels: ["email", "sms"], templateKey: "return_received",
+  },
+  RETURN_COMPLETED: {
+    category: "transactional", preferenceKey: "refund", mandatory: true,
+    channels: ["email", "sms"], templateKey: "return_completed",
+  },
 
   ACCOUNT_LOGIN: {
     category: "security",

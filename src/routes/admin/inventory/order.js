@@ -84,5 +84,11 @@ orderRouter.post(
   inventoryValidation.orderValidation.completeManualRefund,
   inventoryController.orderController.completeManualRefund,
 );
+orderRouter.post(
+  "/returns/pickup",
+  requirePermission(PERMISSIONS.RETURN_REVIEW),
+  inventoryValidation.orderValidation.updatePickup,
+  inventoryController.orderController.updatePickup,
+);
 
 export { orderRouter };

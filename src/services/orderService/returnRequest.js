@@ -191,3 +191,22 @@ export const completeManualReturnRefund = async ({ requestId, adminId, reference
   }
   return request;
 };
+
+export const updateReturnPickup = async ({ requestId, adminId, status, provider, trackingNumber, failureReason }) => {
+  const request = await ReturnRequest.findOne({ _id: requestId, status: { $in: ["approved", "received"] } });
+  if (!request) throw StatusError.conflict("Pickup can only be updated for an approved return.");
+  if (status === "scheduled" && (!provider || !trackingNumber)) {
+    throw StatusError.badRequest("Pickup provider and tracking number are required.");
+  }
+  request.pickup.status = status;
+  if (provider !== undefined) request.pickup.provider = provider;
+  if (trackingNumber !== undefined) request.pickup.tracking_number = trackingNumber;
+  request.pickup.updated_at = new Date();
+  request.pickup.failure_reason = status === "failed" ? failureReason : null;
+  if (status === "scheduled" && !request.pickup.scheduled_at) request.pickup.scheduled_at = new Date();
+  await request.save();
+  if (status === "delivered" && request.status === "approved") {
+    return receiveReturnRequest({ requestId: request._id, adminId });
+  }
+  return request;
+};

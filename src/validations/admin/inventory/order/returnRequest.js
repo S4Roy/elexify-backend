@@ -32,3 +32,11 @@ export const completeManualRefund = celebrate({ body: Joi.object({
   reference: Joi.string().trim().min(3).max(200).required(),
   note: Joi.string().trim().max(1000).allow("", null).optional(),
 }) });
+
+export const updatePickup = celebrate({ body: Joi.object({
+  return_request_id: Joi.string().hex().length(24).required(),
+  status: Joi.string().valid("scheduled", "in_transit", "delivered", "failed").required(),
+  provider: Joi.string().trim().max(100).allow("", null).optional(),
+  tracking_number: Joi.string().trim().max(150).allow("", null).optional(),
+  failure_reason: Joi.string().trim().max(500).when("status", { is: "failed", then: Joi.required(), otherwise: Joi.allow("", null).optional() }),
+}) });

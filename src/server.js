@@ -165,6 +165,13 @@ cron.schedule("*/10 * * * *", async () => {
     console.error("updatePendingPaypalPayments Cron Failed", e);
   }
 });
+cron.schedule("*/10 * * * *", async () => {
+  try {
+    await CronJobs.reconcileReturnRefunds();
+  } catch (e) {
+    console.error("reconcileReturnRefunds Cron Failed", e);
+  }
+});
 
 // Run every 6 hours
 cron.schedule("0 */6 * * *", async () => {
@@ -201,6 +208,13 @@ cron.schedule("30 2 * * *", async () => {
     if (result.deletedCount) console.log(`SystemOperationLog retention cleanup: deleted ${result.deletedCount} log line(s) older than ${SYSTEM_OPERATION_LOG_RETENTION_DAYS} day(s).`);
   } catch (e) {
     console.error("SystemOperationLog retention cleanup Cron Failed", e);
+  }
+});
+cron.schedule("15 3 * * *", async () => {
+  try {
+    await CronJobs.cleanupReturnEvidence();
+  } catch (e) {
+    console.error("cleanupReturnEvidence Cron Failed", e);
   }
 });
 

@@ -1,5 +1,6 @@
 import crypto from "crypto";
 import Order from "../../models/Order.js";
+import ReturnRequest from "../../models/ReturnRequest.js";
 import WebhookEvent from "../../models/WebhookEvent.js";
 import { PAYMENT_STATUS } from "../../constants/orderStatus.js";
 import { orderService, notificationService } from "../../services/index.js";
@@ -28,7 +29,30 @@ const processEvent = async (event) => {
           dedupeKey: `${result.order.id}:PAYMENT_SUCCESS`,
         });
     }
-  } else if (event?.event === "refund.processed" && (refundId || paymentId)) {
+  } else if (["refund.processed", "refund.failed"].includes(event?.event) && (refundId || paymentId)) {
+    const returnRequest = await ReturnRequest.findOne({
+      $or: [
+        ...(refundId ? [{ "refund.provider_ref": refundId }] : []),
+        ...(refund?.receipt ? [{ "refund.idempotency_key": refund.receipt }] : []),
+      ],
+    });
+    if (returnRequest) {
+      const processed = event.event === "refund.processed";
+      returnRequest.status = processed ? "completed" : "refund_failed";
+      returnRequest.refund.status = processed ? "processed" : "failed";
+      returnRequest.refund.provider_ref = refundId || returnRequest.refund.provider_ref;
+      returnRequest.refund.failure_reason = processed ? null : (refund?.error_description || "Refund failed at Razorpay");
+      returnRequest.refund.processed_at = processed ? new Date() : null;
+      await returnRequest.save();
+      const returnOrder = await Order.findById(returnRequest.order_id);
+      if (returnOrder) {
+        const fullRefund = returnRequest.refund.amount >= returnOrder.grand_total;
+        await Order.updateOne({ _id: returnOrder._id }, { $set: { payment_status: processed ? (fullRefund ? PAYMENT_STATUS.REFUNDED : PAYMENT_STATUS.PARTIALLY_REFUNDED) : PAYMENT_STATUS.REFUND_FAILED } });
+        if (processed) notificationService.sendOrderNotification({ order: returnOrder, event: "REFUND_COMPLETED", data: { refund_amount: returnRequest.refund.amount }, dedupeKey: `${returnRequest.request_number}:REFUND_COMPLETED` });
+      }
+      return;
+    }
+    if (event?.event === "refund.processed") {
     const order = await Order.findOne({
       $or: [{ "refund.razorpay_refund_id": refundId }, { "payment_meta.razorpay_payment_id": paymentId }],
     });
@@ -48,7 +72,7 @@ const processEvent = async (event) => {
       data: refund?.amount ? { refund_amount: refund.amount / 100 } : {},
       dedupeKey: `${order.id}:REFUND_COMPLETED`,
     });
-  } else if (event?.event === "refund.failed" && (refundId || paymentId)) {
+    } else {
     const order = await Order.findOne({
       $or: [{ "refund.razorpay_refund_id": refundId }, { "payment_meta.razorpay_payment_id": paymentId }],
     });
@@ -61,6 +85,7 @@ const processEvent = async (event) => {
         "refund.failure_reason": refund?.error_description || "Refund failed at Razorpay",
       },
     });
+    }
   }
 };
 
@@ -116,11 +141,11 @@ export const razorpayWebhook = async (req, res) => {
   if (!valid) return res.status(400).json({ status: "error", message: "Invalid signature" });
 
   const event = req.body;
-  const eventId = event?.id || event?.event_id;
-  if (!eventId || !event?.event) {
+  const payloadHash = crypto.createHash("sha256").update(req.rawBody).digest("hex");
+  const eventId = req.headers["x-razorpay-event-id"] || event?.id || event?.event_id || `${event?.event}:${payloadHash}`;
+  if (!event?.event) {
     return res.status(400).json({ status: "error", message: "Invalid event" });
   }
-  const payloadHash = crypto.createHash("sha256").update(req.rawBody).digest("hex");
   try {
     let inbox = await WebhookEvent.findOne({ event_id: eventId });
     // Records created by the previous inbox schema represent events that were

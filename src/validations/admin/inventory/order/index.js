@@ -4,6 +4,6 @@ import { list } from "./list.js";
 import { details } from "./details.js";
 import { remove } from "./remove.js";
 import { cancel, retryRefund } from "./cancel.js";
-import { listReturns, reviewReturn, receiveReturn, inspectReturn, completeManualRefund } from "./returnRequest.js";
+import { listReturns, reviewReturn, receiveReturn, inspectReturn, completeManualRefund, updatePickup } from "./returnRequest.js";
 
-export { place, edit, list, details, remove, cancel, retryRefund, listReturns, reviewReturn, receiveReturn, inspectReturn, completeManualRefund };
+export { place, edit, list, details, remove, cancel, retryRefund, listReturns, reviewReturn, receiveReturn, inspectReturn, completeManualRefund, updatePickup };

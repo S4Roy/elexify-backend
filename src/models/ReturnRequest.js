@@ -38,6 +38,14 @@ const ReturnRequestSchema = new Schema({
   inspected_at: { type: Date, default: null },
   inspected_by: { type: Types.ObjectId, ref: "users", default: null },
   inventory_processed_at: { type: Date, default: null },
+  pickup: {
+    status: { type: String, enum: ["not_scheduled", "scheduled", "in_transit", "delivered", "failed"], default: "not_scheduled" },
+    provider: { type: String, trim: true, maxlength: 100, default: null },
+    tracking_number: { type: String, trim: true, maxlength: 150, default: null },
+    scheduled_at: { type: Date, default: null },
+    updated_at: { type: Date, default: null },
+    failure_reason: { type: String, trim: true, maxlength: 500, default: null },
+  },
   refund: {
     amount: { type: Number, min: 0, default: 0 },
     status: { type: String, enum: ["not_required", "pending", "processed", "failed", "manual_required"], default: "not_required" },
