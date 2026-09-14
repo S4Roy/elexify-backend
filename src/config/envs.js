@@ -107,7 +107,8 @@ export const envs = {
   FAST2SMS: {
     authorization: process.env.FAST2SMS_API_KEY || "",
     URL: "https://www.fast2sms.com/dev/bulkV2",
-    sender_id: "ELXFY",
+    sender_id: process.env.FAST2SMS_SENDER_ID || "ELXFY",
+    otp_message_id: process.env.FAST2SMS_OTP_MESSAGE_ID || "189215",
     route: "dlt",
   },
   whatsapp: {

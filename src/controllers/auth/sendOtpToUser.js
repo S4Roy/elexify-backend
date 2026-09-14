@@ -186,7 +186,7 @@ export const sendOtpToUser = async (req, res, next) => {
     } else {
       const smsResponse = await smsService.sendSMS({
         to: identifier,
-        message: "189215",
+        message: envs.FAST2SMS.otp_message_id,
         variables: [user?.name ?? "User", purposeLabel, otp],
       });
 

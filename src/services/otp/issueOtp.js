@@ -76,7 +76,7 @@ export const issueOtp = async ({ identifier, purpose, email, mobile, name, req }
     const purposeLabel = purpose === "change_mobile" ? "mobile number change" : purpose;
     const result = await smsService.sendSMS({
       to: identifier,
-      message: "189215",
+      message: envs.FAST2SMS.otp_message_id,
       variables: [name || "User", purposeLabel, otp],
     });
     if (result?.success === false) {
