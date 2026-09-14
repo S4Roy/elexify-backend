@@ -110,6 +110,40 @@ export const envs = {
     sender_id: process.env.FAST2SMS_SENDER_ID || "ELXFY",
     otp_message_id: process.env.FAST2SMS_OTP_MESSAGE_ID || "189215",
     route: "dlt",
+    // DLT-approved Fast2SMS message_id per notification event (route "dlt"
+    // rejects free-text — every message body must already be registered
+    // with the telecom DLT entity by id). Unset ("") until that event's
+    // copy is actually registered on the Fast2SMS DLT template portal —
+    // services/notification/processNotificationQueue.js dead-letters a job
+    // whose event has no message_id configured rather than sending garbage
+    // or retrying forever. Keys match constants/notificationEvents.js
+    // `templateKey`; see constants/messagingTemplateDefaults.js for the
+    // sample copy + variable order each id's registered text should use.
+    message_ids: {
+      order_placed: process.env.FAST2SMS_ORDER_PLACED_MESSAGE_ID || "",
+      payment_success: process.env.FAST2SMS_PAYMENT_SUCCESS_MESSAGE_ID || "",
+      payment_failed: process.env.FAST2SMS_PAYMENT_FAILED_MESSAGE_ID || "",
+      order_processing: process.env.FAST2SMS_ORDER_PROCESSING_MESSAGE_ID || "",
+      order_shipped: process.env.FAST2SMS_ORDER_SHIPPED_MESSAGE_ID || "",
+      order_out_for_delivery: process.env.FAST2SMS_ORDER_OUT_FOR_DELIVERY_MESSAGE_ID || "",
+      order_delivered: process.env.FAST2SMS_ORDER_DELIVERED_MESSAGE_ID || "",
+      order_cancelled: process.env.FAST2SMS_ORDER_CANCELLED_MESSAGE_ID || "",
+      refund_initiated: process.env.FAST2SMS_REFUND_INITIATED_MESSAGE_ID || "",
+      refund_completed: process.env.FAST2SMS_REFUND_COMPLETED_MESSAGE_ID || "",
+      return_requested: process.env.FAST2SMS_RETURN_REQUESTED_MESSAGE_ID || "",
+      return_approved: process.env.FAST2SMS_RETURN_APPROVED_MESSAGE_ID || "",
+      return_rejected: process.env.FAST2SMS_RETURN_REJECTED_MESSAGE_ID || "",
+      return_received: process.env.FAST2SMS_RETURN_RECEIVED_MESSAGE_ID || "",
+      return_completed: process.env.FAST2SMS_RETURN_COMPLETED_MESSAGE_ID || "",
+      return_updated: process.env.FAST2SMS_RETURN_UPDATED_MESSAGE_ID || "",
+      account_login: process.env.FAST2SMS_ACCOUNT_LOGIN_MESSAGE_ID || "",
+      password_changed: process.env.FAST2SMS_PASSWORD_CHANGED_MESSAGE_ID || "",
+      mobile_changed: process.env.FAST2SMS_MOBILE_CHANGED_MESSAGE_ID || "",
+      suspicious_activity: process.env.FAST2SMS_SUSPICIOUS_ACTIVITY_MESSAGE_ID || "",
+      promotional_offer: process.env.FAST2SMS_PROMOTIONAL_OFFER_MESSAGE_ID || "",
+      back_in_stock: process.env.FAST2SMS_BACK_IN_STOCK_MESSAGE_ID || "",
+      price_drop: process.env.FAST2SMS_PRICE_DROP_MESSAGE_ID || "",
+    },
   },
   whatsapp: {
     // Meta WhatsApp Business Cloud API (graph.facebook.com). Unset in every

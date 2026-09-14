@@ -13,6 +13,8 @@ const KNOWN = {
   no_email_on_file: "INVALID_DESTINATION",
   no_mobile_on_file: "INVALID_DESTINATION",
   whatsapp_provider_not_configured: "PERMANENT",
+  whatsapp_template_not_configured: "TEMPLATE_ERROR",
+  sms_template_not_configured: "TEMPLATE_ERROR",
   template_or_delivery_failed: "TEMPLATE_ERROR",
 };
 

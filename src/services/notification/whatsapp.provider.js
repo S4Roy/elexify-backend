@@ -11,24 +11,46 @@
 
 import axios from "axios";
 import { envs } from "../../config/index.js";
+import { NOTIFICATION_EVENTS } from "../../constants/notificationEvents.js";
 
 const isConfigured = () => !!(envs.whatsapp.phoneNumberId && envs.whatsapp.accessToken);
 
-// Maps our internal template keys (constants/notificationEvents.js) to
-// Meta-approved WhatsApp template names. WhatsApp requires templates to be
-// pre-approved by Meta by name — these are illustrative until real
-// templates are submitted/approved; unmapped keys fall back to the raw key.
+// Maps our internal template keys (constants/notificationEvents.js
+// `templateKey`) to Meta-approved WhatsApp template names. WhatsApp
+// requires every template to be pre-approved by Meta by name before it can
+// be sent — these names are what to submit for approval; nothing here
+// sends until the real name is approved and (if it differs) the mapping
+// below is updated to match. `otp` is included separately since OTP isn't
+// part of the NOTIFICATION_EVENTS registry (its own dedicated flow).
 const TEMPLATE_NAME_MAP = {
   otp: "otp_code",
-  order_shipped: "order_shipped",
-  order_out_for_delivery: "order_out_for_delivery",
-  order_delivered: "order_delivered",
-  order_cancelled: "order_cancelled",
-  abandoned_cart: "abandoned_cart_reminder",
+  ...Object.fromEntries(
+    Object.values(NOTIFICATION_EVENTS).map(({ templateKey }) => [templateKey, templateKey])
+  ),
 };
 
-const buildComponents = (data = {}) => {
-  const params = Object.values(data)
+// Ordered variable list per template key — must match what the approved
+// Meta template's {{1}} {{2}} ... placeholders expect. Mirrors
+// notificationEvents.js `messagingVariables`; `otp` (outside that registry)
+// is added explicitly.
+const TEMPLATE_VARIABLES_MAP = {
+  otp: ["otp"],
+  ...Object.fromEntries(
+    Object.values(NOTIFICATION_EVENTS).map(({ templateKey, messagingVariables }) => [
+      templateKey,
+      messagingVariables || [],
+    ])
+  ),
+};
+
+// Builds positional body parameters in the template's declared variable
+// order (falling back to whatever data was passed, for unmapped
+// templateKeys) rather than relying on `data`'s own key order, which is
+// determined by whichever caller happened to build the object.
+const buildComponents = (templateKey, data = {}) => {
+  const order = TEMPLATE_VARIABLES_MAP[templateKey];
+  const values = order ? order.map((key) => data[key]) : Object.values(data);
+  const params = values
     .filter((v) => v !== undefined && v !== null && typeof v !== "object")
     .map((v) => ({ type: "text", text: String(v) }));
   if (!params.length) return undefined;
@@ -43,8 +65,12 @@ const post = async ({ to, templateKey, data }) => {
     return { success: false, error: "no_mobile_on_file" };
   }
 
-  const templateName = TEMPLATE_NAME_MAP[templateKey] || templateKey;
+  const templateName = TEMPLATE_NAME_MAP[templateKey];
+  if (!templateName) {
+    return { success: false, error: "whatsapp_template_not_configured" };
+  }
   const url = `https://graph.facebook.com/${envs.whatsapp.apiVersion}/${envs.whatsapp.phoneNumberId}/messages`;
+  const components = buildComponents(templateKey, data);
 
   try {
     const response = await axios.post(
@@ -56,7 +82,7 @@ const post = async ({ to, templateKey, data }) => {
         template: {
           name: templateName,
           language: { code: "en_US" },
-          ...(buildComponents(data) ? { components: buildComponents(data) } : {}),
+          ...(components ? { components } : {}),
         },
       },
       {

@@ -4,6 +4,19 @@ import User from "../../models/User.js";
 import { emailService, smsService } from "../index.js";
 import * as whatsappProvider from "./whatsapp.provider.js";
 import { classifyNotificationError } from "./classifyNotificationError.js";
+import { envs } from "../../config/index.js";
+import { NOTIFICATION_EVENTS } from "../../constants/notificationEvents.js";
+
+// templateKey -> ordered variable list (constants/notificationEvents.js),
+// used to fill SMS's positional `variables_values` in the order the
+// registered DLT template expects — see constants/messagingTemplateDefaults.js
+// for the sample copy each position corresponds to.
+const MESSAGING_VARIABLES_BY_TEMPLATE_KEY = Object.fromEntries(
+  Object.values(NOTIFICATION_EVENTS).map(({ templateKey, messagingVariables }) => [
+    templateKey,
+    messagingVariables || [],
+  ])
+);
 
 // attempts: 1 -> 1min, 2 -> 5min, 3 -> 15min, beyond -> 15min flat (should
 // never be reached since max_attempts defaults to 3).
@@ -28,11 +41,15 @@ const deliverByChannel = {
   },
   sms: async ({ user, templateKey, data }) => {
     if (!user.mobile) return { success: false, error: "no_mobile_on_file" };
+    const messageId = envs.FAST2SMS.message_ids[templateKey];
+    if (!messageId) return { success: false, error: "sms_template_not_configured" };
     const identifier = `${user.phone_code || "91"}${user.mobile}`;
+    const merged = { name: user.name || "Customer", ...data };
+    const order = MESSAGING_VARIABLES_BY_TEMPLATE_KEY[templateKey] || ["name"];
     const result = await smsService.sendSMS({
       to: identifier,
-      message: templateKey,
-      variables: [user.name || "Customer", ...(data?.smsVariables || [])],
+      message: messageId,
+      variables: order.map((key) => merged[key] ?? ""),
     });
     return result?.success
       ? { success: true }
@@ -41,7 +58,8 @@ const deliverByChannel = {
   whatsapp: async ({ user, templateKey, data }) => {
     if (!user.mobile) return { success: false, error: "no_mobile_on_file" };
     const to = `${user.phone_code || "91"}${user.mobile}`;
-    const result = await whatsappProvider.sendTemplate({ to, templateKey, data });
+    const merged = { name: user.name || "Customer", ...data };
+    const result = await whatsappProvider.sendTemplate({ to, templateKey, data: merged });
     return result?.success
       ? { success: true, provider_message_id: result.provider_message_id }
       : { success: false, error: result?.error || "delivery_failed" };
