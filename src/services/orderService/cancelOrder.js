@@ -108,7 +108,7 @@ export const cancelOrder = async ({ orderId, actorType, actorId, reason, comment
   // Only for a razorpay order whose payment actually cleared. A refund
   // failure never blocks or reverses the cancellation — the order stays
   // cancelled and stock stays restored regardless.
-  if (order.payment_method === "razorpay" && order.payment_status === "paid") {
+  if (order.payment_method === "razorpay" && order.payment_status === "paid" && !order.replacement_return_id) {
     order = await attemptRefund(order);
   }
 

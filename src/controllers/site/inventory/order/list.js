@@ -1,3 +1,6 @@
+import { publicReturn } from "../../../../services/returnService/publicReturn.js";
+import OrderItem from "../../../../models/OrderItem.js";
+import { returnEligibility } from "../../../../services/returnService/rules.js";
 import Order from "../../../../models/Order.js";
 import { StatusError, envs } from "../../../../config/index.js";
 import mongoose from "mongoose";
@@ -16,7 +19,7 @@ export const list = async (req, res, next) => {
       limit = envs.pagination.limit,
       order_status = "",
       search_key = "",
-      sort_by = "id",
+      sort_by = "created_at",
       sort_order = -1,
       _id = null,
     } = req.query;
@@ -26,7 +29,12 @@ export const list = async (req, res, next) => {
     const options = {
       page: parseInt(page),
       limit: parseInt(limit),
-      sort: { [sort_by]: parseInt(sort_order) },
+      // Placement date is the default; a unique tie-breaker keeps page
+      // boundaries deterministic when multiple orders share a timestamp.
+      sort: {
+        [sort_by || "created_at"]: Number(sort_order) === 1 ? 1 : -1,
+        _id: Number(sort_order) === 1 ? 1 : -1,
+      },
     };
 
     const matchFilter = {
@@ -569,13 +577,12 @@ export const list = async (req, res, next) => {
       data = new OrderResource(result[0]).exec();
       const policy = await getOrderPolicy();
       data.capabilities = getCustomerOrderCapabilities(result[0], policy);
-      const existingReturn = await ReturnRequest.findOne({ order_id: result[0]._id })
-        .select("_id request_number status requested_at review_note")
-        .lean();
-      if (existingReturn) {
-        data.capabilities.returns.allowed = false;
-        data.capabilities.returns.existing_request = existingReturn;
-      }
+      const requests = await ReturnRequest.find({ order_id: result[0]._id }).sort({ requested_at: -1 }).lean();
+      const purchasedItems = await OrderItem.find({ order_id: result[0]._id }).lean();
+      data.capabilities.returns = returnEligibility(result[0], policy, purchasedItems, requests);
+      const publicRequests = requests.map(publicReturn);
+      data.capabilities.returns.requests = publicRequests;
+      data.capabilities.returns.existing_request = publicRequests[0] || null;
     } else {
       // Recalculate units for historical orders that stored the number of
       // distinct lines in total_items. This keeps list badges accurate without

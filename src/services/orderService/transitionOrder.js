@@ -47,9 +47,18 @@ export const transitionOrder = async ({
   const update = { ...set };
   if (orderStatus) update.order_status = orderStatus;
   if (paymentStatus) update.payment_status = paymentStatus;
-  return Order.findOneAndUpdate(
+  const updated = await Order.findOneAndUpdate(
     { _id: current._id, order_status: current.order_status, payment_status: current.payment_status },
     { $set: update },
     { new: true, session },
   );
+  if (updated?.replacement_return_id && !session) {
+    const { syncReplacement } = await import('../returnService/replacement.js');
+    const request = await syncReplacement(updated);
+    if (request) {
+      const { sendReturnNotification } = await import('../notification/sendReturnNotification.js');
+      await sendReturnNotification({ request, event: request.status === 'completed' ? 'RETURN_COMPLETED' : 'RETURN_UPDATED' });
+    }
+  }
+  return updated;
 };

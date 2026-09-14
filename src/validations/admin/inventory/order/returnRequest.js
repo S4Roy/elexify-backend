@@ -9,7 +9,7 @@ export const reviewReturn = celebrate({ body: Joi.object({
 export const listReturns = celebrate({ query: Joi.object({
   page: Joi.number().integer().min(1).optional(),
   limit: Joi.number().integer().min(1).max(100).optional(),
-  status: Joi.string().valid("requested", "approved", "rejected", "cancelled", "received", "processing", "refund_pending", "refund_failed", "manual_action_required", "completed").optional(),
+  status: Joi.string().valid("requested", "approved", "rejected", "cancelled", "received", "processing", "refund_pending", "refund_failed", "manual_action_required", "qc_failed", "replacement_pending", "replacement_shipped", "completed").optional(),
 }) });
 
 export const receiveReturn = celebrate({ body: Joi.object({
@@ -35,8 +35,9 @@ export const completeManualRefund = celebrate({ body: Joi.object({
 
 export const updatePickup = celebrate({ body: Joi.object({
   return_request_id: Joi.string().hex().length(24).required(),
-  status: Joi.string().valid("scheduled", "in_transit", "delivered", "failed").required(),
+  status: Joi.string().valid("scheduled", "rescheduled", "out_for_pickup", "picked_up", "in_transit", "delivered", "failed", "cancelled").required(),
   provider: Joi.string().trim().max(100).allow("", null).optional(),
   tracking_number: Joi.string().trim().max(150).allow("", null).optional(),
   failure_reason: Joi.string().trim().max(500).when("status", { is: "failed", then: Joi.required(), otherwise: Joi.allow("", null).optional() }),
+  expected_at: Joi.date().iso().min("now").allow(null).optional(),
 }) });

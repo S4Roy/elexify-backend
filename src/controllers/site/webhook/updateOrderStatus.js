@@ -1,4 +1,8 @@
+import { validReturnWebhookToken } from "../../../services/returnService/webhookAuth.js";
+import { StatusError } from "../../../config/index.js";
+import { applyReverseEvent } from "../../../services/returnService/pickup.js";
 import Order from "../../../models/Order.js";
+import ReturnRequest from "../../../models/ReturnRequest.js";
 import OrderScans from "../../../models/OrderScans.js";
 import moment from "moment-timezone";
 import { normalizeOrderStatus } from "../../../helpers/order/normalizeOrderStatus.js";
@@ -9,6 +13,19 @@ const SHIPMENT_STATUS_EVENTS = {
   [ORDER_STATUS.SHIPPED]: "ORDER_SHIPPED",
   [ORDER_STATUS.OUT_FOR_DELIVERY]: "ORDER_OUT_FOR_DELIVERY",
   [ORDER_STATUS.DELIVERED]: "ORDER_DELIVERED",
+};
+
+const processReverseWebhook = async ({ incomingOrderId, awbStr, incoming, courierName, eventTimestamp, shipmentId, token }) => {
+  const refs = [
+    ...(incomingOrderId ? [{ request_number: String(incomingOrderId) }, { 'pickup.shiprocket_order_id': String(incomingOrderId) }] : []),
+    ...(awbStr ? [{ 'pickup.shiprocket_awb': awbStr }, { 'pickup.tracking_number': awbStr }] : []),
+    ...(shipmentId ? [{ 'pickup.shiprocket_shipment_id': String(shipmentId) }] : []),
+  ];
+  if (!refs.length) return null;
+  const request = await ReturnRequest.findOne({ $or: refs });
+  if (!request) return null;
+  if (!validReturnWebhookToken(token)) throw StatusError.forbidden('Invalid return webhook token');
+  return { request: await applyReverseEvent({ request, raw: incoming, at: eventTimestamp, awb: awbStr, courier: courierName }) };
 };
 
 /**
@@ -39,7 +56,7 @@ export const updateOrderStatus = async (req, res, next) => {
     const awbStr = awb != null ? String(awb) : null;
     const incomingOrderId = order_id || channel_order_id || null;
 
-    if (!incomingOrderId && !awbStr) {
+    if (!incomingOrderId && !awbStr && !body.shipment_id) {
       // Nothing to correlate — respond 200 so webhook doesn't block
       return res.status(200).json({
         status: "ok",
@@ -47,7 +64,21 @@ export const updateOrderStatus = async (req, res, next) => {
       });
     }
 
-    // Try find order
+    const incoming = (current_status || shipment_status || "")
+      .toString()
+      .trim()
+      .toLowerCase();
+    const eventTimestamp = current_timestamp ? new Date(current_timestamp) : new Date();
+
+    // Reverse shipments are correlated by the return number/Shiprocket id/AWB
+    // and update the same customer-visible event log as manual admin actions.
+    const reverse = await processReverseWebhook({ incomingOrderId, awbStr, incoming, courierName: courier_name, eventTimestamp, shipmentId: body.shipment_id, token: req.headers["x-api-key"] });
+    if (reverse) {
+      if (reverse.unsupported) return res.status(422).json({ status: "error", message: "Unsupported reverse shipment status" });
+      return res.status(200).json({ status: "success", message: "Return pickup status processed", data: { return_request_id: reverse.request._id, pickup_status: reverse.request.pickup.status } });
+    }
+
+    // Try find forward order
     let order = await Order.findOne({ id: incomingOrderId });
 
     if (!order) {
@@ -63,18 +94,14 @@ export const updateOrderStatus = async (req, res, next) => {
         awb: awbStr,
       });
     }
-    const incoming = (current_status || shipment_status || "")
-      .toString()
-      .trim()
-      .toLowerCase();
-
     const newStatus = normalizeOrderStatus(incoming.replace(/\s+/g, "_"));
     if (!newStatus) {
       return res.status(422).json({ status: "error", message: "Unsupported shipment status" });
     }
-    const eventTimestamp = current_timestamp
-      ? new Date(current_timestamp)
-      : new Date();
+    // Historical orders may predate the free-form carrier metadata object.
+    // Initialize it before recording AWB/courier details so a valid webhook
+    // can never fail solely because the order has no prior carrier metadata.
+    order.meta = order.meta || {};
 
     // const event = {
     //   // provider: "shiprocket",

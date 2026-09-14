@@ -217,6 +217,12 @@ ${small("If you didn't request this, you can safely ignore this email.")}
     body: orderShell({ heading: "Return Received", badgeLabel: "Inspection Pending", message: "Your returned items reached our warehouse and are being inspected." }),
     required_variables: ["name", "order_id", "order_number", "return_request_number"], is_marketing: false,
   },
+  return_updated: {
+    subject: 'Return Update — {{return_request_number}}',
+    preheader: '{{return_status}}',
+    body: orderShell({ heading: 'Return Update', badgeLabel: 'Update', message: '{{return_status}}. View your order for the latest return details.' }),
+    required_variables: ['name', 'order_id', 'order_number', 'return_request_number', 'return_status'], is_marketing: false,
+  },
   return_completed: {
     subject: "Return Completed — {{return_request_number}}",
     preheader: "Your return has been processed.",

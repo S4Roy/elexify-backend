@@ -1,3 +1,5 @@
+import { celebrate, Joi } from "celebrate";
+import { returnOperation } from "../../../controllers/admin/inventory/order/returnOperations.js";
 import { Router } from "express";
 import { inventoryController } from "../../../controllers/admin/index.js";
 import { inventoryValidation } from "../../../validations/admin/index.js";
@@ -90,5 +92,13 @@ orderRouter.post(
   inventoryValidation.orderValidation.updatePickup,
   inventoryController.orderController.updatePickup,
 );
+
+orderRouter.post('/returns/operation', requirePermission(PERMISSIONS.RETURN_REVIEW), celebrate({ body: Joi.object({
+  return_request_id: Joi.string().hex().length(24).required(),
+  operation: Joi.string().valid('book', 'track', 'replacement', 'refund').required(),
+  warehouse: Joi.string().trim().max(100).allow('').optional(),
+  external_order_id: Joi.string().pattern(/^\d+$/).allow('').optional(),
+  parcel: Joi.object({ length: Joi.number().positive().max(1000).required(), breadth: Joi.number().positive().max(1000).required(), height: Joi.number().positive().max(1000).required(), weight: Joi.number().positive().max(1000).required() }).optional(),
+}) }), returnOperation);
 
 export { orderRouter };

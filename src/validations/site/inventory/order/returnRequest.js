@@ -1,6 +1,8 @@
 import { celebrate, Joi } from "celebrate";
 
 export const createReturn = celebrate({ body: Joi.object({
+  return_type: Joi.string().valid('refund', 'replacement').default('refund'),
+  submission_key: Joi.string().guid().optional(),
   order_id: Joi.string().hex().length(24).required(),
   items: Joi.array().items(Joi.object({
     order_item_id: Joi.string().hex().length(24).required(),

@@ -1,3 +1,4 @@
+import { validReturnWebhookToken } from "../services/returnService/webhookAuth.js";
 /**
  * Middleware to validate X-API-KEY header.
  */
@@ -11,7 +12,8 @@ export const validateApiKey = (req, res, next) => {
       return next(StatusError.forbidden("Missing X-API-KEY header"));
     }
 
-    if (apiKey !== process.env.API_KEY) {
+    const carrierWebhook = req.method === 'POST' && req.originalUrl?.split('?')[0].endsWith('/site/webhook/order/update-status');
+    if (apiKey !== process.env.API_KEY && !(carrierWebhook && validReturnWebhookToken(apiKey))) {
       return next(StatusError.forbidden("Invalid API key"));
     }
 

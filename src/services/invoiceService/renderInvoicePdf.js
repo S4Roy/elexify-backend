@@ -1,4 +1,5 @@
 import PDFDocument from "pdfkit";
+import { invoiceDisplayAmounts } from "./invoiceDisplayAmounts.js";
 
 const PAGE_MARGIN = 40;
 const PAGE_WIDTH = 595.28; // A4 pt
@@ -68,7 +69,7 @@ const ITEM_COLS_BASE = [
   { key: "discount", label: "Discount", width: 55, align: "right" },
 ];
 const ITEM_COLS_GST = [
-  { key: "tax", label: "Tax", width: 70, align: "right" },
+  { key: "tax", label: "GST (included)", width: 70, align: "right" },
 ];
 const ITEM_COLS_TOTAL = [{ key: "amount", label: "Amount", width: 0, align: "right" }]; // width filled dynamically
 
@@ -100,6 +101,7 @@ export const renderInvoicePdf = (invoice) =>
     doc.on("error", reject);
 
     const currency = invoice.currency || "INR";
+    const display = invoiceDisplayAmounts(invoice);
     const columns = buildColumns(invoice.is_gst_applicable);
 
     const drawHeader = () => {
@@ -189,6 +191,7 @@ export const renderInvoicePdf = (invoice) =>
     cursorY = drawTableHeader(cursorY);
 
     (invoice.items || []).forEach((item, idx) => {
+      const amounts = display.items[idx];
       const productLabel = [item.product_name, item.variation_name].filter(Boolean).join("\n");
       const skuLabel = item.sku ? `SKU: ${item.sku}` : "";
       const fullProductText = [productLabel, skuLabel].filter(Boolean).join("\n");
@@ -207,7 +210,7 @@ export const renderInvoicePdf = (invoice) =>
       doc.text(String(idx + 1), columns[0].x, cursorY, { width: columns[0].width });
       doc.text(fullProductText, columns[1].x, cursorY, { width: columns[1].width });
       doc.text(String(item.quantity), columns[2].x, cursorY, { width: columns[2].width, align: "right" });
-      doc.text(inr(item.unit_price, currency), columns[3].x, cursorY, { width: columns[3].width, align: "right" });
+      doc.text(inr(amounts.unit_price, currency), columns[3].x, cursorY, { width: columns[3].width, align: "right" });
       doc.text(item.discount ? inr(item.discount, currency) : "-", columns[4].x, cursorY, {
         width: columns[4].width,
         align: "right",
@@ -221,7 +224,7 @@ export const renderInvoicePdf = (invoice) =>
         });
         colIdx += 1;
       }
-      doc.text(inr(item.total, currency), columns[colIdx].x, cursorY, {
+      doc.text(inr(amounts.total, currency), columns[colIdx].x, cursorY, {
         width: columns[colIdx].width,
         align: "right",
       });
@@ -236,12 +239,12 @@ export const renderInvoicePdf = (invoice) =>
     // ── Totals block ──────────────────────────────────────────────────────
     const totals = invoice.totals || {};
     const totalsRows = [
-      ["Subtotal", totals.subtotal],
+      ["Subtotal", display.subtotal],
       totals.product_discount ? ["Product Discount", -totals.product_discount] : null,
       totals.coupon_discount ? ["Coupon Discount", -totals.coupon_discount] : null,
       ["Shipping", totals.shipping],
       totals.cod_fee ? ["COD Fee", totals.cod_fee] : null,
-      invoice.is_gst_applicable ? ["Tax/GST", totals.tax_total] : null,
+      invoice.is_gst_applicable ? ["GST (included)", totals.tax_total] : null,
     ].filter(Boolean);
 
     if (cursorY + (totalsRows.length + 4) * 14 > CONTENT_BOTTOM) {
@@ -263,6 +266,14 @@ export const renderInvoicePdf = (invoice) =>
     doc.text("Grand Total", totalsLabelX, cursorY, { width: 110 });
     doc.text(inr(totals.grand_total, currency), totalsValueX, cursorY, { width: 100, align: "right" });
     cursorY += 24;
+
+    if (invoice.is_gst_applicable) {
+      doc.font("Helvetica").fontSize(8).text(
+        "Prices include GST. Line GST includes tax on allocated shipping; GST is not added again.",
+        PAGE_MARGIN, cursorY, { width: CONTENT_WIDTH },
+      );
+      cursorY += 24;
+    }
 
     if (cursorY + 60 > CONTENT_BOTTOM) {
       doc.addPage();

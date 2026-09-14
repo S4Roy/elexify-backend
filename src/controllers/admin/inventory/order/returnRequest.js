@@ -47,7 +47,7 @@ export const inspectReturn = async (req, res, next) => {
   try {
     const request = await orderService.inspectReturnRequest({ requestId: req.body.return_request_id, adminId: req.auth.user_id, items: req.body.items, note: req.body.note });
     await auditService.recordAudit({ userId: request.customer_id, actorId: req.auth.user_id, req, event: "RETURN_INSPECTED", metadata: { return_request_id: request._id, order_id: request.order_id, status: request.status, refund_amount: request.refund?.amount } });
-    if (request.status === "completed") notificationService.sendReturnNotification({ request, event: "RETURN_COMPLETED" });
+    notificationService.sendReturnNotification({ request, event: request.status === "completed" ? "RETURN_COMPLETED" : "RETURN_UPDATED" });
     res.status(200).json({ status: "success", message: "Return inspection completed.", data: request });
   } catch (error) { next(error); }
 };
@@ -63,8 +63,9 @@ export const completeManualRefund = async (req, res, next) => {
 
 export const updatePickup = async (req, res, next) => {
   try {
-    const request = await orderService.updateReturnPickup({ requestId: req.body.return_request_id, adminId: req.auth.user_id, status: req.body.status, provider: req.body.provider, trackingNumber: req.body.tracking_number, failureReason: req.body.failure_reason });
+    const request = await orderService.updateReturnPickup({ requestId: req.body.return_request_id, adminId: req.auth.user_id, status: req.body.status, provider: req.body.provider, trackingNumber: req.body.tracking_number, failureReason: req.body.failure_reason, expectedAt: req.body.expected_at });
     await auditService.recordAudit({ userId: request.customer_id, actorId: req.auth.user_id, req, event: "RETURN_PICKUP_UPDATED", metadata: { return_request_id: request._id, status: request.pickup.status, provider: request.pickup.provider, tracking_number: request.pickup.tracking_number } });
-    res.status(200).json({ status: "success", message: "Return pickup updated.", data: request });
+    notificationService.sendReturnNotification({ request, event: "RETURN_UPDATED" });
+    res.status(200).json({ status: "success", message: req.body.status === "rescheduled" ? "Return pickup rescheduled." : "Return pickup updated.", data: request });
   } catch (error) { next(error); }
 };

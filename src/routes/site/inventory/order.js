@@ -1,3 +1,4 @@
+import { validateAccessToken } from "../../../middleware/accessToken.js";
 import { Router } from "express";
 import { inventoryController } from "../../../controllers/site/index.js";
 import { inventoryValidation } from "../../../validations/site/index.js";
@@ -28,9 +29,10 @@ orderRouter.post(
 orderRouter.get("/invoice", inventoryController.orderController.invoice);
 orderRouter.post(
   "/return",
+  validateAccessToken,
   inventoryValidation.orderValidation.createReturn,
   inventoryController.orderController.createReturn,
 );
-orderRouter.get("/returns", inventoryController.orderController.listReturns);
+orderRouter.get("/returns", validateAccessToken, inventoryController.orderController.listReturns);
 
 export { orderRouter };

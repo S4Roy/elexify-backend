@@ -72,10 +72,12 @@ export const issueOtp = async ({ identifier, purpose, email, mobile, name, req }
       throw StatusError.badRequest("Failed to send OTP email. Please try again.");
     }
   } else {
+    // Keep the internal verification purpose out of customer-facing SMS copy.
+    const purposeLabel = purpose === "change_mobile" ? "mobile number change" : purpose;
     const result = await smsService.sendSMS({
       to: identifier,
       message: "189215",
-      variables: [name || "User", purpose, otp],
+      variables: [name || "User", purposeLabel, otp],
     });
     if (result?.success === false) {
       await OtpVerification.deleteMany({ identifier, purpose, verified_at: null });

@@ -16,6 +16,8 @@ const OrderSchema = new Schema(
       unique: true,
       index: true,
     },
+    replacement_return_id: { type: Schema.Types.ObjectId, ref: "return_requests", default: null },
+    original_order_id: { type: Schema.Types.ObjectId, ref: "orders", default: null },
     user: {
       type: mongoose.Types.ObjectId,
       ref: "users",
@@ -164,6 +166,8 @@ OrderSchema.index(
   { user: 1, idempotency_key: 1 },
   { unique: true, partialFilterExpression: { idempotency_key: { $type: "string" } } },
 );
+
+OrderSchema.index({ replacement_return_id: 1 }, { unique: true, partialFilterExpression: { replacement_return_id: { $type: "objectId" } } });
 
 // Apply pagination plugin
 OrderSchema.plugin(mongooseAggregatePaginate);
