@@ -4,6 +4,8 @@ import { envs } from "./index.js";
 const mongoDBUrl = `${envs.MONGODB_URI}`;
 
 mongoose.Promise = global.Promise;
+// Explicitly retain Mongoose 6 query filtering behavior.
+mongoose.set("strictQuery", true);
 
 export const connectDB = async () => {
   try {
