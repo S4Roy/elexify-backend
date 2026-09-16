@@ -54,6 +54,7 @@ export const resolvePincode = async (pincode) => {
     found: true,
     serviceable: true,
     city: city ? { id: city.id, name: city.name } : null,
+    suggested_city_name: city ? null : record.source_city_name || record.district || null,
     state: state ? { id: state.id, name: state.name } : null,
     country: country ? { id: country.id, name: country.name } : null,
   };
