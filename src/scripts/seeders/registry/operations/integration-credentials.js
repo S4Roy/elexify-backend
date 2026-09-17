@@ -33,6 +33,11 @@ const CONFIG_FIELDS = {
     fields: { key_id: "key_id", key_secret: "key_secret", account_id: "account_id", webhook_secret: "webhook_secret" },
     identityFields: ["key_id", "key_secret"],
   },
+  smtp: {
+    section: "smtp",
+    fields: { host: "host", port: "port", secure: "secure", email: "email", password: "password", fromEmail: "fromEmail" },
+    identityFields: ["host", "email", "password"],
+  },
 };
 
 const configuredEnvironment = (configuration = envs) =>
@@ -49,9 +54,13 @@ const configuredEnvironment = (configuration = envs) =>
 
 const planImport = async (configuration = envs) => {
   const sources = configuredEnvironment(configuration);
+  // "provider +credentials" would switch Mongoose into inclusion mode on
+  // `provider` and silently drop the force-included `credentials` field
+  // (a select:false field) entirely — `+credentials` alone un-hides it
+  // while leaving every other field, including `provider`, at its default.
   const existing = await IntegrationCredential.find({
     provider: { $in: sources.map(({ provider }) => provider) },
-  }).select("provider +credentials");
+  }).select("+credentials");
   const byProvider = new Map(existing.map((doc) => [doc.provider, doc]));
 
   return sources.map(({ provider, credentials }) => {
@@ -110,7 +119,7 @@ const healthCheck = async () => {
   }
   const docs = await IntegrationCredential.find({
     provider: { $in: sources.map(({ provider }) => provider) },
-  }).select("provider +credentials");
+  }).select("+credentials");
   const complete = sources.filter(({ provider, credentials }) => {
     const doc = docs.find((candidate) => candidate.provider === provider);
     return doc && credentials.every(([field]) => doc.credentials?.has(field));
@@ -137,7 +146,7 @@ export default {
   risk: "HIGH",
   allowedEnvironments: ["development", "test", "production"],
   dependencies: [],
-  estimatedImpact: "Creates or completes up to five encrypted IntegrationCredential records without overwriting managed values.",
+  estimatedImpact: "Creates or completes up to six encrypted IntegrationCredential records without overwriting managed values.",
   supportsDryRun: true,
   requiresConfirmation: true,
   permission: PERMISSIONS.SEEDER_EXECUTE,

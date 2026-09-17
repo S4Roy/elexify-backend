@@ -5,6 +5,7 @@ import { emailBrand } from "../../config/emailBrand.js";
 import { renderEmailTemplate } from "./renderEmailTemplate.js";
 import { renderEmailShell } from "./emailLayout.js";
 import { htmlToText } from "./htmlToText.js";
+import { getIntegrationConfig } from "../integrationCredentials/index.js";
 
 export const sendEmail = async (
   email,
@@ -82,18 +83,30 @@ export const sendEmail = async (
     });
     const text = `${htmlToText(rendered.body)}\n\n--\n${emailBrand.brandName}\nNeed help? ${emailBrand.supportEmail}\nMy Account: ${emailBrand.accountUrl}\nOrders: ${emailBrand.ordersUrl}`;
 
+    // SMTP settings are admin-manageable (Settings > Integration
+    // Credentials); env vars remain the fallback when no managed
+    // credentials are saved. Read fresh each send so a credential rotation
+    // takes effect without a restart. null (not undefined) means an admin
+    // explicitly disabled the integration — honor that and stop sending,
+    // same as every other provider on this screen.
+    const smtpConfig = await getIntegrationConfig("smtp", envs.smtp);
+    if (!smtpConfig) {
+      console.error("❌ SMTP integration is disabled in Settings > Integration Credentials — email not sent.");
+      return false;
+    }
+
     // Configure SMTP transport — nodemailer has had SMTP support built in
     // since v6; the separate nodemailer-smtp-transport package (a
     // nodemailer@2.x-era plugin, itself the root of several critical
     // advisories via its own smtp-connection/httpntlm/underscore chain) is
     // no longer needed or installed.
     const transporter = nodemailer.createTransport({
-      host: envs.smtp.host,
-      port: envs.smtp.port,
-      secure: envs.smtp.secure,
+      host: smtpConfig.host,
+      port: Number(smtpConfig.port) || 465,
+      secure: String(smtpConfig.secure) !== "false",
       auth: {
-        user: envs.smtp.email,
-        pass: envs.smtp.password,
+        user: smtpConfig.email,
+        pass: smtpConfig.password,
       },
     });
 
@@ -101,7 +114,7 @@ export const sendEmail = async (
     const mailOptions = {
       from: {
         name: emailBrand.brandName,
-        address: envs.smtp.fromEmail,
+        address: smtpConfig.fromEmail || smtpConfig.email,
       },
       to: email,
       subject: rendered.subject,

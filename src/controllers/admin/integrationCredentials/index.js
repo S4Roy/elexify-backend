@@ -1,6 +1,7 @@
+import nodemailer from "nodemailer";
 import IntegrationCredential from "../../../models/IntegrationCredential.js";
 import Token from "../../../models/Token.js";
-import { StatusError } from "../../../config/index.js";
+import { StatusError, envs } from "../../../config/index.js";
 import { auditService } from "../../../services/index.js";
 import { decryptCredential, encryptCredential, maskCredential } from "../../../utils/integrationCredentialsCrypto.js";
 import { getTokens as getShiprocketToken } from "../../../services/shiprocket/getTokens.js";
@@ -8,6 +9,7 @@ import { getPickupLocations as getShiprocketPickupLocations } from "../../../ser
 import { getTokens as getZohoToken } from "../../../services/zoho/getTokens.js";
 import { getPayPalToken } from "../../../services/paymentService/getPayPalToken.js";
 import { getRazorpayClient } from "../../../services/integrationCredentials/razorpay.js";
+import { getIntegrationConfig } from "../../../services/integrationCredentials/index.js";
 
 const PROVIDERS = {
   paypal: { label: "PayPal", fields: ["client_id", "client_secret", "environment"], secret: ["client_secret"], defaults: { environment: "sandbox" } },
@@ -15,6 +17,7 @@ const PROVIDERS = {
   zoho: { label: "Zoho Books", fields: ["org_id", "client_id", "client_secret", "refresh_token", "base_url"], secret: ["client_secret", "refresh_token"] },
   google: { label: "Google Sign-In", fields: ["client_id"], secret: [] },
   razorpay: { label: "Razorpay", fields: ["key_id", "key_secret", "account_id", "webhook_secret"], secret: ["key_secret", "webhook_secret"] },
+  smtp: { label: "Transactional Email (SMTP)", fields: ["host", "port", "secure", "email", "password", "fromEmail"], secret: ["password"], plain: ["host", "port", "secure", "email", "fromEmail"] },
 };
 
 const descriptor = async (provider) => {
@@ -128,6 +131,21 @@ const testShiprocket = async () => {
   return `Connected. Pickup location "${match.pickup_location}" (${match.city}, ${match.pincode}) verified.`;
 };
 
+const testSmtp = async () => {
+  const config = await getIntegrationConfig("smtp", envs.smtp);
+  if (!config?.host || !config?.email || !config?.password) {
+    throw new Error("Host, email, and password are required to test the SMTP connection.");
+  }
+  const transporter = nodemailer.createTransport({
+    host: config.host,
+    port: Number(config.port) || 465,
+    secure: String(config.secure) !== "false",
+    auth: { user: config.email, pass: config.password },
+  });
+  await transporter.verify();
+  return `Connected to ${config.host}:${config.port || 465} as ${config.email}.`;
+};
+
 export const test = async (req, res, next) => {
   const provider = String(req.params.provider || "").toLowerCase();
   try {
@@ -139,6 +157,7 @@ export const test = async (req, res, next) => {
     if (provider === "paypal") await getPayPalToken();
     else if (provider === "shiprocket") message = await testShiprocket();
     else if (provider === "zoho") await getZohoToken();
+    else if (provider === "smtp") message = await testSmtp();
     else if (provider === "google") {
       const current = await IntegrationCredential.findOne({ provider }).select("+credentials");
       const clientId = decryptCredential(current?.credentials?.get("client_id"));
