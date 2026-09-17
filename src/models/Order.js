@@ -84,7 +84,7 @@ const OrderSchema = new Schema(
     is_migrated: { type: Boolean, default: false },
 
     // Set true the moment stock is actually decremented for this order
-    // (COD at placement, Razorpay/PayPal at payment verification). Cancel
+    // (COD at placement, Razorpay at payment verification). Cancel
     // flow gates inventory restoration on this flag rather than inferring
     // from payment_method/payment_status, since historical COD orders
     // placed before this field existed never decremented stock at all.

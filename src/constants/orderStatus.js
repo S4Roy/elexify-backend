@@ -33,7 +33,7 @@ export const PAYMENT_STATUS = {
 };
 export const PAYMENT_STATUS_VALUES = Object.values(PAYMENT_STATUS);
 
-export const PAYMENT_METHOD = { COD: "cod", RAZORPAY: "razorpay", PAYPAL: "paypal" };
+export const PAYMENT_METHOD = { COD: "cod", RAZORPAY: "razorpay" };
 export const PAYMENT_METHOD_VALUES = Object.values(PAYMENT_METHOD);
 
 const ALLOWED_TRANSITIONS = {

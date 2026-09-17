@@ -7,12 +7,10 @@ import { decryptCredential, encryptCredential, maskCredential } from "../../../u
 import { getTokens as getShiprocketToken } from "../../../services/shiprocket/getTokens.js";
 import { getPickupLocations as getShiprocketPickupLocations } from "../../../services/shiprocket/getPickupLocations.js";
 import { getTokens as getZohoToken } from "../../../services/zoho/getTokens.js";
-import { getPayPalToken } from "../../../services/paymentService/getPayPalToken.js";
 import { getRazorpayClient } from "../../../services/integrationCredentials/razorpay.js";
 import { getIntegrationConfig } from "../../../services/integrationCredentials/index.js";
 
 const PROVIDERS = {
-  paypal: { label: "PayPal", fields: ["client_id", "client_secret", "environment"], secret: ["client_secret"], defaults: { environment: "sandbox" } },
   shiprocket: { label: "Shiprocket", fields: ["email", "password", "channel_id", "pickup_location"], secret: ["password"], plain: ["pickup_location"] },
   zoho: { label: "Zoho Books", fields: ["org_id", "client_id", "client_secret", "refresh_token", "base_url"], secret: ["client_secret", "refresh_token"] },
   google: { label: "Google Sign-In", fields: ["client_id"], secret: [] },
@@ -154,8 +152,7 @@ export const test = async (req, res, next) => {
     if (!doc.enabled) throw StatusError.badRequest("Enable the integration before testing.");
     await Token.updateOne({ provider }, { $set: { access_token: null, expires_at: new Date(0) } });
     let message = "Connection verified";
-    if (provider === "paypal") await getPayPalToken();
-    else if (provider === "shiprocket") message = await testShiprocket();
+    if (provider === "shiprocket") message = await testShiprocket();
     else if (provider === "zoho") await getZohoToken();
     else if (provider === "smtp") message = await testSmtp();
     else if (provider === "google") {

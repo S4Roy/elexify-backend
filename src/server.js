@@ -22,7 +22,6 @@ import * as CronJobs from "./controllers/cronjobs/index.js";
 import { notificationService } from "./services/index.js";
 import SystemOperationLog from "./models/SystemOperationLog.js";
 import { v1AuthRouter } from "./routes/auth/index.js";
-import { v1CallBackRouter } from "./routes/callback/index.js";
 import { v1UserRouter } from "./routes/user/index.js";
 import { v1AdminRouter } from "./routes/admin/index.js";
 import { v1SiteRouter } from "./routes/site/index.js";
@@ -161,13 +160,6 @@ cron.schedule("*/5 * * * *", async () => {
 });
 cron.schedule("*/10 * * * *", async () => {
   try {
-    await CronJobs.updatePendingPaypalPayments(); // ✅ invoke the function
-  } catch (e) {
-    console.error("updatePendingPaypalPayments Cron Failed", e);
-  }
-});
-cron.schedule("*/10 * * * *", async () => {
-  try {
     await CronJobs.reconcileReturnRefunds();
   } catch (e) {
     console.error("reconcileReturnRefunds Cron Failed", e);
@@ -225,7 +217,6 @@ app.use(
   middleware.accessTokenIfAny,
   v1AuthRouter,
 );
-app.use(`${envs.basePath}/callback`, v1CallBackRouter);
 app.use(`${envs.basePath}/api/v1/payments/razorpay`, razorpayWebhookRouter);
 
 app.use(

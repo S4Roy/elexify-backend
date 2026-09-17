@@ -79,11 +79,6 @@ export const envs = {
     cooldownSeconds: Math.max(60, Number(process.env.OPERATIONS_ALERT_COOLDOWN_SECONDS) || 900),
     transactionAbortThreshold: Math.max(1, Number(process.env.OPERATIONS_TRANSACTION_ABORT_THRESHOLD) || 3),
   },
-  paypal: {
-    client_id: process.env.PAYPAL_CLIENT_ID,
-    secret: process.env.PAYPAL_SECRET,
-    env: process.env.PAYPAL_ENV,
-  },
   // Company/GST/invoice details live in SiteSetting (see
   // src/services/invoiceService/getCompanySettings.js) rather than here,
   // so an admin can edit them via the existing Settings page without a

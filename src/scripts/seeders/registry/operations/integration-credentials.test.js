@@ -4,13 +4,13 @@ import { configuredEnvironment } from "./integration-credentials.js";
 describe("integration credentials environment import", () => {
   it("maps only supported, non-empty values exposed by config/envs.js", () => {
     const result = configuredEnvironment({
-      paypal: { client_id: " paypal-client ", secret: "paypal-secret" },
+      shiprocket: { email: " ship-email ", password: "ship-secret" },
       google: { clientId: "" },
       unrelated: { secret: "must-not-be-read" },
     });
     expect(result).toEqual([{
-      provider: "paypal",
-      credentials: [["client_id", "paypal-client"], ["client_secret", "paypal-secret"]],
+      provider: "shiprocket",
+      credentials: [["email", "ship-email"], ["password", "ship-secret"]],
     }]);
   });
 
@@ -20,7 +20,7 @@ describe("integration credentials environment import", () => {
 
   it("does not seed a provider from config defaults alone", () => {
     expect(configuredEnvironment({
-      paypal: { env: "sandbox" },
+      smtp: { port: 465, secure: true },
       zoho: { BASE_URL: "https://books.zoho.com/api/v3" },
     })).toEqual([]);
   });

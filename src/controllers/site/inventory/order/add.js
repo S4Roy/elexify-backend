@@ -16,7 +16,6 @@ import ProviderOrderAttempt from "../../../../models/ProviderOrderAttempt.js";
 import { StatusError } from "../../../../config/index.js";
 import { getRazorpayConfig } from "../../../../services/integrationCredentials/razorpay.js";
 import { createRazorpayOrder } from "../../../../services/paymentService/createRazorpayOrder.js";
-import { createPayPalOrder } from "../../../../services/paymentService/createPayPalOrder.js";
 import { validateCoupon } from "../../../../services/inventory/cart/validateCoupon.js";
 import { calculateQuantityDiscount } from "../../../../services/inventory/cart/calculateQuantityDiscount.js";
 import { calculateShippingRate } from "../../../../services/shipping/calculateShippingRate.js";
@@ -487,8 +486,8 @@ const address = await Address.findOne({
 
     // ── COD stock reservation ───────────────────────────────────────────────
     // COD orders have no separate payment-confirmation step (unlike
-    // Razorpay/PayPal, which reserve stock in verifyPayment.js once payment
-    // clears), so the order is fully accepted the moment it's placed — stock
+    // Razorpay, which reserves stock once payment clears), so the order is
+    // fully accepted the moment it's placed — stock
     // must be decremented here, or a COD order never reserves inventory at all.
     if (payment_method === "cod") {
       for (const item of items) {
@@ -590,26 +589,6 @@ const address = await Address.findOne({
       );
       await injectPlacementFault(req, "provider_attempt_persistence");
       providerResponse = { provider: "razorpay", data: preparedRazorpayOrder };
-    } else if (payment_method === "paypal") {
-      const paypalResp = await createPayPalOrder(
-        grandTotal,
-        currency,
-        order_id,
-        items,
-      );
-
-      await Order.findOneAndUpdate(
-        { id: order_id },
-        {
-          payment_meta: {
-            payment_provider: "paypal",
-            paypal_order_id: paypalResp.paypalOrderId,
-          },
-        },
-        { session: dbSession },
-      );
-
-      providerResponse = { provider: "paypal", data: paypalResp };
     }
 
     await injectPlacementFault(req, "transaction_commit_boundary");

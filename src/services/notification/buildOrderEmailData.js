@@ -7,7 +7,6 @@ import { emailBrand } from "../../config/emailBrand.js";
 const PAYMENT_METHOD_LABELS = {
   cod: "Cash on Delivery",
   razorpay: "Online Payment",
-  paypal: "Online Payment (PayPal)",
 };
 
 const humanize = (value) =>

@@ -47,7 +47,6 @@ const addressLines = (address) => {
 const paymentMethodLabel = (method) => {
   if (method === "cod") return "Cash on Delivery";
   if (method === "razorpay") return "Online Payment (Razorpay)";
-  if (method === "paypal") return "Online Payment (PayPal)";
   return method || "-";
 };
 

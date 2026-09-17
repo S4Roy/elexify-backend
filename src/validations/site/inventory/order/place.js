@@ -174,10 +174,10 @@ export const place = celebrate({
         "string.pattern.base": "Invalid Address ID format",
       }),
     payment_method: Joi.string()
-      .valid("paypal", "razorpay", "cod")
+      .valid("razorpay", "cod")
       .required()
       .messages({
-        "any.only": "Payment method must be either 'paypal', 'razorpay', or 'cod'",
+        "any.only": "Payment method must be either 'razorpay' or 'cod'",
         "string.empty": "Payment method is required",
       }),
 

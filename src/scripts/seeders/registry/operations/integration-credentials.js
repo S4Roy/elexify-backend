@@ -8,11 +8,6 @@ import { envs } from "../../../../config/index.js";
 // process.env mapping/defaults; data operations never reach into process.env
 // directly. Never log or return any value from this map.
 const CONFIG_FIELDS = {
-  paypal: {
-    section: "paypal",
-    fields: { client_id: "client_id", client_secret: "secret", environment: "env" },
-    identityFields: ["client_id", "client_secret"],
-  },
   shiprocket: {
     section: "shiprocket",
     fields: { email: "email", password: "password", channel_id: "channel_id" },
@@ -46,8 +41,8 @@ const configuredEnvironment = (configuration = envs) =>
     const credentials = Object.entries(definition.fields)
       .map(([field, property]) => [field, String(section[property] || "").trim()])
       .filter(([, value]) => Boolean(value));
-    // Ignore default-only values such as PayPal "sandbox" or Zoho's base
-    // URL unless that provider also has an actual identity/secret value.
+    // Ignore default-only values such as Zoho's base URL unless that
+    // provider also has an actual identity/secret value.
     const configured = credentials.some(([field]) => definition.identityFields.includes(field));
     return configured ? [{ provider, credentials }] : [];
   });
@@ -146,7 +141,7 @@ export default {
   risk: "HIGH",
   allowedEnvironments: ["development", "test", "production"],
   dependencies: [],
-  estimatedImpact: "Creates or completes up to six encrypted IntegrationCredential records without overwriting managed values.",
+  estimatedImpact: "Creates or completes up to five encrypted IntegrationCredential records without overwriting managed values.",
   supportsDryRun: true,
   requiresConfirmation: true,
   permission: PERMISSIONS.SEEDER_EXECUTE,
