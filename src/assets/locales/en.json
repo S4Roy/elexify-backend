@@ -221,5 +221,7 @@
 	"A user with this mobile number already exists": "A user with this mobile number already exists",
 	"{{channel}} marked as verified": "{{channel}} marked as verified",
 	"OTP sent to your new mobile number": "OTP sent to your new mobile number",
-	"Mobile number updated and verified successfully": "Mobile number updated and verified successfully"
+	"Mobile number updated and verified successfully": "Mobile number updated and verified successfully",
+	"SMS templates fetched successfully": "SMS templates fetched successfully",
+	"SMS template fetched successfully": "SMS template fetched successfully"
 }

@@ -100,7 +100,7 @@ export const shipping = async (req, res, next) => {
       order_date: moment(order_data.created_at || new Date())
         .tz("Asia/Kolkata")
         .format("YYYY-MM-DD HH:mm"),
-      pickup_location: envs.PROJECT_NAME,
+      pickup_location: shiprocketConfig.pickup_location || envs.PROJECT_NAME,
       channel_id: shiprocketConfig.channel_id || "7990522",
       comment: order_data.note || order_data.comment || "",
       billing_customer_name: billing.full_name,
