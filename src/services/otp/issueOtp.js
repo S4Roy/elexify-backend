@@ -1,7 +1,7 @@
 import moment from "moment";
 import OtpVerification from "../../models/OtpVerification.js";
 import { StatusError, envs } from "../../config/index.js";
-import { emailService, smsService } from "../index.js";
+import { emailService, smsService, smsTemplateService } from "../index.js";
 import { generalHelper } from "../../helpers/index.js";
 
 const OTP_LENGTH = envs.otp.length || 6;
@@ -74,11 +74,16 @@ export const issueOtp = async ({ identifier, purpose, email, mobile, name, req }
   } else {
     // Keep the internal verification purpose out of customer-facing SMS copy.
     const purposeLabel = purpose === "change_mobile" ? "mobile number change" : purpose;
-    const result = await smsService.sendSMS({
-      to: identifier,
-      message: envs.FAST2SMS.otp_message_id,
-      variables: [name || "User", purposeLabel, otp],
-    });
+    const otpTemplate = await smsTemplateService.getTemplate("otp_generic");
+    const otpValuesByKey = { name: name || "User", purpose: purposeLabel, otp };
+    const result = otpTemplate
+      ? await smsService.sendSMS({
+        to: identifier,
+        message: otpTemplate.dlt_message_id,
+        variables: otpTemplate.variables.map((key) => otpValuesByKey[key] ?? ""),
+        ...(otpTemplate.sender_id ? { sender_id: otpTemplate.sender_id } : {}),
+      })
+      : { success: false, error: "sms_template_not_configured" };
     if (result?.success === false) {
       await OtpVerification.deleteMany({ identifier, purpose, verified_at: null });
       throw StatusError.badRequest("Failed to send OTP. Please try again later.");

@@ -4,14 +4,14 @@
 // channels/templates/mandatory-ness stay in one place instead of scattered
 // across controllers.
 //
-// `messagingVariables` is the ordered variable list SMS (Fast2SMS DLT
-// `variables_values`) and WhatsApp (Meta template `{{1}} {{2}} ...`
-// positional params) fill in — see constants/messagingTemplateDefaults.js
-// for the message_id/template-name lookup and the documented sample copy
-// each position corresponds to. Both channels require the *content* behind
-// these positions to be pre-registered with the provider (DLT for SMS,
-// Meta Business Manager for WhatsApp) before it can actually send — this
-// list only fixes the contract for what data fills which slot.
+// `messagingVariables` is the ordered variable list WhatsApp (Meta template
+// `{{1}} {{2}} ...` positional params — see whatsapp.provider.js) fills in.
+// SMS no longer reads this: its variable order/message_id/copy now live
+// per-event in models/SmsTemplate.js (admin-editable, seeded by
+// constants/smsTemplateDefaults.js), decoupled from this WhatsApp-only
+// contract. Both channels still require the *content* behind these
+// positions to be pre-registered with the provider (DLT for SMS, Meta
+// Business Manager for WhatsApp) before it can actually send.
 
 export const NOTIFICATION_EVENTS = {
   ORDER_PLACED: {
@@ -44,6 +44,16 @@ export const NOTIFICATION_EVENTS = {
     mandatory: false,
     channels: ["email", "sms", "whatsapp"],
     templateKey: "order_processing",
+    messagingVariables: ["name", "order_id"],
+  },
+  ORDER_PACKED: {
+    category: "transactional",
+    preferenceKey: "order",
+    mandatory: false,
+    // Only SMS has an approved template for this event right now — add
+    // "email"/"whatsapp" once copy is approved for those channels too.
+    channels: ["sms"],
+    templateKey: "order_packed",
     messagingVariables: ["name", "order_id"],
   },
   ORDER_SHIPPED: {

@@ -1,5 +1,6 @@
 import * as userService from "./user/index.js";
 import * as emailTemplateService from "./emailTemplate/index.js";
+import * as smsTemplateService from "./smsTemplate/index.js";
 import * as emailService from "./email/index.js";
 // import * as paginationService from "./pagination/index.js";
 // import * as primaryIdByUuidService from "./primaryIdByUuid/index.js";
@@ -29,6 +30,7 @@ export {
   userRoleService,
   emailService,
   emailTemplateService,
+  smsTemplateService,
   awsService,
   s3HandlerService,
   inventoryService,

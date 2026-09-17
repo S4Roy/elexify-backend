@@ -30,6 +30,7 @@ import { operationsRouter } from "./operations.js";
 import { customersRouter } from "./customers.js";
 import { notificationsRouter } from "./notifications.js";
 import { emailTemplatesRouter } from "./emailTemplates.js";
+import { smsTemplatesRouter } from "./smsTemplates.js";
 import { dataOperationsRouter } from "./dataOperations.js";
 import { integrationCredentialsRouter } from "./integrationCredentials.js";
 
@@ -67,6 +68,7 @@ v1AdminRouter.use("/operations", operationsRouter);
 v1AdminRouter.use("/customers", customersRouter);
 v1AdminRouter.use("/notifications", notificationsRouter);
 v1AdminRouter.use("/email-templates", emailTemplatesRouter);
+v1AdminRouter.use("/sms-templates", smsTemplatesRouter);
 v1AdminRouter.use("/data-operations", dataOperationsRouter);
 v1AdminRouter.use("/integration-credentials", integrationCredentialsRouter);
 

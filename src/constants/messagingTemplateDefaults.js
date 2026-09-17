@@ -1,13 +1,19 @@
-// Documentation-only sample copy for the SMS (Fast2SMS DLT) and WhatsApp
-// (Meta Business) messages behind each notification event. Neither channel
-// can send free text at request time — SMS on the "dlt" route requires a
-// pre-registered message_id (see config/envs.js FAST2SMS.message_ids), and
-// WhatsApp requires a pre-approved template name (see whatsapp.provider.js
-// TEMPLATE_NAME_MAP). This file is what to hand the DLT/Meta template
-// registration form, not something the app reads at runtime — it exists so
-// the registered copy and the code's variable order
-// (notificationEvents.js `messagingVariables`) are authored and reviewed
-// together instead of drifting apart.
+// Documentation-only sample copy for the WhatsApp (Meta Business) messages
+// behind each notification event — WhatsApp requires a pre-approved
+// template name (see whatsapp.provider.js TEMPLATE_NAME_MAP). This file is
+// what to hand the Meta template registration form, not something the app
+// reads at runtime — it exists so the registered copy and the code's
+// variable order (notificationEvents.js `messagingVariables`) are authored
+// and reviewed together instead of drifting apart.
+//
+// SMS no longer sources from this file: the actual DLT-approved SMS copy,
+// message_id and variable order live in constants/smsTemplateDefaults.js
+// (seeded into models/SmsTemplate.js, admin-editable) — that's the
+// authoritative set, independent of whatever gets registered with Meta for
+// the same event, since the two providers' approved templates don't have
+// to match each other. `SMS_SAMPLE_COPY` below is kept only as the base
+// WHATSAPP_SAMPLE_COPY spreads from; despite the name, it is NOT what SMS
+// actually sends for any event that also has a real SmsTemplate row.
 //
 // {{1}}, {{2}}, ... are positional — they map index-for-index onto each
 // event's `messagingVariables` array. Keep both in sync: adding/reordering
@@ -17,6 +23,7 @@ export const SMS_SAMPLE_COPY = {
   payment_success: "Hi {{1}}, payment received for order {{2}} (Rs.{{3}}). Thank you for shopping with Elexify!",
   payment_failed: "Hi {{1}}, payment for order {{2}} could not be completed. No amount was deducted. Please retry on the app. - Elexify",
   order_processing: "Hi {{1}}, your Elexify order {{2}} is being prepared and will ship soon.",
+  order_packed: "Hi {{1}}, your Elexify order {{2}} has been packed and is ready for dispatch. We'll notify you once it ships.",
   order_shipped: "Hi {{1}}, your Elexify order {{2}} has shipped. Tracking No: {{3}}. Track it in the app.",
   order_out_for_delivery: "Hi {{1}}, your Elexify order {{2}} is out for delivery and should arrive today.",
   order_delivered: "Hi {{1}}, your Elexify order {{2}} has been delivered. We hope you love it!",

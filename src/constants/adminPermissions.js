@@ -16,6 +16,9 @@ export const PERMISSIONS = {
   // reset-to-default) — same superadmin+manager-only shape as the other
   // sensitive admin capabilities above.
   EMAIL_TEMPLATE_MANAGE: "email_template.manage",
+  // Same shape as EMAIL_TEMPLATE_MANAGE, for the DLT-approved SMS
+  // template set (models/SmsTemplate.js).
+  SMS_TEMPLATE_MANAGE: "sms_template.manage",
   INTEGRATION_CREDENTIAL_MANAGE: "integration_credential.manage",
   ZOHO_INVOICE_MANAGE: "zoho_invoice.manage",
   RETURN_VIEW: "return.view",
@@ -61,6 +64,7 @@ export const ROLE_PERMISSIONS = {
     PERMISSIONS.CUSTOMER_NOTIFICATION_RETRY,
     PERMISSIONS.CUSTOMER_PREFERENCE_MANAGE,
     PERMISSIONS.EMAIL_TEMPLATE_MANAGE,
+    PERMISSIONS.SMS_TEMPLATE_MANAGE,
     PERMISSIONS.ZOHO_INVOICE_MANAGE,
     PERMISSIONS.RETURN_VIEW,
     PERMISSIONS.RETURN_REVIEW,

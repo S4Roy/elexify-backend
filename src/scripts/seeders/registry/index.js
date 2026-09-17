@@ -7,6 +7,7 @@
 // accepts a free-form script path or shell command.
 import emailTemplates from "./operations/email-templates.js";
 import emailTemplatesUpgrade from "./operations/email-templates-upgrade.js";
+import smsTemplates from "./operations/sms-templates.js";
 import cmsPages from "./operations/cms-pages.js";
 import faqs from "./operations/faqs.js";
 import homePage from "./operations/home-page.js";
@@ -35,6 +36,7 @@ import integrationCredentials from "./operations/integration-credentials.js";
 const RAW_ENTRIES = [
   emailTemplates,
   emailTemplatesUpgrade,
+  smsTemplates,
   cmsPages,
   faqs,
   homePage,

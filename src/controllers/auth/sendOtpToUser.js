@@ -2,7 +2,7 @@ import moment from "moment";
 import User from "../../models/User.js";
 import OtpVerification from "../../models/OtpVerification.js";
 import { StatusError } from "../../config/index.js";
-import { smsService, emailService } from "../../services/index.js";
+import { smsService, emailService, smsTemplateService } from "../../services/index.js";
 import { generalHelper } from "../../helpers/index.js";
 import { normalizeMobile } from "../../helpers/mobileHelper.js";
 import { envs } from "../../config/index.js";
@@ -184,11 +184,19 @@ export const sendOtpToUser = async (req, res, next) => {
         );
       }
     } else {
-      const smsResponse = await smsService.sendSMS({
-        to: identifier,
-        message: envs.FAST2SMS.otp_message_id,
-        variables: [user?.name ?? "User", purposeLabel, otp],
-      });
+      // Existing-user login gets its own shorter, single-variable DLT
+      // template; every other purpose (signup, forgot/reset password)
+      // uses the generic 3-variable one — see constants/smsTemplateDefaults.js.
+      const otpTemplate = await smsTemplateService.getTemplate(is_otp_login ? "otp_login" : "otp_generic");
+      const otpValuesByKey = { name: user?.name ?? "User", purpose: purposeLabel, otp };
+      const smsResponse = otpTemplate
+        ? await smsService.sendSMS({
+          to: identifier,
+          message: otpTemplate.dlt_message_id,
+          variables: otpTemplate.variables.map((key) => otpValuesByKey[key] ?? ""),
+          ...(otpTemplate.sender_id ? { sender_id: otpTemplate.sender_id } : {}),
+        })
+        : { success: false, error: "sms_template_not_configured" };
 
       if (smsResponse?.success === false) {
         await OtpVerification.deleteMany({

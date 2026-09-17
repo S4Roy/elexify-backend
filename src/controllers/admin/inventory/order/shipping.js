@@ -1,6 +1,6 @@
 import Order from "../../../../models/Order.js";
 import { StatusError, envs } from "../../../../config/index.js";
-import { shiprocket, inventoryService } from "../../../../services/index.js";
+import { shiprocket, inventoryService, orderService, notificationService } from "../../../../services/index.js";
 import moment from "moment-timezone";
 import { getIntegrationConfig } from "../../../../services/integrationCredentials/index.js";
 
@@ -225,6 +225,26 @@ export const shipping = async (req, res, next) => {
     } catch (err) {
       // don't fail the whole flow for persistence error — return a warning
       console.warn("Failed to persist Shiprocket mapping", err);
+    }
+
+    // The order is handed to the courier queue but not yet actually
+    // shipped (that's a separate "shipped" transition, fired by the
+    // Shiprocket webhook once the courier assigns an AWB) — this is the
+    // "packed and ready for dispatch" moment. Never let a transition/
+    // notification failure fail a Shiprocket call that already succeeded.
+    try {
+      const updatedOrder = await orderService.transitionOrder({
+        orderId: order_data._id,
+        orderStatus: "packed",
+        source: "application",
+      });
+      notificationService.sendOrderNotification({
+        order: updatedOrder,
+        event: "ORDER_PACKED",
+        dedupeKey: `${updatedOrder.id}:ORDER_PACKED`,
+      });
+    } catch (err) {
+      console.warn("Failed to transition order to packed / notify customer", err);
     }
 
     return res.status(200).json({
