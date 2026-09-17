@@ -3,6 +3,7 @@ import { StatusError, envs } from "../../../../config/index.js";
 import { shiprocket, inventoryService, orderService, notificationService } from "../../../../services/index.js";
 import moment from "moment-timezone";
 import { getIntegrationConfig } from "../../../../services/integrationCredentials/index.js";
+import { canTransitionOrder } from "../../../../constants/orderStatus.js";
 
 export const shipping = async (req, res, next) => {
   try {
@@ -12,6 +13,7 @@ export const shipping = async (req, res, next) => {
       length: qLength,
       width: qWidth,
       height: qHeight,
+      pickup_location: qPickupLocation,
       _id = null,
     } = req.body;
 
@@ -19,6 +21,17 @@ export const shipping = async (req, res, next) => {
 
     const order_data = await inventoryService.orderService.details(_id);
     if (!order_data) throw new StatusError(404, "Order not found");
+
+    // Guard against pushing an order to Shiprocket that our own state
+    // machine won't let move to "packed" afterwards (e.g. cancelled,
+    // delivered, returned) — checked up front so we never create a real
+    // shipment for an order this fails silently on later.
+    if (!canTransitionOrder(order_data.order_status, "packed")) {
+      throw StatusError.conflict(
+        `Cannot send order to Shiprocket: order is "${order_data.order_status}" and cannot transition to "packed".`
+      );
+    }
+
     const shiprocketConfig = await getIntegrationConfig("shiprocket", { channel_id: envs.shiprocket?.channel_id });
     if (!shiprocketConfig) throw StatusError.serviceUnavailable("Shiprocket integration is disabled");
 
@@ -100,8 +113,17 @@ export const shipping = async (req, res, next) => {
       order_date: moment(order_data.created_at || new Date())
         .tz("Asia/Kolkata")
         .format("YYYY-MM-DD HH:mm"),
-      pickup_location: shiprocketConfig.pickup_location || envs.PROJECT_NAME,
-      channel_id: shiprocketConfig.channel_id || "7990522",
+      // Admin can pick a "ship from" address per shipment from the dropdown
+      // in the Send to Shiprocket dialog; falls back to the account-wide
+      // default configured in Settings > Integration Credentials.
+      pickup_location:
+        (qPickupLocation && String(qPickupLocation).trim()) ||
+        shiprocketConfig.pickup_location ||
+        envs.PROJECT_NAME,
+      // Optional on Shiprocket's side — omitted when unset so Shiprocket
+      // falls back to the account's default channel instead of erroring
+      // out on a stale/incorrect id.
+      ...(shiprocketConfig.channel_id ? { channel_id: shiprocketConfig.channel_id } : {}),
       comment: order_data.note || order_data.comment || "",
       billing_customer_name: billing.full_name,
       billing_last_name: billing.last_name || "",
