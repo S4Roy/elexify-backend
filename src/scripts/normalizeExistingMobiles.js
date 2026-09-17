@@ -21,6 +21,16 @@
  * fewer accounts end up in a "duplicate, tagged" state vs. a clean
  * "already canonical" one.)
  *
+ * The unique (phone_code, mobile) partial index is live, so rewriting
+ * one account into its normalized form can collide with ANOTHER
+ * account that already holds that exact value (raw or already-clean) —
+ * that pair is, by definition, exactly the kind of duplicate
+ * dedupe-user-mobiles resolves. Rather than letting one collision abort
+ * the whole batch, a write that hits E11000 here is logged as a
+ * conflict and skipped; run dedupe-user-mobiles afterward to resolve it
+ * (it re-normalizes internally, so it doesn't need this run to have
+ * fully succeeded first).
+ *
  * Usage:
  *   node src/scripts/normalizeExistingMobiles.js            # dry run
  *   node src/scripts/normalizeExistingMobiles.js --apply     # write changes
@@ -41,6 +51,7 @@ export const runNormalizeExistingMobiles = async ({ apply = false, logger = crea
 
   let changed = 0;
   let invalid = 0;
+  let conflicts = 0;
 
   for (const user of users) {
     const phoneCode = user.phone_code || DEFAULT_PHONE_CODE;
@@ -55,24 +66,38 @@ export const runNormalizeExistingMobiles = async ({ apply = false, logger = crea
     const mobileNeedsFix = normalized !== user.mobile;
     const phoneCodeNeedsFix = (user.phone_code || null) !== phoneCode;
     if (mobileNeedsFix || phoneCodeNeedsFix) {
-      changed += 1;
       logger.info(`FIX ${user._id}: mobile "${user.mobile}" -> "${normalized}", phone_code ${user.phone_code ?? "null"} -> ${phoneCode}`);
       if (apply) {
-        await User.updateOne(
-          { _id: user._id },
-          { $set: { mobile: normalized, phone_code: phoneCode } },
-        );
+        try {
+          await User.updateOne(
+            { _id: user._id },
+            { $set: { mobile: normalized, phone_code: phoneCode } },
+          );
+          changed += 1;
+        } catch (error) {
+          if (error?.code !== 11000) throw error;
+          conflicts += 1;
+          logger.warn(`CONFLICT ${user._id}: another account already holds phone_code=${phoneCode} mobile="${normalized}" — left as-is, run dedupe-user-mobiles to resolve`);
+        }
+      } else {
+        changed += 1;
       }
     }
   }
 
-  logger.info(`${apply ? "Fixed" : "Would fix"} ${changed} account(s). ${invalid} could not be normalized (manual review needed).`);
+  logger.info(`${apply ? "Fixed" : "Would fix"} ${changed} account(s). ${invalid} could not be normalized (manual review needed).${conflicts ? ` ${conflicts} skipped as duplicate conflicts (run dedupe-user-mobiles).` : ""}`);
 
   return {
     logs: logger.logs,
-    summary: { checked: users.length, changed, invalid, applied: apply },
+    summary: { checked: users.length, changed, invalid, conflicts, applied: apply },
     result: apply
-      ? buildResult({ updated: changed, warnings: invalid ? [`${invalid} mobile value(s) need manual review`] : [] })
+      ? buildResult({
+        updated: changed,
+        warnings: [
+          ...(invalid ? [`${invalid} mobile value(s) need manual review`] : []),
+          ...(conflicts ? [`${conflicts} account(s) skipped as duplicate conflicts — run dedupe-user-mobiles`] : []),
+        ],
+      })
       : buildResult({ warnings: [`Dry run: would fix ${changed} account(s), ${invalid} need manual review`] }),
     dryRunPreview: !apply ? { wouldInsert: 0, wouldUpdate: changed, wouldSkip: invalid, wouldDelete: 0 } : null,
   };

@@ -27,6 +27,14 @@
  * survivor's canonicalization is also just a mobile/phone_code value,
  * recoverable from the account's own history if ever needed).
  *
+ * Write order within a group matters: duplicates are tagged away FIRST,
+ * survivor canonicalization happens AFTER. The unique (phone_code,
+ * mobile) partial index is live and exact-string, so if e.g. one dupe
+ * already happens to hold the group's canonical value verbatim (just
+ * hasn't been through normalize yet), canonicalizing the survivor into
+ * that same value *before* the dupe is tagged away throws E11000 —
+ * canonicalizing after clears that value out of the collection first.
+ *
  * Usage:
  *   node src/scripts/dedupeUserMobiles.js            # dry run, prints plan only
  *   node src/scripts/dedupeUserMobiles.js --apply     # actually writes changes
@@ -78,6 +86,31 @@ export const runDedupeUserMobiles = async ({ apply = false, logger = createLogge
 
     logger.info(`${keep.canonicalPhoneCode} ${keep.canonicalMobile}: KEEP ${keep._id} created ${keep.created_at}`);
 
+    // Tag duplicates away FIRST — see the write-order note above. A tag
+    // write can never collide (the suffixed value is unique per _id), so
+    // this is always safe regardless of what the survivor currently holds.
+    for (const dupe of dupes) {
+      logger.info(`${keep.canonicalPhoneCode} ${keep.canonicalMobile}: TAG ${dupe._id} created ${dupe.created_at} (raw mobile="${dupe.mobile}")`);
+      totalTagged += 1;
+
+      if (apply) {
+        try {
+          await User.updateOne(
+            { _id: dupe._id },
+            {
+              $set: {
+                deleted_at: new Date(),
+                mobile: `${dupe.mobile}_dup_${dupe._id}`,
+              },
+            },
+          );
+        } catch (error) {
+          if (error?.code !== 11000) throw error;
+          logger.error(`${keep.canonicalPhoneCode} ${keep.canonicalMobile}: FAILED to tag ${dupe._id} — unexpected duplicate key, skipped: ${error.message}`);
+        }
+      }
+    }
+
     // The survivor may still hold the un-normalized raw string (e.g. dedupe
     // ran before normalize-existing-mobiles) — canonicalize it too, so the
     // group is actually resolved and the unique index can build on it.
@@ -87,27 +120,15 @@ export const runDedupeUserMobiles = async ({ apply = false, logger = createLogge
       logger.info(`${keep.canonicalPhoneCode} ${keep.canonicalMobile}: CANONICALIZE survivor ${keep._id} (was phone_code=${keep.phone_code} mobile="${keep.mobile}")`);
       survivorsCanonicalized += 1;
       if (apply) {
-        await User.updateOne(
-          { _id: keep._id },
-          { $set: { mobile: keep.canonicalMobile, phone_code: keep.canonicalPhoneCode } },
-        );
-      }
-    }
-
-    for (const dupe of dupes) {
-      logger.info(`${keep.canonicalPhoneCode} ${keep.canonicalMobile}: TAG ${dupe._id} created ${dupe.created_at} (raw mobile="${dupe.mobile}")`);
-      totalTagged += 1;
-
-      if (apply) {
-        await User.updateOne(
-          { _id: dupe._id },
-          {
-            $set: {
-              deleted_at: new Date(),
-              mobile: `${dupe.mobile}_dup_${dupe._id}`,
-            },
-          },
-        );
+        try {
+          await User.updateOne(
+            { _id: keep._id },
+            { $set: { mobile: keep.canonicalMobile, phone_code: keep.canonicalPhoneCode } },
+          );
+        } catch (error) {
+          if (error?.code !== 11000) throw error;
+          logger.error(`${keep.canonicalPhoneCode} ${keep.canonicalMobile}: FAILED to canonicalize survivor ${keep._id} — unexpected duplicate key, skipped: ${error.message}`);
+        }
       }
     }
   }
