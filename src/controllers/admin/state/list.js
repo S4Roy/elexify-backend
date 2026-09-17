@@ -17,6 +17,7 @@ export const list = async (req, res, next) => {
       sort_by = "created_at",
       sort_order = -1,
       _id = null,
+      ids = null,
       status = null,
     } = req.query;
     const { slug = null } = req.params;
@@ -34,6 +35,14 @@ export const list = async (req, res, next) => {
         { country_name: { $regex: ".*" + search_key + ".*", $options: "i" } },
         { status: { $regex: ".*" + search_key + ".*", $options: "i" } },
       ];
+    }
+    if (ids) {
+      matchFilter.id = {
+        $in: ids
+          .split(",")
+          .map((id) => Number(id))
+          .filter((id) => !Number.isNaN(id)),
+      };
     }
     if (status) {
       matchFilter.status = { $in: status.split(",") };

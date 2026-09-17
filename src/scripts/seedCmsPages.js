@@ -52,7 +52,42 @@ const pages = [
     content: "",
   },
   {
-    slug: "refund-policy",
+    slug: "privacy-policy",
+    title: "Privacy Policy",
+    short_description:
+      "How we collect, use, and safeguard your personal information.",
+    content:
+      "<p>At Elexify Online, we value your privacy and are committed to protecting your personal information. This Privacy Policy outlines how we collect, use, and safeguard your data.</p>" +
+      "<h2>1. Information We Collect</h2>" +
+      "<p>When you create an account or make a purchase, we may collect personal information such as your name, email address, phone number, shipping and billing address, and payment information. We may also automatically collect non-personal information such as your IP address, browser type, device type, pages visited, and time spent on the site.</p>" +
+      "<h2>2. How We Use Your Information</h2>" +
+      "<p>We use your information to:</p>" +
+      "<ul>" +
+      "<li>Process and fulfil your orders</li>" +
+      "<li>Communicate with you about your account and orders</li>" +
+      "<li>Improve our website and services</li>" +
+      "<li>Send promotional materials and updates (with your consent)</li>" +
+      "<li>Respond to customer inquiries and provide support</li>" +
+      "<li>Comply with legal obligations</li>" +
+      "</ul>" +
+      "<h2>3. Data Sharing and Disclosure</h2>" +
+      "<p>We do not sell or rent your personal information to third parties. We may share your information with service providers who assist us in operating our website and business, with law enforcement or regulatory agencies if required by law, or in the event of a merger or acquisition.</p>" +
+      "<h2>4. Data Security</h2>" +
+      "<p>We implement appropriate security measures — including encryption, firewalls, and secure server hosting — to protect your personal information from unauthorized access, alteration, disclosure, or destruction.</p>" +
+      "<h2>5. Cookies</h2>" +
+      "<p>Elexify Online uses cookies to enhance your shopping experience, recognize you on future visits, track your preferences, and analyze site traffic. You can manage cookie settings through your browser, though disabling cookies may affect certain features of our website.</p>" +
+      "<h2>6. Your Rights</h2>" +
+      "<p>You have the right to access your personal information, request corrections, withdraw consent for processing your data, and request deletion of your personal data, subject to legal obligations.</p>" +
+      "<h2>7. Third-Party Links</h2>" +
+      "<p>Our website may contain links to third-party sites. We are not responsible for their privacy practices or content, and encourage you to review the privacy policies of any third-party sites you visit.</p>" +
+      "<h2>8. Changes to This Privacy Policy</h2>" +
+      "<p>We may update this Privacy Policy from time to time. Any changes will be posted on this page with an updated effective date. Your continued use of the site constitutes acceptance of any changes.</p>" +
+      "<h2>9. Contact Us</h2>" +
+      "<p>If you have any questions or concerns about this Privacy Policy, please contact us:</p>" +
+      `<p><strong>Elexify Support</strong><br>Email: <a href="mailto:${CONTACT_EMAIL}">${CONTACT_EMAIL}</a><br>Phone: <a href="tel:${CONTACT_PHONE_TEL}">${CONTACT_PHONE_DISPLAY}</a></p>`,
+  },
+  {
+    slug: "refund-cancellations-policy",
     title: "Refund & Cancellation Policy",
     short_description:
       "Our policy on refunds, returns, and order cancellations.",
@@ -87,7 +122,7 @@ const pages = [
       `<p><strong>Elexify Support</strong><br>Email: <a href="mailto:${CONTACT_EMAIL}">${CONTACT_EMAIL}</a><br>Phone: <a href="tel:${CONTACT_PHONE_TEL}">${CONTACT_PHONE_DISPLAY}</a></p>`,
   },
   {
-    slug: "terms-and-conditions",
+    slug: "terms-conditions",
     title: "Terms & Conditions",
     short_description:
       "The terms that apply when you browse Elexify Online or purchase our products.",
@@ -124,6 +159,16 @@ const pages = [
   },
 ];
 
+// Slugs renamed to match the storefront's top-level policy URLs
+// (/refund-cancellations-policy, /terms-conditions instead of the old
+// /page/refund-policy, /page/terms-and-conditions). Any environment that
+// already seeded a page under the old slug gets it renamed in place rather
+// than ending up with a duplicate under the new slug.
+const RENAMED_SLUGS = [
+  { from: "refund-policy", to: "refund-cancellations-policy" },
+  { from: "terms-and-conditions", to: "terms-conditions" },
+];
+
 export const runSeedCmsPages = async ({ logger = createLogger() } = {}) => {
   let created = 0;
   let skipped = 0;
@@ -132,8 +177,8 @@ export const runSeedCmsPages = async ({ logger = createLogger() } = {}) => {
   // Repair the placeholder "terms-of-service" record left over from testing
   // (empty content, wrong slug) instead of leaving it as orphaned junk.
   const legacyTerms = await Page.findOne({ slug: "terms-of-service" });
-  const properTerms = pages.find((p) => p.slug === "terms-and-conditions");
-  if (legacyTerms && !(await Page.findOne({ slug: "terms-and-conditions" }))) {
+  const properTerms = pages.find((p) => p.slug === "terms-conditions");
+  if (legacyTerms && !(await Page.findOne({ slug: "terms-conditions" }))) {
     legacyTerms.slug = properTerms.slug;
     legacyTerms.title = properTerms.title;
     legacyTerms.short_description = properTerms.short_description;
@@ -141,7 +186,30 @@ export const runSeedCmsPages = async ({ logger = createLogger() } = {}) => {
     legacyTerms.updated_at = new Date();
     await legacyTerms.save();
     repaired += 1;
-    logger.info("Repaired placeholder page -> terms-and-conditions");
+    logger.info("Repaired placeholder page -> terms-conditions");
+  }
+
+  for (const { from, to } of RENAMED_SLUGS) {
+    const legacyPage = await Page.findOne({ slug: from });
+    if (legacyPage && !(await Page.findOne({ slug: to }))) {
+      legacyPage.slug = to;
+      legacyPage.updated_at = new Date();
+      await legacyPage.save();
+      repaired += 1;
+      logger.info(`Renamed page slug: ${from} -> ${to}`);
+    }
+  }
+
+  // The privacy-policy page was created directly via the admin panel with an
+  // unedited default title ("privacy-policy") — fix that cosmetic issue
+  // without touching its real, already-written content.
+  const privacyStub = await Page.findOne({ slug: "privacy-policy", title: "privacy-policy" });
+  if (privacyStub) {
+    privacyStub.title = "Privacy Policy";
+    privacyStub.updated_at = new Date();
+    await privacyStub.save();
+    repaired += 1;
+    logger.info("Repaired privacy-policy page title");
   }
 
   for (const page of pages) {

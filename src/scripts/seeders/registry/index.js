@@ -16,6 +16,7 @@ import contactSettings from "./operations/contact-settings.js";
 import pincodes from "./operations/pincodes.js";
 import restrictCountries from "./operations/restrict-countries.js";
 import coreSiteBootstrap from "./operations/core-site-bootstrap.js";
+import footerPolicies from "./operations/footer-policies.js";
 import orderTotalItemsBackfill from "./operations/order-total-items-backfill.js";
 import orderSchemaMigration from "./operations/order-schema-migration.js";
 import fixCartIndexes from "./operations/fix-cart-indexes.js";
@@ -41,6 +42,7 @@ const RAW_ENTRIES = [
   pincodes,
   restrictCountries,
   coreSiteBootstrap,
+  footerPolicies,
   orderTotalItemsBackfill,
   orderSchemaMigration,
   fixCartIndexes,

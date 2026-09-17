@@ -6,6 +6,7 @@ export const list = celebrate({
     limit: Joi.number().optional(),
     slug: Joi.string().optional().allow("", null),
     search_key: Joi.string().optional().allow("", null),
+    ids: Joi.string().optional().allow("", null),
     sort_by: Joi.string()
       .optional()
       .allow("", null)

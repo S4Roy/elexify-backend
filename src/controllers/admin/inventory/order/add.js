@@ -10,6 +10,7 @@ import ExchangeRate from "../../../../models/ExchangeRate.js"; // ✅
 import { StatusError } from "../../../../config/index.js";
 import { paymentService } from "../../../../services/index.js";
 import { snapshotAddress } from "../../../../services/invoiceService/snapshotAddress.js";
+import { nextOrderNumber } from "../../../../services/orderService/generateOrderNumber.js";
 
 export const add = async (req, res, next) => {
   try {
@@ -90,7 +91,7 @@ export const add = async (req, res, next) => {
       throw StatusError.badRequest("No valid products found in the cart.");
     }
 
-    const order_id = `ORD-${Date.now()}`;
+    const order_id = await nextOrderNumber();
     const customer = {
       first_name: first_name || "Guest",
       last_name: last_name || "User",

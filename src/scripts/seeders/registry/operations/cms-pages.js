@@ -2,7 +2,7 @@ import Page from "../../../../models/Page.js";
 import { runSeedCmsPages } from "../../../seedCmsPages.js";
 import { PERMISSIONS } from "../../../../constants/adminPermissions.js";
 
-const REQUIRED_SLUGS = ["about-us", "contact-us", "faq", "refund-policy", "terms-and-conditions"];
+const REQUIRED_SLUGS = ["about-us", "contact-us", "faq", "privacy-policy", "refund-cancellations-policy", "terms-conditions"];
 
 const handler = async (context) => {
   if (context.dryRun) {
@@ -29,7 +29,7 @@ const healthCheck = async () => {
 export default {
   key: "cms-pages",
   name: "Seed CMS Pages",
-  description: "Creates the required static CMS pages (about-us, contact-us, faq, refund-policy, terms-and-conditions) if missing.",
+  description: "Creates the required static CMS pages (about-us, contact-us, faq, privacy-policy, refund-cancellations-policy, terms-conditions) if missing.",
   type: "SEEDER",
   category: "content",
   version: 1,

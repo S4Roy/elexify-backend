@@ -40,7 +40,7 @@ const run = async () => {
     },
     {
       slug: "contact_mobile",
-      value: "9064401121",
+      value: "+91 9110976419",
       label: "Contact Mobile",
       type: "contact_info",
     },
@@ -52,13 +52,13 @@ const run = async () => {
     },
     {
       slug: "contact_email",
-      value: "support@baseweb.in",
+      value: "support@elexify.online",
       label: "Contact Email",
       type: "contact_info",
     },
     {
       slug: "contact_address",
-      value: "Saltlake, Kolkata - 700091",
+      value: "57, T.N. Banerjee Road, Panihati, Kolkata - 700114, West Bengal, India",
       label: "Contact Address",
       type: "contact_info",
     },
@@ -66,6 +66,25 @@ const run = async () => {
       slug: "whatsapp_number",
       value: "919064401121",
       label: "WhatsApp Number (digits only, with country code)",
+      type: "contact_info",
+    },
+    {
+      slug: "company_lat",
+      value: "22.6922229",
+      label: "Map Latitude",
+      type: "contact_info",
+    },
+    {
+      slug: "company_lng",
+      value: "88.3671835",
+      label: "Map Longitude",
+      type: "contact_info",
+    },
+    {
+      slug: "map_embed_url",
+      value:
+        "https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3829.5489437646183!2d88.36460857537602!3d22.69222782857516!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x39f89d2740f52c59%3A0xddae7ee4bf0cb01!2sElexify%20Industries%20Pvt.%20Ltd.!5e1!3m2!1sen!2sin!4v1789654190769!5m2!1sen!2sin",
+      label: "Map Embed URL (Google Maps → Share → Embed a map)",
       type: "contact_info",
     },
     {
@@ -84,6 +103,18 @@ const run = async () => {
       slug: "social_youtube_url",
       value: "",
       label: "YouTube URL",
+      type: "social_links",
+    },
+    {
+      slug: "social_twitter_url",
+      value: "",
+      label: "X (Twitter) URL",
+      type: "social_links",
+    },
+    {
+      slug: "social_telegram_url",
+      value: "",
+      label: "Telegram URL",
       type: "social_links",
     },
     {

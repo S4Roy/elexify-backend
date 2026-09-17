@@ -28,6 +28,7 @@ import { computeGst } from "../../../../services/invoiceService/computeGst.js";
 import { reconcileProviderOrderAttempt } from "../../../../services/paymentService/reconcileProviderOrderAttempt.js";
 import { recordOperationalEvent } from "../../../../services/observability/recordOperationalEvent.js";
 import { injectPlacementFault } from "../../../../services/orderService/injectPlacementFault.js";
+import { nextOrderNumber } from "../../../../services/orderService/generateOrderNumber.js";
 import { notificationService } from "../../../../services/index.js";
 
 export const add = async (req, res, next) => {
@@ -302,8 +303,6 @@ const address = await Address.findOne({
     }
 
     // ── Create order ─────────────────────────────────────────────────────────
-    const order_id = `ORD-${crypto.createHash("sha256").update(`${user._id}:${idempotency_key}`).digest("hex").slice(0, 24).toUpperCase()}`;
-
     const existingOrder = await Order.findOne({ user: user._id, idempotency_key });
     if (existingOrder) {
       if (existingOrder.idempotency_fingerprint !== requestFingerprint) {
@@ -323,6 +322,13 @@ const address = await Address.findOne({
         },
       });
     }
+
+    // A short sequential number, not the idempotency mechanism itself — that's
+    // the (user, idempotency_key) unique index on Order, which still catches
+    // concurrent duplicate submissions (E11000 below) regardless of what this
+    // value is. Allocated only past the replay check above so retried/replayed
+    // requests don't burn a sequence number on every retry.
+    const order_id = await nextOrderNumber();
 
     let preparedRazorpayOrder = null;
     if (payment_method === "razorpay") {
