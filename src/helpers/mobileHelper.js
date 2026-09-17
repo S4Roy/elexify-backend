@@ -7,11 +7,22 @@
  * (which defeats the unique index and creates duplicate accounts).
  *
  * Currently assumes Indian 10-digit mobile numbers (phone_code "91").
- * Extend the STT_LENGTHS map if you support other country codes.
+ * Extend NATIONAL_LENGTH_BY_CODE / VALID_PATTERN_BY_CODE for other
+ * country codes.
  */
+
+export const DEFAULT_PHONE_CODE = "91";
 
 const NATIONAL_LENGTH_BY_CODE = {
   91: 10, // India
+};
+
+// TRAI/industry standard: Indian mobile numbers are 10 digits starting
+// with 6, 7, 8, or 9 — a plain digit-count check alone lets pincodes,
+// landline numbers, and other garbage of the right length through as
+// "valid". Codes without a specific pattern fall back to "N digits".
+const VALID_PATTERN_BY_CODE = {
+  91: /^[6-9]\d{9}$/,
 };
 
 /**
@@ -19,7 +30,7 @@ const NATIONAL_LENGTH_BY_CODE = {
  * @param {string} phoneCode - e.g. "91" (no "+")
  * @returns {string|null} normalized bare mobile number, or null if it doesn't validate
  */
-export const normalizeMobile = (rawMobile, phoneCode = "91") => {
+export const normalizeMobile = (rawMobile, phoneCode = DEFAULT_PHONE_CODE) => {
   if (!rawMobile) return null;
 
   const code = String(phoneCode).replace(/\D/g, "");
@@ -46,6 +57,11 @@ export const normalizeMobile = (rawMobile, phoneCode = "91") => {
     return null;
   }
 
+  const validPattern = VALID_PATTERN_BY_CODE[code] ?? new RegExp(`^\\d{${nationalLength}}$`);
+  if (!validPattern.test(cleaned)) {
+    return null;
+  }
+
   return cleaned;
 };
 
@@ -54,5 +70,5 @@ export const normalizeMobile = (rawMobile, phoneCode = "91") => {
  * @param {string} phoneCode
  * @returns {boolean}
  */
-export const isValidMobile = (rawMobile, phoneCode = "91") =>
+export const isValidMobile = (rawMobile, phoneCode = DEFAULT_PHONE_CODE) =>
   normalizeMobile(rawMobile, phoneCode) !== null;

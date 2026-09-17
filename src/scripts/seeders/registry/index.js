@@ -23,8 +23,8 @@ import fixCartIndexes from "./operations/fix-cart-indexes.js";
 import fixUserIndexes from "./operations/fix-user-indexes.js";
 import fixWishlistIndexes from "./operations/fix-wishlist-indexes.js";
 import fixProductContent from "./operations/fix-product-content.js";
-import dedupeUserMobiles from "./operations/dedupe-user-mobiles.js";
 import normalizeExistingMobiles from "./operations/normalize-existing-mobiles.js";
+import dedupeUserMobiles from "./operations/dedupe-user-mobiles.js";
 import e2eCleanup from "./operations/e2e-cleanup.js";
 import e2eSeed from "./operations/e2e-seed.js";
 import e2eSeedAdmin from "./operations/e2e-seed-admin.js";
@@ -49,8 +49,8 @@ const RAW_ENTRIES = [
   fixUserIndexes,
   fixWishlistIndexes,
   fixProductContent,
-  dedupeUserMobiles,
   normalizeExistingMobiles,
+  dedupeUserMobiles,
   e2eCleanup,
   e2eSeed,
   e2eSeedAdmin,

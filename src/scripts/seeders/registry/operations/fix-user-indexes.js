@@ -17,7 +17,10 @@ export default {
   idempotent: true,
   risk: "MEDIUM",
   allowedEnvironments: ["development", "test", "production"],
-  dependencies: [],
+  // syncIndexes() builds the unique (phone_code, mobile) partial index —
+  // that build fails with a duplicate-key error if real duplicate accounts
+  // still exist, so dedupe-user-mobiles must have run successfully first.
+  dependencies: ["dedupe-user-mobiles"],
   estimatedImpact: "Drops up to 2 stale indexes on the users collection, then syncs indexes to match User.js.",
   supportsDryRun: false,
   requiresConfirmation: true,
