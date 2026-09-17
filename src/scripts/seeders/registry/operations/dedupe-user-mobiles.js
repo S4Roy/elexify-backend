@@ -9,10 +9,10 @@ const handler = async (context) => {
 export default {
   key: "dedupe-user-mobiles",
   name: "Dedupe User Mobiles",
-  description: "Matches duplicate user accounts on normalized (phone_code, mobile), canonicalizes the oldest as survivor, and soft-tags the rest so the unique partial index can build. Reversible.",
+  description: "Matches duplicate user accounts on normalized (phone_code, mobile), keeps the OTP-verified account as survivor (oldest as tiebreaker), canonicalizes it, and soft-tags the rest so the unique partial index can build. Reversible.",
   type: "REPAIR",
   category: "users",
-  version: 2,
+  version: 3,
   required: false,
   idempotent: true,
   risk: "MEDIUM",
@@ -26,7 +26,7 @@ export default {
   // first is still recommended (fewer accounts end up tagged vs. already
   // clean) — see the description below.
   dependencies: [],
-  estimatedImpact: "Sets deleted_at and suffixes `mobile` on every duplicate account after the first per normalized (phone_code, mobile) group; rewrites the survivor's mobile/phone_code to canonical form if needed. No document is deleted; reversible.",
+  estimatedImpact: "Sets deleted_at and suffixes `mobile` on every non-survivor account per normalized (phone_code, mobile) group (an unverified account is tagged even if older, when a verified duplicate exists); rewrites the survivor's mobile/phone_code to canonical form if needed. No document is deleted; reversible.",
   supportsDryRun: true,
   requiresConfirmation: true,
   permission: PERMISSIONS.REPAIR_EXECUTE,

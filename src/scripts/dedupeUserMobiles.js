@@ -14,8 +14,14 @@
  * values that can't be normalized (e.g. two numbers jammed into one
  * field) — those still get caught if truly byte-identical.
  *
- * Policy: keep the OLDEST (earliest created_at) account per duplicate
- * group as canonical/active. If the group matched via normalization,
+ * Policy: within a group, prefer an OTP-verified account
+ * (mobile_verified_at set) over an unverified one, and only fall back
+ * to OLDEST (earliest created_at) to break ties. Ignoring verification
+ * and going by age alone is wrong here: on this dataset it would have
+ * kept an older, never-verified stub account as canonical and tagged
+ * away a newer account the real customer actually completed OTP
+ * verification on — locking them out of the account they can prove
+ * they own. If the group matched via normalization,
  * the survivor's mobile/phone_code are also rewritten to the
  * normalized canonical form (so the survivor itself doesn't block the
  * unique index). Every newer duplicate is soft-tagged:
@@ -51,7 +57,7 @@ import { buildResult } from "./shared/result.js";
 // reimplementation.
 export const runDedupeUserMobiles = async ({ apply = false, logger = createLogger() } = {}) => {
   const users = await User.find({ mobile: { $type: "string" }, deleted_at: null })
-    .select("_id name phone_code mobile created_at")
+    .select("_id name phone_code mobile created_at mobile_verified_at")
     .lean();
 
   const groups = new Map();
@@ -78,19 +84,21 @@ export const runDedupeUserMobiles = async ({ apply = false, logger = createLogge
   let survivorsCanonicalized = 0;
 
   for (const group of dupeGroups) {
-    const sorted = [...group].sort(
-      (a, b) => new Date(a.created_at) - new Date(b.created_at),
-    );
+    const sorted = [...group].sort((a, b) => {
+      const verifiedDiff = Number(!!b.mobile_verified_at) - Number(!!a.mobile_verified_at);
+      if (verifiedDiff !== 0) return verifiedDiff;
+      return new Date(a.created_at) - new Date(b.created_at);
+    });
     const keep = sorted[0];
     const dupes = sorted.slice(1);
 
-    logger.info(`${keep.canonicalPhoneCode} ${keep.canonicalMobile}: KEEP ${keep._id} created ${keep.created_at}`);
+    logger.info(`${keep.canonicalPhoneCode} ${keep.canonicalMobile}: KEEP ${keep._id} created ${keep.created_at} verified=${!!keep.mobile_verified_at}`);
 
     // Tag duplicates away FIRST — see the write-order note above. A tag
     // write can never collide (the suffixed value is unique per _id), so
     // this is always safe regardless of what the survivor currently holds.
     for (const dupe of dupes) {
-      logger.info(`${keep.canonicalPhoneCode} ${keep.canonicalMobile}: TAG ${dupe._id} created ${dupe.created_at} (raw mobile="${dupe.mobile}")`);
+      logger.info(`${keep.canonicalPhoneCode} ${keep.canonicalMobile}: TAG ${dupe._id} created ${dupe.created_at} verified=${!!dupe.mobile_verified_at} (raw mobile="${dupe.mobile}")`);
       totalTagged += 1;
 
       if (apply) {
