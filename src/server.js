@@ -111,6 +111,7 @@ const allowedOrigins = buildAllowedOrigins(
   "https://elexify.baseweb.in",
   "https://inventory.elexify.online",
   "https://api.elexify.online",
+  "http://new.elexify.online",
 );
 app.use(cors(buildCorsOptions(allowedOrigins)));
 app.use(
