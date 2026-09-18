@@ -7,7 +7,7 @@ import StockTransaction from "../../models/StockTransaction.js";
 import Coupon from "../../models/Coupon.js";
 import CouponUsage from "../../models/CouponUsage.js";
 import User from "../../models/User.js";
-import { envs, StatusError } from "../../config/index.js";
+import { StatusError } from "../../config/index.js";
 import { ORDER_STATUS, PAYMENT_STATUS } from "../../constants/orderStatus.js";
 import { getRazorpayConfig } from "../integrationCredentials/razorpay.js";
 import { sendOrderNotification } from "../notification/sendOrderNotification.js";
@@ -21,7 +21,7 @@ const normalize = (value) => String(value || "").toUpperCase();
 const isPaymentClearedStatus = (status) =>
   status === PAYMENT_STATUS.PAID || status === PAYMENT_STATUS.ADVANCE_PAID;
 
-export const validateCapturedPayment = (order, payment, configuredAccount = envs.razorpay.account_id) => {
+export const validateCapturedPayment = (order, payment) => {
   // Partial COD orders only collect the advance online — the remaining
   // balance is Cash on Delivery, so the captured amount must match
   // advance_amount, not the full order value.
@@ -31,8 +31,7 @@ export const validateCapturedPayment = (order, payment, configuredAccount = envs
     payment.order_id !== order.payment_meta?.razorpay_order_id ||
     payment.status !== "captured" ||
     Number(payment.amount) !== expectedAmount ||
-    normalize(payment.currency) !== normalize(order.currency) ||
-    (configuredAccount && payment.account_id !== configuredAccount)
+    normalize(payment.currency) !== normalize(order.currency)
   ) {
     throw StatusError.badRequest("Captured payment does not match this order");
   }
@@ -55,8 +54,8 @@ export const finalizeCapturedPayment = async ({
 
   const existing = await Order.findOne(lookup);
   if (!existing) throw StatusError.notFound("Order not found");
-  const credentials = await getRazorpayConfig();
-  validateCapturedPayment(existing, paymentData, credentials.account_id);
+  await getRazorpayConfig();
+  validateCapturedPayment(existing, paymentData);
 
   if (isPaymentClearedStatus(existing.payment_status) && existing.stock_reserved) {
     sendOrderNotification({

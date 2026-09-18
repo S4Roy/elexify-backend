@@ -20,7 +20,12 @@ describe("production Razorpay configuration", () => {
 
   it("rejects incomplete production credentials without exposing values", () => {
     expect(() => validateProductionRazorpayConfig({ key_id: complete.key_id }, { NODE_ENV: "production" }))
-      .toThrow("missing key_secret, webhook_secret, account_id");
+      .toThrow("missing key_secret, webhook_secret");
+  });
+
+  it("allows an omitted Account ID because it is not part of the fetched payment entity", () => {
+    expect(validateProductionRazorpayConfig({ ...complete, account_id: "" }, { NODE_ENV: "production" }))
+      .toMatchObject({ key_id: complete.key_id });
   });
 
   it("rejects test keys in production", () => {

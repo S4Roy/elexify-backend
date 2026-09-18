@@ -141,6 +141,9 @@ export const razorpayWebhook = async (req, res) => {
   if (!valid) return res.status(400).json({ status: "error", message: "Invalid signature" });
 
   const event = req.body;
+  if (credentials.account_id && event?.account_id !== credentials.account_id) {
+    return res.status(400).json({ status: "error", message: "Webhook account mismatch" });
+  }
   const payloadHash = crypto.createHash("sha256").update(req.rawBody).digest("hex");
   const eventId = req.headers["x-razorpay-event-id"] || event?.id || event?.event_id || `${event?.event}:${payloadHash}`;
   if (!event?.event) {

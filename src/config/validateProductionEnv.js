@@ -6,7 +6,7 @@ export const validateProductionRazorpayConfig = (credentials, environment = proc
     /^https:\/\/(?:[a-z0-9-]+\.)?elexify\.online(?:[/:]|$)/i.test(String(url || "")),
   );
   if (environment.NODE_ENV !== "production" && !liveStorefront) return credentials;
-  const required = ["key_id", "key_secret", "webhook_secret", "account_id"];
+  const required = ["key_id", "key_secret", "webhook_secret"];
   const missing = required.filter((field) => !String(credentials?.[field] || "").trim());
   if (missing.length) {
     throw new Error(`Production Razorpay configuration is incomplete: missing ${missing.join(", ")}`);
