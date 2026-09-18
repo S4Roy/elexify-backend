@@ -112,6 +112,7 @@ export const list = async (req, res, next) => {
                   delivered_at: "$$pkg.delivered_at",
                   cancelled_at: "$$pkg.cancelled_at",
                   item_count: { $size: { $ifNull: ["$$pkg.items", []] } },
+                  items: { $ifNull: ["$$pkg.items", []] },
                 },
               },
             },

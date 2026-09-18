@@ -39,6 +39,10 @@ class OrderResource extends Resource {
         etd: pkg.etd || null,
         tracking_url: pkg.tracking_url || null,
         item_count: pkg.item_count || 0,
+        ...(pkg.items ? { items: pkg.items.map((line) => ({
+          order_item_id: line.order_item_id,
+          quantity: line.quantity,
+        })) } : {}),
         shipped_at: pkg.shipped_at || null,
         delivered_at: pkg.delivered_at || null,
         cancelled_at: pkg.cancelled_at || null,
