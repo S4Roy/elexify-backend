@@ -22,6 +22,9 @@ const descriptor = async (provider) => {
   const definition = PROVIDERS[provider];
   const doc = await IntegrationCredential.findOne({ provider }).select("+credentials");
   const stored = doc?.credentials || new Map();
+  const razorpayKeyId = provider === "razorpay"
+    ? decryptCredential(stored.get("key_id")) || envs.razorpay.key_id || ""
+    : "";
   const fields = Object.fromEntries(definition.fields.map((field) => {
     const configured = stored.has(field);
     const plainValue = configured ? decryptCredential(stored.get(field)) : null;
@@ -39,6 +42,13 @@ const descriptor = async (provider) => {
   return {
     provider, label: definition.label, enabled: doc?.enabled ?? true,
     configured: definition.fields.some((field) => stored.has(field)), fields,
+    ...(provider === "razorpay" ? {
+      mode: razorpayKeyId.startsWith("rzp_live_")
+        ? "live"
+        : razorpayKeyId.startsWith("rzp_test_")
+          ? "test"
+          : "unconfigured",
+    } : {}),
     last_tested_at: doc?.last_tested_at ?? null,
     last_test_status: doc?.last_test_status ?? null,
     last_test_message: doc?.last_test_message ?? null,

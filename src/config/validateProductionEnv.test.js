@@ -27,4 +27,10 @@ describe("production Razorpay configuration", () => {
     expect(() => validateProductionRazorpayConfig({ ...complete, key_id: "rzp_test_example" }, { NODE_ENV: "production" }))
       .toThrow("live-mode key");
   });
+
+  it("rejects test keys for the live storefront even when NODE_ENV is misconfigured", () => {
+    expect(() => validateProductionRazorpayConfig({ ...complete, key_id: "rzp_test_example" }, {
+      NODE_ENV: "development", FRONTEND_URL: "https://new.elexify.online/",
+    })).toThrow("live-mode key");
+  });
 });

@@ -2,7 +2,10 @@
 // fallback) when Razorpay is used. Startup must remain available so an admin
 // can configure the provider on a fresh production installation.
 export const validateProductionRazorpayConfig = (credentials, environment = process.env) => {
-  if (environment.NODE_ENV !== "production") return credentials;
+  const liveStorefront = [environment.FRONTEND_URL, environment.BASE_URL].some((url) =>
+    /^https:\/\/(?:[a-z0-9-]+\.)?elexify\.online(?:[/:]|$)/i.test(String(url || "")),
+  );
+  if (environment.NODE_ENV !== "production" && !liveStorefront) return credentials;
   const required = ["key_id", "key_secret", "webhook_secret", "account_id"];
   const missing = required.filter((field) => !String(credentials?.[field] || "").trim());
   if (missing.length) {

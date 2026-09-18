@@ -15,6 +15,7 @@ import CouponUsage from "../../../../models/CouponUsage.js";
 import ProviderOrderAttempt from "../../../../models/ProviderOrderAttempt.js";
 import { StatusError } from "../../../../config/index.js";
 import { getRazorpayConfig } from "../../../../services/integrationCredentials/razorpay.js";
+import { validateProductionRazorpayConfig } from "../../../../config/validateProductionEnv.js";
 import { createRazorpayOrder } from "../../../../services/paymentService/createRazorpayOrder.js";
 import { validateCoupon } from "../../../../services/inventory/cart/validateCoupon.js";
 import { calculateQuantityDiscount } from "../../../../services/inventory/cart/calculateQuantityDiscount.js";
@@ -354,6 +355,11 @@ const address = await Address.findOne({
     const providerAmount = advanceEnabled ? advanceAmount : grandTotal;
     let preparedRazorpayOrder = null;
     if (payment_method === "razorpay" || advanceEnabled) {
+      // A public production storefront must never create a test-mode provider
+      // order, even if this API process was started with the wrong NODE_ENV.
+      if (/^https:\/\/(?:[a-z0-9-]+\.)?elexify\.online(?:[/:]|$)/i.test(String(req.headers?.origin || ""))) {
+        validateProductionRazorpayConfig(await getRazorpayConfig(), { NODE_ENV: "production" });
+      }
       let ownsProviderCreation = false;
       try {
         providerAttempt = await ProviderOrderAttempt.create({
