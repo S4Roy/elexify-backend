@@ -28,7 +28,7 @@ export const generateProductSEO = async (productId, { actorId = null, overwrite 
       reference_id: product._id,
       reference_type: "products",
       meta_title: product.name,
-      canonical_url: `/product/${product.slug}`,
+      canonical_url: `/product/${product.slug}/`,
     });
   }
 
@@ -52,7 +52,7 @@ export const generateProductSEO = async (productId, { actorId = null, overwrite 
     seo.description_manually_edited = false;
   }
 
-  seo.canonical_url = `/product/${product.slug}`;
+  seo.canonical_url = `/product/${product.slug}/`;
   if (writeTitle || writeDescription) {
     seo.generated = true;
     seo.generated_at = new Date();

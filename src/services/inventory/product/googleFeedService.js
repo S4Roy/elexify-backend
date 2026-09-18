@@ -31,7 +31,7 @@ export const generateGoogleFeedFile = async () => {
       ? product.short_description.replace(/<[^>]+>/g, "").substring(0, 5000)
       : product.name;
 
-    const productLink = `${envs.FRONTEND_URL}/product/${product.slug}`;
+    const productLink = `${envs.FRONTEND_URL.replace(/\/$/, "")}/product/${product.slug}/`;
 
     item.ele("g:id").txt(product.sku || product._id.toString());
     item.ele("g:title").dat(product.name);

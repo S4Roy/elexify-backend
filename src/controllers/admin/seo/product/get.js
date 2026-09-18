@@ -21,7 +21,7 @@ export const get = async (req, res, next) => {
         reference_id: product._id,
         reference_type: "products",
         meta_title: product.name,
-        canonical_url: `/product/${product.slug}`,
+        canonical_url: `/product/${product.slug}/`,
       });
       await Product.findByIdAndUpdate(product._id, { seo: seo._id });
     }

@@ -100,7 +100,7 @@ export const add = async (req, res, next) => {
       reference_type: "products",
       meta_description: meta_description || "",
       meta_keywords: meta_keywords ? meta_keywords.split(",") : [],
-      canonical_url: `/product/${slug}`,
+      canonical_url: `/product/${slug}/`,
       created_by: req.auth.user_id,
     });
     await seo.save();

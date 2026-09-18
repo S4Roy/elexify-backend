@@ -121,7 +121,7 @@ export const edit = async (req, res, next) => {
         ...(meta_title && { meta_title }),
         ...(meta_description && { meta_description }),
         ...(meta_keywords && { meta_keywords: meta_keywords.split(",") }),
-        canonical_url: `/product/${slug}`,
+        canonical_url: `/product/${slug}/`,
         updated_by: req.auth.user_id,
         updated_at: new Date(),
       };

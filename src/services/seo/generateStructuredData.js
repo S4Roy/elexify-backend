@@ -38,7 +38,7 @@ export const generateStructuredData = (product, seo, { baseUrl } = {}) => {
         product.status === "active" && (product.stock_quantity ?? 0) > 0
           ? "https://schema.org/InStock"
           : "https://schema.org/OutOfStock",
-      ...(baseUrl && product.slug ? { url: `${baseUrl}/products/${product.slug}` } : {}),
+      ...(baseUrl && product.slug ? { url: `${baseUrl.replace(/\/$/, "")}/product/${product.slug}/` } : {}),
     };
   }
 
