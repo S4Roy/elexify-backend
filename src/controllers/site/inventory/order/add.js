@@ -97,6 +97,7 @@ export const add = async (req, res, next) => {
       }
       const providerOrderId = replayedOrder.payment_meta?.razorpay_order_id;
       const replayedAmount = replayedOrder.is_partial_cod ? replayedOrder.advance_amount : replayedOrder.grand_total;
+      const checkoutKeyId = providerOrderId ? (await getRazorpayConfig()).key_id : null;
       return res.status(200).json({
         status: "success",
         message: "Order already placed",
@@ -105,7 +106,7 @@ export const add = async (req, res, next) => {
           items: await OrderItem.find({ order_id: replayedOrder._id }),
           providerResponse: providerOrderId ? {
             provider: "razorpay",
-            data: { id: providerOrderId, amount: Math.round(replayedAmount * 100), currency: replayedOrder.currency },
+            data: { id: providerOrderId, amount: Math.round(replayedAmount * 100), currency: replayedOrder.currency, checkout_key_id: checkoutKeyId },
           } : null,
         },
       });
@@ -326,6 +327,7 @@ const address = await Address.findOne({
       }
       const providerOrderId = existingOrder.payment_meta?.razorpay_order_id;
       const existingAmount = existingOrder.is_partial_cod ? existingOrder.advance_amount : existingOrder.grand_total;
+      const checkoutKeyId = providerOrderId ? (await getRazorpayConfig()).key_id : null;
       return res.status(200).json({
         status: "success",
         message: "Order already placed",
@@ -334,7 +336,7 @@ const address = await Address.findOne({
           items: await OrderItem.find({ order_id: existingOrder._id }),
           providerResponse: providerOrderId ? {
             provider: "razorpay",
-            data: { id: providerOrderId, amount: Math.round(existingAmount * 100), currency: existingOrder.currency },
+            data: { id: providerOrderId, amount: Math.round(existingAmount * 100), currency: existingOrder.currency, checkout_key_id: checkoutKeyId },
           } : null,
         },
       });
