@@ -1,0 +1,46 @@
+import { describe, expect, it } from "vitest";
+import { buildPackagePayload, resolveBillingAddress } from "./buildPackagePayload.js";
+
+const baseOrder = {
+  id: "ORD-123",
+  created_at: "2026-09-19T08:00:00.000Z",
+  payment_method: "razorpay",
+  grand_total: 100,
+  order_items: [{ _id: "item-1", display_name: "Part", sku: "P-1", quantity: 1, unit_price: 100 }],
+};
+
+const build = (order_data) => buildPackagePayload({
+  order_data: { ...baseOrder, ...order_data },
+  shiprocketConfig: { pickup_location: "Warehouse" },
+  pkg: { package_number: 1, items: [{ order_item_id: "item-1", quantity: 1 }] },
+  dims: { length: 10, width: 10, height: 10, weight: 0.5 },
+});
+
+describe("Shiprocket package address", () => {
+  it("uses the order-time billing snapshot when the live address is missing", () => {
+    const payload = build({
+      billing_address: null,
+      billing_address_snapshot: {
+        full_name: "Customer", address_line_1: "12 Market Road", city: "Kolkata",
+        state: "West Bengal", country: "India", postcode: "700001", phone: "9876543210",
+      },
+    });
+
+    expect(payload).toMatchObject({
+      billing_address: "12 Market Road", billing_city: "Kolkata",
+      billing_state: "West Bengal", billing_pincode: "700001", billing_phone: "9876543210",
+    });
+  });
+
+  it("uses the shipping address when no billing address or snapshot exists", () => {
+    const payload = build({
+      shipping_address: {
+        full_name: "Customer", address_line_1: "4 Station Road", city_name: "Delhi",
+        state_name: "Delhi", postcode: "110001", phone: "9876543210",
+      },
+    });
+    expect(payload.billing_address).toBe("4 Station Road");
+    expect(payload.billing_city).toBe("Delhi");
+    expect(resolveBillingAddress(baseOrder)).toBeNull();
+  });
+});

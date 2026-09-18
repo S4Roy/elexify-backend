@@ -4,7 +4,7 @@ import OrderItem from "../../../models/OrderItem.js";
 import Package from "../../../models/Package.js";
 import { StatusError, envs } from "../../../config/index.js";
 import { getIntegrationConfig } from "../../integrationCredentials/index.js";
-import { buildPackagePayload, resolvePackageDims, extractShiprocketIds } from "./buildPackagePayload.js";
+import { buildPackagePayload, resolveBillingAddress, resolvePackageDims, extractShiprocketIds } from "./buildPackagePayload.js";
 import { recomputeOrderStatus } from "./recomputeOrderStatus.js";
 
 // Orders in these statuses have nothing left to ship or can never be
@@ -39,6 +39,14 @@ export const createAndShipPackage = async ({
 
   const shiprocketConfig = await getIntegrationConfig("shiprocket", { channel_id: envs.shiprocket?.channel_id });
   if (!shiprocketConfig) throw StatusError.serviceUnavailable("Shiprocket integration is disabled");
+
+  // Validate before allocating stock to a package. An order with no usable
+  // address cannot be submitted to Shiprocket and should remain unpacked.
+  const { inventoryService, shiprocket, notificationService } = await import("../../index.js");
+  const order_data = await inventoryService.orderService.details(order._id);
+  if (!resolveBillingAddress(order_data)) {
+    throw StatusError.badRequest("This order has no billing or shipping address for the shipment.");
+  }
 
   let pkg;
   const dbSession = await mongoose.startSession();
@@ -145,9 +153,6 @@ export const createAndShipPackage = async ({
   // ── Outside the transaction: the external Shiprocket call ──────────────
   // Re-read with the full product/address enrichment needed to build the
   // Shiprocket payload, same helper shipping.js already used.
-  const { inventoryService, shiprocket, notificationService } = await import("../../index.js");
-  const order_data = await inventoryService.orderService.details(order._id);
-
   const payload = buildPackagePayload({
     order_data,
     shiprocketConfig,

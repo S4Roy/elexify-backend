@@ -2,7 +2,7 @@ import mongoose from "mongoose";
 import Package from "../../../models/Package.js";
 import { StatusError, envs } from "../../../config/index.js";
 import { getIntegrationConfig } from "../../integrationCredentials/index.js";
-import { buildPackagePayload, extractShiprocketIds } from "./buildPackagePayload.js";
+import { buildPackagePayload, resolveBillingAddress, extractShiprocketIds } from "./buildPackagePayload.js";
 import { recomputeOrderStatus } from "./recomputeOrderStatus.js";
 
 // Re-attempts the Shiprocket call for an existing failed/unknown package —
@@ -17,6 +17,12 @@ export const retryPackageShipment = async ({ packageId }) => {
     throw StatusError.conflict("Only a failed or unreconciled package can be retried.");
   }
 
+  const { inventoryService, shiprocket, notificationService } = await import("../../index.js");
+  const order_data = await inventoryService.orderService.details(pkg.order_id);
+  if (!resolveBillingAddress(order_data)) {
+    throw StatusError.badRequest("This order has no billing or shipping address for the shipment.");
+  }
+
   // Atomically claim this package for a retry attempt, so a double-click
   // or concurrent retry can't both call Shiprocket for the same package.
   const claimed = await Package.findOneAndUpdate(
@@ -28,9 +34,6 @@ export const retryPackageShipment = async ({ packageId }) => {
 
   const shiprocketConfig = await getIntegrationConfig("shiprocket", { channel_id: envs.shiprocket?.channel_id });
   if (!shiprocketConfig) throw StatusError.serviceUnavailable("Shiprocket integration is disabled");
-
-  const { inventoryService, shiprocket, notificationService } = await import("../../index.js");
-  const order_data = await inventoryService.orderService.details(claimed.order_id);
 
   const payload = buildPackagePayload({
     order_data,

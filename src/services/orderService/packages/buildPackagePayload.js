@@ -15,9 +15,24 @@ import { envs } from "../../../config/index.js";
 // Amounts are rounded per package (may be off by a few cents across
 // packages in total, which is an acceptable, common real-world rounding
 // tolerance for cash-on-delivery collection).
+// Address refs can disappear or be incomplete after placement. Prefer the
+// live address, then the order-time snapshot, then the shipping address.
+export const resolveBillingAddress = (order_data) => {
+  const billingCandidates = [
+    order_data.billing_address,
+    order_data.billing_address_snapshot,
+    order_data.shipping_address,
+    order_data.shipping_address_snapshot,
+  ];
+  return billingCandidates.find((address) => address?.address_line_1?.trim()) || null;
+};
+
 export const buildPackagePayload = ({ order_data, shiprocketConfig, pkg, pickupLocation, dims }) => {
-  const billing = order_data.billing_address || {};
-  const shippingAddr = order_data.shipping_address || {};
+  const billing = resolveBillingAddress(order_data) || {};
+  const shippingAddr = [order_data.shipping_address, order_data.shipping_address_snapshot]
+    .find((address) => address?.address_line_1?.trim()) || billing;
+  const placeName = (value, fallback) =>
+    (typeof value === "object" ? value?.name : typeof value === "string" ? value : null) || fallback || "";
   const shippingEmpty =
     !shippingAddr || !shippingAddr.address_line_1 || !shippingAddr.city?.name || !shippingAddr.postcode;
   const shipping_is_billing = !!order_data.shipping_is_billing;
@@ -62,16 +77,16 @@ export const buildPackagePayload = ({ order_data, shiprocketConfig, pkg, pickupL
     pickup_location: (pickupLocation && String(pickupLocation).trim()) || shiprocketConfig.pickup_location || envs.PROJECT_NAME,
     ...(shiprocketConfig.channel_id ? { channel_id: shiprocketConfig.channel_id } : {}),
     comment: order_data.note || order_data.comment || "",
-    billing_customer_name: billing.full_name,
+    billing_customer_name: billing.full_name || shippingAddr.full_name || order_data.user?.name || "",
     billing_last_name: billing.last_name || "",
-    billing_address: billing.address_line_1,
+    billing_address: billing.address_line_1 || "",
     billing_address_2: billing.address_line_2 || "",
-    billing_city: billing.city?.name,
-    billing_pincode: String(billing.postcode),
-    billing_state: billing.state?.name,
-    billing_country: billing.country?.name || "India",
+    billing_city: placeName(billing.city, billing.city_name),
+    billing_pincode: String(billing.postcode || ""),
+    billing_state: placeName(billing.state, billing.state_name),
+    billing_country: placeName(billing.country, billing.country_name) || "India",
     billing_email: billing.email || order_data.user?.email || "",
-    billing_phone: String(billing.phone),
+    billing_phone: String(billing.phone || shippingAddr.phone || ""),
     shipping_is_billing: true,
     shipping_customer_name: "",
     shipping_last_name: "",
@@ -113,10 +128,10 @@ export const buildPackagePayload = ({ order_data, shiprocketConfig, pkg, pickupL
     payload.shipping_last_name = shippingAddr.last_name || "";
     payload.shipping_address = shippingAddr.address_line_1 || payload.billing_address;
     payload.shipping_address_2 = shippingAddr.address_line_2 || "";
-    payload.shipping_city = shippingAddr.city?.name || payload.billing_city;
+    payload.shipping_city = placeName(shippingAddr.city, shippingAddr.city_name) || payload.billing_city;
     payload.shipping_pincode = String(shippingAddr.postcode || payload.billing_pincode);
-    payload.shipping_state = shippingAddr.state?.name || payload.billing_state;
-    payload.shipping_country = shippingAddr.country?.name || payload.billing_country;
+    payload.shipping_state = placeName(shippingAddr.state, shippingAddr.state_name) || payload.billing_state;
+    payload.shipping_country = placeName(shippingAddr.country, shippingAddr.country_name) || payload.billing_country;
     payload.shipping_email = shippingAddr.email || payload.billing_email;
     payload.shipping_phone = String(shippingAddr.phone || payload.billing_phone);
   }
