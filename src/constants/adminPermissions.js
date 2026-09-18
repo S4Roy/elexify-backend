@@ -23,6 +23,7 @@ export const PERMISSIONS = {
   ZOHO_INVOICE_MANAGE: "zoho_invoice.manage",
   RETURN_VIEW: "return.view",
   RETURN_REVIEW: "return.review",
+  ORDER_STATUS_MANAGE: "order.status.manage",
 
   // Centralized Data Operations (seeders/migrations/backfills/repairs) —
   // see routes/admin/dataOperations.js and scripts/runner.js. View
@@ -68,6 +69,7 @@ export const ROLE_PERMISSIONS = {
     PERMISSIONS.ZOHO_INVOICE_MANAGE,
     PERMISSIONS.RETURN_VIEW,
     PERMISSIONS.RETURN_REVIEW,
+    PERMISSIONS.ORDER_STATUS_MANAGE,
     // View-only for Data Operations — no execute permissions, matching the
     // existing "view-only for non-superadmin" pattern used elsewhere in
     // this file. Adjustable later if a manager role needs to run LOW-risk

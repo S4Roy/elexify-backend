@@ -9,6 +9,7 @@ import { leaderboard } from "./leaderboard.js";
 import { geoStats } from "./geoStats.js";
 import { shipping } from "./shipping.js";
 import { cancel } from "./cancel.js";
+import { updateStatus } from "./updateStatus.js";
 import { retryRefund } from "./retryRefund.js";
 import { invoice } from "./invoice.js";
 import { zohoInvoiceStatus, syncZohoInvoice } from "./zohoInvoice.js";
@@ -27,6 +28,7 @@ export {
   geoStats,
   shipping,
   cancel,
+  updateStatus,
   retryRefund,
   invoice,
   zohoInvoiceStatus,

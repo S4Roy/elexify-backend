@@ -609,6 +609,7 @@ export const list = async (req, res, next) => {
       const result = await Order.aggregate(pipeline);
       if (!result.length) throw StatusError.notFound(req.__("Order not found"));
       data = new OrderResource(result[0]).exec();
+      data.manual_status_history = result[0].manual_status_history || [];
     } else {
       const agg = Order.aggregate(pipeline);
       const result = await Order.aggregatePaginate(agg, options);

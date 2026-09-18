@@ -76,6 +76,13 @@ const OrderSchema = new Schema(
     idempotency_fingerprint: { type: String, default: null },
     idempotency_fingerprint_version: { type: Number, default: 1 },
     payment_meta: { type: Object, default: {} }, // optional Razorpay response etc.
+    manual_status_history: [{
+      from: String,
+      to: String,
+      reason: String,
+      changed_by: { type: Schema.Types.ObjectId, ref: "users" },
+      changed_at: { type: Date, default: Date.now },
+    }],
 
     coupon_code: { type: String },
     shiprocket_order_id: { type: String },

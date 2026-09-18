@@ -48,6 +48,17 @@ orderRouter.post(
   inventoryController.orderController.cancel
 );
 orderRouter.post(
+  "/status",
+  requirePermission(PERMISSIONS.ORDER_STATUS_MANAGE),
+  celebrate({ body: Joi.object({
+    order_id: Joi.string().hex().length(24).required(),
+    expected_status: Joi.string().required(),
+    status: Joi.string().valid("pending", "confirmed", "processing", "packed", "shipped", "out_for_delivery", "delivered", "failed").required(),
+    reason: Joi.string().trim().min(10).max(500).required(),
+  }) }),
+  inventoryController.orderController.updateStatus,
+);
+orderRouter.post(
   "/refund/retry",
   inventoryValidation.orderValidation.retryRefund,
   inventoryController.orderController.retryRefund
