@@ -206,6 +206,8 @@ export const getOrGenerateInvoice = async ({ orderId, actorType }) => {
     coupon_discount: hasStoredFinancials ? storedCouponTotal : order.discount || 0,
     shipping: hasStoredFinancials ? storedShippingTotal : order.shipping || 0,
     cod_fee: order.cod_fee || 0,
+    advance_amount: order.advance_amount || 0,
+    cod_due_amount: order.cod_due_amount || 0,
     tax_total: hasStoredFinancials ? storedTaxTotal : (gst.isGstApplicable ? gst.taxAmount : 0),
     grand_total: order.grand_total,
     amount_in_words: amountInWords(order.grand_total),
@@ -223,6 +225,7 @@ export const getOrGenerateInvoice = async ({ orderId, actorType }) => {
     order_date: order.created_at,
     payment_method: order.payment_method,
     payment_status: order.payment_status,
+    is_partial_cod: order.is_partial_cod || false,
     currency: order.currency || "INR",
 
     billing_address: billingAddress,

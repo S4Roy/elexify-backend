@@ -20,6 +20,9 @@ class OrderResource extends Resource {
       cod_fee: this.cod_fee || 0,
       discount: this.discount || 0,
       grand_total: this.grand_total || 0,
+      is_partial_cod: this.is_partial_cod || false,
+      advance_amount: this.advance_amount || 0,
+      cod_due_amount: this.cod_due_amount || 0,
       payment_method: this.payment_method || null,
       user: this.user ? new UserResource(this.user).exec() : null,
       billing_address: this.billing_address

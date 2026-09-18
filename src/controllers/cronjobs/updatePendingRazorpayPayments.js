@@ -6,7 +6,7 @@ import { getRazorpayConfig } from "../../services/integrationCredentials/razorpa
 export const updatePendingRazorpayPayments = async () => {
   const credentials = await getRazorpayConfig();
   const pendingOrders = await Order.find({
-    order_status: "pending", payment_status: "pending", payment_method: "razorpay",
+    order_status: "pending", payment_status: "pending", payment_method: { $in: ["razorpay", "cod"] },
     "payment_meta.razorpay_order_id": { $ne: null },
   });
   const now = new Date();

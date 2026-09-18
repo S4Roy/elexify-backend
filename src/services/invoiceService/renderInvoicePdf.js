@@ -44,7 +44,22 @@ const addressLines = (address) => {
   ].filter(Boolean);
 };
 
-const paymentMethodLabel = (method) => {
+// Percentage is derived from the invoice's own stored amounts, not the
+// live admin-configured setting, so a snapshot always shows what was
+// actually charged even if the percentage changes later.
+const partialCodPercentages = (invoice) => {
+  const advancePercent = invoice.totals?.grand_total
+    ? Math.round((invoice.totals.advance_amount / invoice.totals.grand_total) * 100)
+    : 0;
+  return { advancePercent, duePercent: 100 - advancePercent };
+};
+
+const paymentMethodLabel = (invoice) => {
+  const method = invoice.payment_method;
+  if (invoice.is_partial_cod) {
+    const { advancePercent, duePercent } = partialCodPercentages(invoice);
+    return `Partial COD – ${advancePercent}% Paid, ${duePercent}% Due on Delivery`;
+  }
   if (method === "cod") return "Cash on Delivery";
   if (method === "razorpay") return "Online Payment (Razorpay)";
   return method || "-";
@@ -54,6 +69,7 @@ const paymentMethodLabel = (method) => {
 // its payment_status stays "pending" on the order/invoice snapshot itself,
 // this only controls the display label.
 const paymentStatusLabel = (invoice) => {
+  if (invoice.payment_status === "advance_paid") return "Advance Paid";
   if (invoice.payment_method === "cod") return "Cash on Delivery";
   if (invoice.payment_status === "paid") return "Paid";
   if (invoice.payment_status === "refunded") return "Refunded";
@@ -138,7 +154,7 @@ export const renderInvoicePdf = (invoice) =>
         ["Invoice Date", fmtDate(invoice.invoice_date)],
         ["Order No", invoice.order_number],
         ["Order Date", fmtDate(invoice.order_date)],
-        ["Payment Method", paymentMethodLabel(invoice.payment_method)],
+        ["Payment Method", paymentMethodLabel(invoice)],
         ["Payment Status", paymentStatusLabel(invoice)],
       ];
       let metaY = infoTop;
@@ -264,7 +280,18 @@ export const renderInvoicePdf = (invoice) =>
     doc.font("Helvetica-Bold").fontSize(10);
     doc.text("Grand Total", totalsLabelX, cursorY, { width: 110 });
     doc.text(inr(totals.grand_total, currency), totalsValueX, cursorY, { width: 100, align: "right" });
-    cursorY += 24;
+    cursorY += 18;
+
+    if (invoice.is_partial_cod) {
+      doc.font("Helvetica").fontSize(9);
+      doc.text("Advance Paid", totalsLabelX, cursorY, { width: 110 });
+      doc.text(inr(totals.advance_amount, currency), totalsValueX, cursorY, { width: 100, align: "right" });
+      cursorY += 14;
+      doc.text("Balance Due (COD)", totalsLabelX, cursorY, { width: 110 });
+      doc.text(inr(totals.cod_due_amount, currency), totalsValueX, cursorY, { width: 100, align: "right" });
+      cursorY += 14;
+    }
+    cursorY += 6;
 
     if (invoice.is_gst_applicable) {
       doc.font("Helvetica").fontSize(8).text(

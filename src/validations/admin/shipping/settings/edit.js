@@ -23,6 +23,8 @@ export const edit = celebrate({
     cod_max_order: Joi.number().min(0).optional().allow(null),
     cod_charge_enabled: Joi.boolean().optional(),
     cod_charge: Joi.number().min(0).optional(),
+    cod_advance_enabled: Joi.boolean().optional(),
+    cod_advance_percent: Joi.number().min(0).max(100).optional(),
     cod_allowed_pincodes: Joi.array().items(Joi.string().pattern(/^\d{6}$/)).optional(),
     cod_disallowed_pincodes: Joi.array().items(Joi.string().pattern(/^\d{6}$/)).optional(),
     cod_disallowed_categories: Joi.array().items(Joi.string().hex().length(24)).optional(),

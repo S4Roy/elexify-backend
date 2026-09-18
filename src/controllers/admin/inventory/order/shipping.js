@@ -107,6 +107,24 @@ export const shipping = async (req, res, next) => {
       !shipping.postcode;
     const shipping_is_billing = !!order_data.shipping_is_billing;
 
+    // Amount Shiprocket should actually record/collect for this order: the
+    // outstanding COD balance for a Partial COD order, otherwise the full
+    // order total (unchanged for prepaid and regular full-COD orders).
+    const codCollectibleAmount = Number(
+      order_data.is_partial_cod
+        ? order_data.cod_due_amount
+        : order_data.grand_total ||
+            order_data.sub_total ||
+            order_data.subtotal ||
+            0
+    );
+    const shippingChargesValue = Number(
+      order_data.shipping_charges || order_data.shipping || 0
+    );
+    const giftwrapChargesValue = Number(order_data.giftwrap_charges || 0);
+    const transactionChargesValue = Number(order_data.transaction_charges || 0);
+    const discountValue = Number(order_data.discount || 0);
+
     // Build payload
     const payload = {
       order_id: order_data.id || order_data._id || `ORD-${Date.now()}`,
@@ -166,17 +184,29 @@ export const shipping = async (req, res, next) => {
         .includes("cod")
         ? "COD"
         : "Prepaid",
-      shipping_charges: Number(
-        order_data.shipping_charges || order_data.shipping || 0
-      ),
-      giftwrap_charges: Number(order_data.giftwrap_charges || 0),
-      transaction_charges: Number(order_data.transaction_charges || 0),
-      total_discount: Number(order_data.discount || 0),
-      sub_total: Number(
-        order_data.grand_total ||
-          order_data.sub_total ||
-          order_data.subtotal ||
-          0
+      shipping_charges: shippingChargesValue,
+      giftwrap_charges: giftwrapChargesValue,
+      transaction_charges: transactionChargesValue,
+      total_discount: discountValue,
+      // Shiprocket's public order-creation API has no dedicated "advance
+      // already collected" field — for a Partial COD order, the collectible
+      // COD amount is the outstanding balance, not the full order value.
+      // (order_data.is_partial_cod check comes first and short-circuits
+      // even when cod_due_amount is legitimately 0.) Shiprocket itself computes
+      // the order's total/collectible value as
+      // sub_total + shipping_charges + giftwrap_charges + transaction_charges
+      // - total_discount — so sub_total must be solved backwards from the
+      // amount we actually want collected/recorded, not set to that amount
+      // directly. Setting sub_total to the full amount while also sending the
+      // real shipping_charges (as this previously did) double-counts shipping
+      // on Shiprocket's side.
+      sub_total: Math.max(
+        0,
+        codCollectibleAmount -
+          shippingChargesValue -
+          giftwrapChargesValue -
+          transactionChargesValue +
+          discountValue
       ),
       length: String(Math.round(finalLength)),
       breadth: String(Math.round(finalWidth)),

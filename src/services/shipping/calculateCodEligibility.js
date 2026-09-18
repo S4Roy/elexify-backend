@@ -95,5 +95,13 @@ export const calculateCodEligibility = async ({
   const fee = settings.cod_charge_enabled
     ? Number((Number(settings.cod_charge || 0) * exchangeRate).toFixed(2))
     : 0;
-  return { eligible: true, fee, reason: null, code: "ELIGIBLE", ...limits };
+  return {
+    eligible: true,
+    fee,
+    reason: null,
+    code: "ELIGIBLE",
+    ...limits,
+    advance_enabled: Boolean(settings.cod_advance_enabled),
+    advance_percent: Number(settings.cod_advance_percent || 0),
+  };
 };

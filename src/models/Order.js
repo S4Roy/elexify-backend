@@ -57,6 +57,15 @@ const OrderSchema = new Schema(
     cod_fee: { type: Number, default: 0 },
     grand_total: { type: Number, required: true },
 
+    // Partial COD: an online advance is required up front, the rest is
+    // collected as Cash on Delivery. is_partial_cod is the single flag
+    // every downstream consumer (Shiprocket payload, invoice, email, admin/
+    // storefront display) branches on; advance_amount + cod_due_amount
+    // always sum to grand_total for these orders and are otherwise 0.
+    is_partial_cod: { type: Boolean, default: false },
+    advance_amount: { type: Number, default: 0 },
+    cod_due_amount: { type: Number, default: 0 },
+
     payment_method: {
       type: String,
       enum: PAYMENT_METHOD_VALUES,

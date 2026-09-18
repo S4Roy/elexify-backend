@@ -97,7 +97,8 @@ const PARTIALS = {
 
   // {{> orderSummaryCard}} — expects order_number, order_date, payment_method_label,
   // payment_status_label, order_status_label, items[], subtotal, discount,
-  // coupon_code, shipping, grand_total (all pre-formatted strings/numbers on
+  // coupon_code, shipping, grand_total, and (Partial COD only) is_partial_cod,
+  // advance_amount, cod_due_amount (all pre-formatted strings/numbers on
   // the render context; `currency` helper formats numeric amounts).
   orderSummaryCard: `
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:16px 0;border:1px solid ${COLORS.border};border-radius:8px;">
@@ -130,6 +131,10 @@ const PARTIALS = {
         {{#if discount}}<tr><td style="padding:2px 0;color:${COLORS.muted};">Discount{{#if coupon_code}} ({{coupon_code}}){{/if}}</td><td style="padding:2px 0;text-align:right;color:${COLORS.text};">-{{currency discount}}</td></tr>{{/if}}
         {{#if shipping}}<tr><td style="padding:2px 0;color:${COLORS.muted};">Shipping</td><td style="padding:2px 0;text-align:right;color:${COLORS.text};">{{currency shipping}}</td></tr>{{/if}}
         <tr><td style="padding:8px 0 0 0;border-top:1px solid ${COLORS.border};font-weight:bold;color:${COLORS.text};">Grand Total</td><td style="padding:8px 0 0 0;border-top:1px solid ${COLORS.border};text-align:right;font-weight:bold;color:${COLORS.text};">{{currency grand_total}}</td></tr>
+        {{#if is_partial_cod}}
+        <tr><td style="padding:4px 0 0 0;color:${COLORS.muted};">Advance Paid</td><td style="padding:4px 0 0 0;text-align:right;color:${COLORS.text};">{{currency advance_amount}}</td></tr>
+        <tr><td style="padding:2px 0;color:${COLORS.muted};">Balance Due (COD)</td><td style="padding:2px 0;text-align:right;color:${COLORS.text};">{{currency cod_due_amount}}</td></tr>
+        {{/if}}
         {{#if refund_amount}}<tr><td style="padding:8px 0 0 0;color:${COLORS.muted};">Refund Amount</td><td style="padding:8px 0 0 0;text-align:right;font-weight:bold;color:${COLORS.text};">{{currency refund_amount}}</td></tr>{{/if}}
       </table>
     </td>

@@ -23,6 +23,13 @@ const ShippingSettingsSchema = new Schema(
     cod_max_order: { type: Number, min: 0, default: null },
     cod_charge_enabled: { type: Boolean, default: false },
     cod_charge: { type: Number, min: 0, default: 0 },
+    // Partial COD: require an online advance before a COD order is
+    // confirmed, with the remainder collected as Cash on Delivery. Defaults
+    // to off — an admin must explicitly opt in from Settings > Shipping
+    // Settings; this must never silently change checkout behavior for a
+    // store that hasn't configured it.
+    cod_advance_enabled: { type: Boolean, default: false },
+    cod_advance_percent: { type: Number, min: 0, max: 100, default: 20 },
     cod_allowed_pincodes: { type: [String], default: [] },
     cod_disallowed_pincodes: { type: [String], default: [] },
     cod_disallowed_categories: [{ type: Types.ObjectId, ref: "categories" }],

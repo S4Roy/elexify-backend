@@ -96,6 +96,7 @@ export const add = async (req, res, next) => {
         throw StatusError.conflict("Idempotency key was already used for a different checkout request");
       }
       const providerOrderId = replayedOrder.payment_meta?.razorpay_order_id;
+      const replayedAmount = replayedOrder.is_partial_cod ? replayedOrder.advance_amount : replayedOrder.grand_total;
       return res.status(200).json({
         status: "success",
         message: "Order already placed",
@@ -104,7 +105,7 @@ export const add = async (req, res, next) => {
           items: await OrderItem.find({ order_id: replayedOrder._id }),
           providerResponse: providerOrderId ? {
             provider: "razorpay",
-            data: { id: providerOrderId, amount: Math.round(replayedOrder.grand_total * 100), currency: replayedOrder.currency },
+            data: { id: providerOrderId, amount: Math.round(replayedAmount * 100), currency: replayedOrder.currency },
           } : null,
         },
       });
@@ -273,8 +274,9 @@ const address = await Address.findOne({
       (sub_total - discountAmount + shippingAmount).toFixed(2),
     );
     let codFee = 0;
+    let cod = null;
     if (payment_method === "cod") {
-      const cod = await calculateCodEligibility({
+      cod = await calculateCodEligibility({
         items: items.map((item) => ({
           product: item.cart_ref.product,
           variation: item.cart_ref.variation,
@@ -301,6 +303,21 @@ const address = await Address.findOne({
       );
     }
 
+    // ── Partial COD ──────────────────────────────────────────────────────────
+    // COD orders require an admin-configurable online advance (default 20%,
+    // see ShippingSettings.cod_advance_percent) before they're confirmed —
+    // the remaining balance is collected as Cash on Delivery. Reuses the
+    // exact same Razorpay order-creation/verification/webhook/refund
+    // pipeline as a normal prepaid order, just for advanceAmount instead of
+    // grandTotal (see finalizeCapturedPayment.js and cancelOrder.js).
+    const advanceEnabled = payment_method === "cod" && Boolean(cod?.advance_enabled);
+    const advanceAmount = advanceEnabled
+      ? parseFloat((grandTotal * (cod.advance_percent / 100)).toFixed(2))
+      : 0;
+    const codDueAmount = advanceEnabled
+      ? parseFloat((grandTotal - advanceAmount).toFixed(2))
+      : 0;
+
     // ── Create order ─────────────────────────────────────────────────────────
     const existingOrder = await Order.findOne({ user: user._id, idempotency_key });
     if (existingOrder) {
@@ -308,6 +325,7 @@ const address = await Address.findOne({
         throw StatusError.conflict("Idempotency key was already used for a different checkout request");
       }
       const providerOrderId = existingOrder.payment_meta?.razorpay_order_id;
+      const existingAmount = existingOrder.is_partial_cod ? existingOrder.advance_amount : existingOrder.grand_total;
       return res.status(200).json({
         status: "success",
         message: "Order already placed",
@@ -316,7 +334,7 @@ const address = await Address.findOne({
           items: await OrderItem.find({ order_id: existingOrder._id }),
           providerResponse: providerOrderId ? {
             provider: "razorpay",
-            data: { id: providerOrderId, amount: Math.round(existingOrder.grand_total * 100), currency: existingOrder.currency },
+            data: { id: providerOrderId, amount: Math.round(existingAmount * 100), currency: existingOrder.currency },
           } : null,
         },
       });
@@ -329,8 +347,11 @@ const address = await Address.findOne({
     // requests don't burn a sequence number on every retry.
     const order_id = await nextOrderNumber();
 
+    // A Partial COD order needs the same provider-order gate as prepaid —
+    // just for the advance amount rather than the full total.
+    const providerAmount = advanceEnabled ? advanceAmount : grandTotal;
     let preparedRazorpayOrder = null;
-    if (payment_method === "razorpay") {
+    if (payment_method === "razorpay" || advanceEnabled) {
       let ownsProviderCreation = false;
       try {
         providerAttempt = await ProviderOrderAttempt.create({
@@ -339,7 +360,7 @@ const address = await Address.findOne({
           request_fingerprint: requestFingerprint,
           local_order_id: order_id,
           provider: "razorpay",
-          amount: grandTotal,
+          amount: providerAmount,
           currency,
         });
         ownsProviderCreation = true;
@@ -376,7 +397,7 @@ const address = await Address.findOne({
             receipt: providerAttempt.local_order_id,
           };
         } else {
-          preparedRazorpayOrder = await createRazorpayOrder(grandTotal, currency, order_id);
+          preparedRazorpayOrder = await createRazorpayOrder(providerAmount, currency, order_id);
           providerOrderCreated = true;
           // Test-only fault boundary for the irreducible provider/local
           // persistence gap. injectPlacementFault is inert unless NODE_ENV is
@@ -402,12 +423,15 @@ const address = await Address.findOne({
       billing_address_snapshot: snapshotAddress(address),
       shipping_address_snapshot: snapshotAddress(address),
       payment_status: "pending",
-      order_status: payment_method === "cod" ? "confirmed" : "pending",
+      order_status: payment_method === "cod" && !advanceEnabled ? "confirmed" : "pending",
       total_amount: sub_total,
       discount: discountAmount,
       shipping: shippingAmount,
       cod_fee: codFee,
       grand_total: grandTotal,
+      is_partial_cod: advanceEnabled,
+      advance_amount: advanceAmount,
+      cod_due_amount: codDueAmount,
       currency,
       payment_method,
       transaction_id: `EXT-${order_id}`,
@@ -485,11 +509,12 @@ const address = await Address.findOne({
     await injectPlacementFault(req, "order_item_creation");
 
     // ── COD stock reservation ───────────────────────────────────────────────
-    // COD orders have no separate payment-confirmation step (unlike
-    // Razorpay, which reserves stock once payment clears), so the order is
-    // fully accepted the moment it's placed — stock
-    // must be decremented here, or a COD order never reserves inventory at all.
-    if (payment_method === "cod") {
+    // Only a full-COD order (no advance required, e.g. the admin has
+    // disabled Partial COD) has no separate payment-confirmation step, so
+    // stock must be decremented here or it would never reserve inventory at
+    // all. A Partial COD order behaves like prepaid — stock is reserved in
+    // finalizeCapturedPayment.js once the advance actually clears.
+    if (payment_method === "cod" && !advanceEnabled) {
       for (const item of items) {
         if (item.variation_id) {
           const result = await ProductVariation.updateOne(
@@ -570,7 +595,7 @@ const address = await Address.findOne({
     // ── Payment ──────────────────────────────────────────────────────────────
     let providerResponse = null;
 
-    if (payment_method === "razorpay") {
+    if (payment_method === "razorpay" || advanceEnabled) {
       await Order.findOneAndUpdate(
         { id: order_id },
         {
@@ -675,7 +700,7 @@ const address = await Address.findOne({
               provider: "razorpay",
               data: {
                 id: existing.payment_meta.razorpay_order_id,
-                amount: Math.round(existing.grand_total * 100),
+                amount: Math.round((existing.is_partial_cod ? existing.advance_amount : existing.grand_total) * 100),
                 currency: existing.currency,
                 checkout_key_id: checkoutKeyId,
               },

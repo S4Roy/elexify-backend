@@ -4,8 +4,12 @@ import { canTransitionOrder } from "../../constants/orderStatus.js";
 import { recordOperationalEvent } from "../observability/recordOperationalEvent.js";
 
 const PAYMENT_TRANSITIONS = {
-  pending: ["paid", "failed"],
+  pending: ["paid", "advance_paid", "failed"],
   failed: ["paid"],
+  // advance_paid: Partial COD order whose online advance cleared. Moves to
+  // "paid" once the COD balance is collected on delivery, or refunds like
+  // any other cleared payment if the order is cancelled first.
+  advance_paid: ["paid", "refund_pending", "refunded", "refund_failed"],
   paid: ["refund_pending", "partially_refunded", "refunded", "refund_failed"],
   refund_pending: ["refunded", "partially_refunded", "refund_failed"],
   refund_failed: ["refund_pending", "refunded"],

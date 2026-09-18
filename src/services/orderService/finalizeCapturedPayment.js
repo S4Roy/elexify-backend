@@ -13,8 +13,18 @@ import { getRazorpayConfig } from "../integrationCredentials/razorpay.js";
 
 const normalize = (value) => String(value || "").toUpperCase();
 
+// A captured payment finalizes to PAID for a normal prepaid order, or to
+// ADVANCE_PAID for a Partial COD order (the balance is still Cash on
+// Delivery) — both are terminal "online leg cleared" states for the
+// purposes of idempotency/replay short-circuiting below.
+const isPaymentClearedStatus = (status) =>
+  status === PAYMENT_STATUS.PAID || status === PAYMENT_STATUS.ADVANCE_PAID;
+
 export const validateCapturedPayment = (order, payment, configuredAccount = envs.razorpay.account_id) => {
-  const expectedAmount = Math.round(Number(order.grand_total) * 100);
+  // Partial COD orders only collect the advance online — the remaining
+  // balance is Cash on Delivery, so the captured amount must match
+  // advance_amount, not the full order value.
+  const expectedAmount = Math.round(Number(order.is_partial_cod ? order.advance_amount : order.grand_total) * 100);
   if (
     !payment?.id ||
     payment.order_id !== order.payment_meta?.razorpay_order_id ||
@@ -35,7 +45,9 @@ export const finalizeCapturedPayment = async ({
 }) => {
   const lookup = {
     deleted_at: null,
-    payment_method: "razorpay",
+    // Partial COD collects its advance through this exact same Razorpay
+    // pipeline, so both payment methods can land here.
+    payment_method: { $in: ["razorpay", "cod"] },
     $or: [{ id: orderId }, ...(mongoose.Types.ObjectId.isValid(orderId) ? [{ _id: orderId }] : [])],
   };
   if (userId) lookup.user = userId;
@@ -45,7 +57,7 @@ export const finalizeCapturedPayment = async ({
   const credentials = await getRazorpayConfig();
   validateCapturedPayment(existing, paymentData, credentials.account_id);
 
-  if (existing.payment_status === PAYMENT_STATUS.PAID && existing.stock_reserved) {
+  if (isPaymentClearedStatus(existing.payment_status) && existing.stock_reserved) {
     return { order: existing, alreadyFinalized: true };
   }
 
@@ -55,13 +67,13 @@ export const finalizeCapturedPayment = async ({
     await session.withTransaction(async () => {
       const order = await Order.findOne({
         _id: existing._id,
-        payment_status: { $ne: PAYMENT_STATUS.PAID },
+        payment_status: { $nin: [PAYMENT_STATUS.PAID, PAYMENT_STATUS.ADVANCE_PAID] },
         stock_reserved: { $ne: true },
       }).session(session);
 
       if (!order) {
         finalized = await Order.findById(existing._id).session(session);
-        if (!finalized?.stock_reserved || finalized.payment_status !== PAYMENT_STATUS.PAID) {
+        if (!finalized?.stock_reserved || !isPaymentClearedStatus(finalized.payment_status)) {
           throw StatusError.conflict("Payment finalization is already in progress");
         }
         return;
@@ -118,9 +130,9 @@ export const finalizeCapturedPayment = async ({
       }
 
       finalized = await Order.findOneAndUpdate(
-        { _id: order._id, payment_status: { $ne: PAYMENT_STATUS.PAID } },
+        { _id: order._id, payment_status: { $nin: [PAYMENT_STATUS.PAID, PAYMENT_STATUS.ADVANCE_PAID] } },
         { $set: {
-          payment_status: PAYMENT_STATUS.PAID,
+          payment_status: order.is_partial_cod ? PAYMENT_STATUS.ADVANCE_PAID : PAYMENT_STATUS.PAID,
           order_status: ORDER_STATUS.PROCESSING,
           paid_at: new Date(),
           stock_reserved: true,

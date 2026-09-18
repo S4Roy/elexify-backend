@@ -7,7 +7,7 @@ import OrderScans from "../../../models/OrderScans.js";
 import moment from "moment-timezone";
 import { normalizeOrderStatus } from "../../../helpers/order/normalizeOrderStatus.js";
 import { orderService, notificationService } from "../../../services/index.js";
-import { ORDER_STATUS } from "../../../constants/orderStatus.js";
+import { ORDER_STATUS, PAYMENT_STATUS } from "../../../constants/orderStatus.js";
 
 const SHIPMENT_STATUS_EVENTS = {
   [ORDER_STATUS.SHIPPED]: "ORDER_SHIPPED",
@@ -218,9 +218,17 @@ export const updateOrderStatus = async (req, res, next) => {
 
     // Save the updated order (meta + status)
     await order.save();
+    // Partial COD: the advance was already collected online; delivery is
+    // when the courier collects the remaining COD balance, so that's the
+    // moment the order actually becomes fully paid.
+    const completesPartialCod =
+      newStatus === ORDER_STATUS.DELIVERED &&
+      order.payment_method === "cod" &&
+      order.payment_status === PAYMENT_STATUS.ADVANCE_PAID;
     order = await orderService.transitionOrder({
       orderId: order._id,
       orderStatus: newStatus,
+      paymentStatus: completesPartialCod ? PAYMENT_STATUS.PAID : undefined,
       source: "carrier",
     });
 

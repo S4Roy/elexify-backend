@@ -14,6 +14,15 @@ const humanize = (value) =>
     .replace(/_/g, " ")
     .replace(/\b\w/g, (c) => c.toUpperCase());
 
+// Percentage is derived from the order's own stored amounts, not the live
+// admin-configured setting, so a sent email always reflects what was
+// actually charged even if the percentage changes later.
+const buildPartialCodLabel = (order) => {
+  if (!order.is_partial_cod || !order.grand_total) return null;
+  const advancePercent = Math.round((order.advance_amount / order.grand_total) * 100);
+  return `Partial COD – ${advancePercent}% Paid, ${100 - advancePercent}% Due on Delivery`;
+};
+
 const toAddressBlock = (snapshot) => {
   if (!snapshot) return null;
   return {
@@ -51,10 +60,14 @@ export const buildOrderEmailData = async (order) => {
     order_id: order.id,
     order_number: order.id,
     order_date: moment(order.created_at).format("D MMM YYYY"),
-    payment_method_label: PAYMENT_METHOD_LABELS[order.payment_method] || humanize(order.payment_method),
-    payment_status_label: humanize(order.payment_status),
+    payment_method_label: buildPartialCodLabel(order) || PAYMENT_METHOD_LABELS[order.payment_method] || humanize(order.payment_method),
+    payment_status_label: order.payment_status === "advance_paid" ? "Advance Paid" : humanize(order.payment_status),
     order_status_label: humanize(order.order_status),
     is_cod: order.payment_method === "cod",
+    is_partial_cod: order.is_partial_cod || false,
+    partial_cod_label: buildPartialCodLabel(order),
+    advance_amount: order.advance_amount || 0,
+    cod_due_amount: order.cod_due_amount || 0,
     items: items.map((item) => ({
       product_name: item.product_name,
       variation_name: item.variation_name || null,

@@ -24,6 +24,11 @@ export const ORDER_STATUS_VALUES = Object.values(ORDER_STATUS);
 
 export const PAYMENT_STATUS = {
   PENDING: "pending",
+  // Partial COD only: the online advance has been captured; the remaining
+  // balance is still owed as Cash on Delivery. Flips to PAID once the
+  // Shiprocket delivery webhook confirms delivery (see
+  // src/controllers/site/webhook/updateOrderStatus.js).
+  ADVANCE_PAID: "advance_paid",
   PAID: "paid",
   FAILED: "failed",
   REFUND_PENDING: "refund_pending",

@@ -28,6 +28,7 @@ const InvoiceSchema = new Schema(
     order_date: { type: Date, required: true },
     payment_method: { type: String, default: null },
     payment_status: { type: String, default: null },
+    is_partial_cod: { type: Boolean, default: false },
     currency: { type: String, default: "INR" },
 
     billing_address: { type: Object, default: null },
@@ -64,6 +65,8 @@ const InvoiceSchema = new Schema(
       coupon_discount: { type: Number, default: 0 },
       shipping: { type: Number, default: 0 },
       cod_fee: { type: Number, default: 0 },
+      advance_amount: { type: Number, default: 0 },
+      cod_due_amount: { type: Number, default: 0 },
       tax_total: { type: Number, default: 0 },
       grand_total: { type: Number, required: true },
       amount_in_words: { type: String, default: "" },

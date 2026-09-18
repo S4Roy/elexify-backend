@@ -24,7 +24,7 @@ export const attemptRefund = async (order) => {
   const claimed = await Order.findOneAndUpdate(
     {
       _id: order._id,
-      payment_status: { $in: [PAYMENT_STATUS.PAID, PAYMENT_STATUS.REFUND_FAILED] },
+      payment_status: { $in: [PAYMENT_STATUS.PAID, PAYMENT_STATUS.ADVANCE_PAID, PAYMENT_STATUS.REFUND_FAILED] },
       "refund.razorpay_refund_id": { $in: [null, undefined] },
     },
     {
