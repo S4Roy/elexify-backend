@@ -21,6 +21,7 @@ orderRouter.post(
   inventoryValidation.orderValidation.verifyPayment,
   inventoryController.orderController.verifyPayment
 );
+orderRouter.post("/retry-payment", validateAccessToken, inventoryController.orderController.retryPayment);
 orderRouter.post(
   "/cancel",
   inventoryValidation.orderValidation.cancel,
