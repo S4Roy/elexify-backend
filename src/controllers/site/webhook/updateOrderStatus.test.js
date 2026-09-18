@@ -169,4 +169,79 @@ describe("updateOrderStatus — Shiprocket forward-shipment webhook", () => {
     );
     expect(res.status).toHaveBeenCalledWith(200);
   });
+
+  it("cancels a still-packed package on a Cancelled event and stamps cancelled_at", async () => {
+    const pkg = {
+      _id: "pkg3",
+      order_id: "order3",
+      status: "packed",
+      awb: null,
+      courier_name: null,
+      etd: null,
+      timeline: [{ status: "packed" }],
+      shipped_at: null,
+      delivered_at: null,
+      cancelled_at: null,
+    };
+    Package.findOne.mockResolvedValue(pkg);
+    Package.findOneAndUpdate.mockResolvedValue({ ...pkg, status: "cancelled" });
+    orderService.recomputeOrderStatus.mockResolvedValue({
+      order: { _id: "order3", id: "ORD-000020", order_status: "confirmed" },
+      statusChanged: false,
+      previousStatus: "packed",
+    });
+
+    const req = {
+      headers: {},
+      body: {
+        current_status: "Cancelled",
+        order_id: "13905399",
+        shipment_status: "Cancelled",
+        scans: [],
+      },
+    };
+    const res = mockRes();
+
+    await updateOrderStatus(req, res, vi.fn());
+
+    expect(Package.findOneAndUpdate).toHaveBeenCalledTimes(1);
+    const [filter, update] = Package.findOneAndUpdate.mock.calls[0];
+    expect(filter).toEqual({ _id: "pkg3" });
+    expect(update.$set.status).toBe("cancelled");
+    expect(update.$set.cancelled_at).toBeInstanceOf(Date);
+    expect(res.status).toHaveBeenCalledWith(200);
+  });
+
+  it("ignores a stale Cancelled event against an already-shipped package", async () => {
+    const pkg = {
+      _id: "pkg4",
+      order_id: "order4",
+      status: "shipped",
+      awb: "111",
+      courier_name: "Delhivery",
+      etd: null,
+      timeline: [{ status: "packed" }, { status: "shipped" }],
+      shipped_at: new Date("2021-06-24T00:00:00Z"),
+      delivered_at: null,
+      cancelled_at: null,
+    };
+    Package.findOne.mockResolvedValue(pkg);
+
+    const req = {
+      headers: {},
+      body: {
+        current_status: "Cancelled",
+        order_id: "13905399",
+        shipment_status: "Cancelled",
+        scans: [],
+      },
+    };
+    const res = mockRes();
+
+    await updateOrderStatus(req, res, vi.fn());
+
+    expect(Package.findOneAndUpdate).not.toHaveBeenCalled();
+    expect(orderService.recomputeOrderStatus).not.toHaveBeenCalled();
+    expect(res.status).toHaveBeenCalledWith(200);
+  });
 });

@@ -28,6 +28,7 @@ const PACKAGE_STATUS_MAP = {
   shipped: "shipped",
   out_for_delivery: "out_for_delivery",
   delivered: "delivered",
+  cancelled: "cancelled",
   returned: "returned",
 };
 
@@ -38,6 +39,11 @@ const PACKAGE_STATUS_MAP = {
 const PACKAGE_STATUS_ORDER = ["packed", "shipped", "out_for_delivery", "delivered"];
 const isForwardPackageTransition = (from, to) => {
   if (to === "returned") return from === "delivered";
+  // Shiprocket only ever cancels pre-pickup (same window our own
+  // cancelPackage enforces) — a "Cancelled" event against a package that's
+  // already shipped/delivered is stale/out-of-order, never a real
+  // transition to apply.
+  if (to === "cancelled") return ["packed", "failed"].includes(from);
   const fromIdx = PACKAGE_STATUS_ORDER.indexOf(from);
   const toIdx = PACKAGE_STATUS_ORDER.indexOf(to);
   if (fromIdx === -1 || toIdx === -1) return true;
@@ -165,6 +171,7 @@ export const updateOrderStatus = async (req, res, next) => {
       const set = { status: packageStatus, ...metaSet };
       if (packageStatus === "shipped" && !pkg.shipped_at) set.shipped_at = eventTimestamp;
       if (packageStatus === "delivered" && !pkg.delivered_at) set.delivered_at = eventTimestamp;
+      if (packageStatus === "cancelled" && !pkg.cancelled_at) set.cancelled_at = eventTimestamp;
 
       const updatedPackage = await Package.findOneAndUpdate(
         { _id: pkg._id },
