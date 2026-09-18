@@ -10,6 +10,7 @@ import ExchangeRate from "../../../../models/ExchangeRate.js"; // ✅
 import { StatusError } from "../../../../config/index.js";
 import { paymentService } from "../../../../services/index.js";
 import { snapshotAddress } from "../../../../services/invoiceService/snapshotAddress.js";
+import { roundShippingCharge } from "../../../../services/shipping/roundShippingCharge.js";
 import { nextOrderNumber } from "../../../../services/orderService/generateOrderNumber.js";
 
 export const add = async (req, res, next) => {
@@ -147,7 +148,7 @@ export const add = async (req, res, next) => {
     }
 
     const discountAmount = parseFloat((discount * exchangeRate).toFixed(2));
-    const shippingAmount = parseFloat((shipping * exchangeRate).toFixed(2));
+    const shippingAmount = roundShippingCharge(shipping * exchangeRate, currency);
     const grandTotal = parseFloat(total.toFixed(2));
     const sub_total = parseFloat(
       (grandTotal - discountAmount + shippingAmount).toFixed(2)

@@ -20,6 +20,7 @@ import { createRazorpayOrder } from "../../../../services/paymentService/createR
 import { validateCoupon } from "../../../../services/inventory/cart/validateCoupon.js";
 import { calculateQuantityDiscount } from "../../../../services/inventory/cart/calculateQuantityDiscount.js";
 import { calculateShippingRate } from "../../../../services/shipping/calculateShippingRate.js";
+import { roundShippingCharge } from "../../../../services/shipping/roundShippingCharge.js";
 import { calculateDeliveryEstimate } from "../../../../services/shipping/calculateDeliveryEstimate.js";
 import { calculateCodEligibility } from "../../../../services/shipping/calculateCodEligibility.js";
 import { snapshotAddress } from "../../../../services/invoiceService/snapshotAddress.js";
@@ -262,9 +263,7 @@ const address = await Address.findOne({
       orderSubtotal: sub_total,
     });
 
-    const shippingAmount = parseFloat(
-      (rateResult.amount * exchangeRate).toFixed(2)
-    );
+    const shippingAmount = roundShippingCharge(rateResult.amount * exchangeRate, currency);
 
     const deliveryEstimate = await calculateDeliveryEstimate({
       min_delivery_days: rateResult.min_delivery_days,

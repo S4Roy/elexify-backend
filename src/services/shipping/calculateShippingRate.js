@@ -1,5 +1,6 @@
 import ShippingRate from "../../models/ShippingRate.js";
 import { resolveZone } from "./resolveZone.js";
+import { roundShippingCharge } from "./roundShippingCharge.js";
 
 /**
  * Compute the server-authoritative shipping charge + transit-time range for an order.
@@ -98,7 +99,7 @@ export const calculateShippingRate = async ({
   }
 
   return {
-    amount: parseFloat(amount.toFixed(2)),
+    amount: roundShippingCharge(amount, "INR"),
     currency: "INR",
     zone: { _id: zone._id, name: zone.name },
     breakdown,
