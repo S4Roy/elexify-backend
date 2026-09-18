@@ -103,13 +103,21 @@ export const updateOrderStatus = async (req, res, next) => {
       .toString()
       .trim()
       .toLowerCase();
-    const eventTimestamp = current_timestamp ? new Date(current_timestamp) : new Date();
+    // Shiprocket doesn't guarantee current_timestamp is a parseable date —
+    // an unparseable value must never reach a Date-typed field as-is (an
+    // "Invalid Date" fails Mongoose's cast and throws), so it falls back to
+    // "now" instead.
+    const parsedTimestamp = current_timestamp ? new Date(current_timestamp) : new Date();
+    const eventTimestamp = Number.isNaN(parsedTimestamp.valueOf()) ? new Date() : parsedTimestamp;
 
     // Reverse shipments are correlated by the return number/Shiprocket id/AWB
     // and update the same customer-visible event log as manual admin actions.
     const reverse = await processReverseWebhook({ incomingOrderId, awbStr, incoming, courierName: courier_name, eventTimestamp, shipmentId: body.shipment_id, token: req.headers["x-api-key"] });
     if (reverse) {
-      if (reverse.unsupported) return res.status(422).json({ status: "error", message: "Unsupported reverse shipment status" });
+      // A webhook retries on any non-2xx — an unsupported status will
+      // never become supported on retry, so this acks with 200 rather
+      // than triggering an endless resend loop from Shiprocket's side.
+      if (reverse.unsupported) return res.status(200).json({ status: "ignored", message: "Unsupported reverse shipment status" });
       return res.status(200).json({ status: "success", message: "Return pickup status processed", data: { return_request_id: reverse.request._id, pickup_status: reverse.request.pickup.status } });
     }
 
@@ -249,7 +257,9 @@ export const updateOrderStatus = async (req, res, next) => {
     }
     const newStatus = normalizeOrderStatus(incoming.replace(/\s+/g, "_"));
     if (!newStatus) {
-      return res.status(422).json({ status: "error", message: "Unsupported shipment status" });
+      // Same reasoning as the reverse-shipment branch above — ack with 200
+      // so an unsupported status doesn't loop Shiprocket's retries forever.
+      return res.status(200).json({ status: "ignored", message: "Unsupported shipment status" });
     }
     // Historical orders may predate the free-form carrier metadata object.
     // Initialize it before recording AWB/courier details so a valid webhook
@@ -406,10 +416,14 @@ export const updateOrderStatus = async (req, res, next) => {
       },
     });
   } catch (err) {
-    // Return a retryable failure. A 200 here would silently discard a carrier
-    // transition that never reached the order state machine.
+    // Always ack 200. A non-2xx makes Shiprocket retry this same payload
+    // repeatedly (with no backoff guarantee), and most failures here are
+    // deterministic — a bad/missing field, a validation error — so a retry
+    // would just reproduce the identical failure forever instead of ever
+    // recovering. Log it for manual investigation/replay instead of
+    // relying on the sender's retry to fix a bug on our side.
     console.error("Shiprocket webhook processing error:", err);
-    return res.status(500).json({
+    return res.status(200).json({
       status: "error",
       message: "Failed to process webhook, logged for review",
       error: err?.message || err,

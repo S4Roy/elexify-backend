@@ -15,6 +15,7 @@ vi.mock("../../../services/index.js", () => ({
 
 const { updateOrderStatus } = await import("./updateOrderStatus.js");
 const { default: Package } = await import("../../../models/Package.js");
+const { default: Order } = await import("../../../models/Order.js");
 const { default: ReturnRequest } = await import("../../../models/ReturnRequest.js");
 const { default: OrderScans } = await import("../../../models/OrderScans.js");
 const { orderService, notificationService } = await import("../../../services/index.js");
@@ -243,5 +244,89 @@ describe("updateOrderStatus — Shiprocket forward-shipment webhook", () => {
     expect(Package.findOneAndUpdate).not.toHaveBeenCalled();
     expect(orderService.recomputeOrderStatus).not.toHaveBeenCalled();
     expect(res.status).toHaveBeenCalledWith(200);
+  });
+
+  // Reproduces a real production crash: Shiprocket sent a current_timestamp
+  // that doesn't parse, `new Date(...)` silently became "Invalid Date", and
+  // that reached Package.findOneAndUpdate's $set — which is harmless against
+  // a mock, but against real Mongoose (Date schema type) throws a
+  // CastError/ValidationError that was surfacing as an unhandled 500.
+  it("falls back to now() when current_timestamp doesn't parse, instead of writing an Invalid Date", async () => {
+    const pkg = {
+      _id: "pkg5",
+      order_id: "order5",
+      status: "shipped",
+      awb: "111",
+      courier_name: "Delhivery",
+      etd: null,
+      timeline: [{ status: "packed" }, { status: "shipped" }],
+      shipped_at: new Date("2021-06-24T00:00:00Z"),
+      delivered_at: null,
+    };
+    Package.findOne.mockResolvedValue(pkg);
+    Package.findOneAndUpdate.mockResolvedValue({ ...pkg, status: "delivered" });
+    orderService.recomputeOrderStatus.mockResolvedValue({
+      order: { _id: "order5", id: "ORD-000021", order_status: "delivered" },
+      statusChanged: true,
+    });
+
+    const req = {
+      headers: {},
+      body: {
+        current_status: "Delivered",
+        order_id: "13905400",
+        current_timestamp: "not-a-real-date",
+        scans: [],
+      },
+    };
+    const res = mockRes();
+
+    await updateOrderStatus(req, res, vi.fn());
+
+    const [, update] = Package.findOneAndUpdate.mock.calls[0];
+    expect(update.$set.delivered_at).toBeInstanceOf(Date);
+    expect(Number.isNaN(update.$set.delivered_at.valueOf())).toBe(false);
+    expect(res.status).toHaveBeenCalledWith(200);
+  });
+
+  it("acks 200 for a status this app doesn't recognize on a legacy (no-Package) order", async () => {
+    Package.findOne.mockResolvedValue(null);
+    Order.findOne.mockResolvedValue({ id: "ORD-000022", order_status: "processing", meta: {} });
+
+    const req = {
+      headers: {},
+      body: { current_status: "Some Unmapped Carrier Status", order_id: "ORD-000022", scans: [] },
+    };
+    const res = mockRes();
+
+    await updateOrderStatus(req, res, vi.fn());
+
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ status: "ignored" }));
+  });
+
+  // The whole point of a webhook receiver: never hand the sender a reason
+  // to retry a payload that will fail identically every time. This drives
+  // the exact crash from production (order.save() rejecting on a bad
+  // field) through the top-level catch and confirms it still acks 200.
+  it("acks 200 even when saving the order throws (legacy path)", async () => {
+    Package.findOne.mockResolvedValue(null);
+    Order.findOne.mockResolvedValue({
+      id: "ORD-000023",
+      order_status: "processing",
+      meta: {},
+      save: vi.fn().mockRejectedValue(new Error('orders validation failed: shipped_at: Cast to date failed')),
+    });
+
+    const req = {
+      headers: {},
+      body: { current_status: "Shipped", order_id: "ORD-000023", scans: [] },
+    };
+    const res = mockRes();
+
+    await updateOrderStatus(req, res, vi.fn());
+
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ status: "error" }));
   });
 });
