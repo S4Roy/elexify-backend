@@ -2,7 +2,7 @@ import mongoose from "mongoose";
 import Package from "../../../models/Package.js";
 import { StatusError, envs } from "../../../config/index.js";
 import { getIntegrationConfig } from "../../integrationCredentials/index.js";
-import { buildPackagePayload, resolveBillingAddress, extractShiprocketIds } from "./buildPackagePayload.js";
+import { buildPackagePayload, resolveBillingAddress, extractShiprocketIds, assignShipmentAwb } from "./buildPackagePayload.js";
 import { recomputeOrderStatus } from "./recomputeOrderStatus.js";
 
 // Re-attempts the Shiprocket call for an existing failed/unknown package —
@@ -52,7 +52,17 @@ export const retryPackageShipment = async ({ packageId }) => {
 
   let updated;
   if (createOrderResp?.success) {
-    const { shiprocket_order_id, shiprocket_shipment_id, courier_name, awb } = extractShiprocketIds(createOrderResp);
+    let { shiprocket_order_id, shiprocket_shipment_id, courier_name, awb } = extractShiprocketIds(createOrderResp);
+    let awbError = null;
+    if (!awb && shiprocket_shipment_id) {
+      const assigned = await assignShipmentAwb({ shiprocket, shiprocketShipmentId: shiprocket_shipment_id });
+      if (assigned.awb) {
+        awb = assigned.awb;
+        courier_name = assigned.courier_name || courier_name;
+      } else {
+        awbError = assigned.error;
+      }
+    }
     updated = await Package.findByIdAndUpdate(
       claimed._id,
       {
@@ -64,7 +74,7 @@ export const retryPackageShipment = async ({ packageId }) => {
           courier_name,
           awb,
           booking_snapshot: payload,
-          last_error: null,
+          last_error: awbError,
         },
       },
       { new: true },
