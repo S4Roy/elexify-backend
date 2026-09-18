@@ -5,6 +5,7 @@ import Order from "../../../models/Order.js";
 import Package from "../../../models/Package.js";
 import ReturnRequest from "../../../models/ReturnRequest.js";
 import OrderScans from "../../../models/OrderScans.js";
+import WebhookLog from "../../../models/WebhookLog.js";
 import moment from "moment-timezone";
 import { normalizeOrderStatus } from "../../../helpers/order/normalizeOrderStatus.js";
 import { orderService, notificationService } from "../../../services/index.js";
@@ -63,13 +64,67 @@ const processReverseWebhook = async ({ incomingOrderId, awbStr, incoming, courie
   return { request: await applyReverseEvent({ request, raw: incoming, at: eventTimestamp, awb: awbStr, courier: courierName }) };
 };
 
+// Best-effort audit write — this must never affect the response the
+// webhook sender sees, so any failure here is swallowed by the caller.
+const recordWebhookLog = ({ body, statusCode, responseBody, processingMs, packageId }) => {
+  const awbStr = body?.awb != null ? String(body.awb) : null;
+  const incomingStatus = (body?.current_status || body?.shipment_status || "").toString().trim() || null;
+  const mappedStatus = incomingStatus
+    ? normalizeOrderStatus(incomingStatus.toLowerCase().replace(/\s+/g, "_"))
+    : null;
+  // channel_order_id is the composite id we originally sent Shiprocket
+  // (e.g. "ORD-010708-P2" — see buildPackagePayload.js); order_id in their
+  // webhook body is Shiprocket's own internal numeric order id.
+  const orderId = typeof body?.channel_order_id === "string" && body.channel_order_id.trim()
+    ? body.channel_order_id.trim()
+    : null;
+  const shiprocketOrderId = body?.order_id != null ? String(body.order_id) : null;
+
+  const outcome = statusCode >= 500 || responseBody?.status === "error"
+    ? "error"
+    : responseBody?.status === "ignored"
+      ? "ignored"
+      : "processed";
+
+  return WebhookLog.create({
+    provider: "shiprocket",
+    event_type: "order_status",
+    order_id: orderId,
+    package_id: packageId || null,
+    shiprocket_order_id: shiprocketOrderId,
+    awb: awbStr,
+    incoming_status: incomingStatus,
+    mapped_status: mappedStatus,
+    outcome,
+    outcome_detail: responseBody?.message || null,
+    status_code: statusCode,
+    payload: body || {},
+    processing_ms: processingMs,
+  });
+};
+
 /**
  * Shiprocket webhook -> update order status + save scans
  */
 export const updateOrderStatus = async (req, res, next) => {
-  try {
-    const body = req.body || {};
+  const startedAt = Date.now();
+  const body = req.body || {};
+  // Every branch below is already a 200 — this always logs one audit entry
+  // (best-effort, never blocking or altering the actual response) and then
+  // sends the same response every existing call site sent.
+  let matchedPackageId = null;
+  const respond = (payload) => {
+    recordWebhookLog({
+      body,
+      statusCode: 200,
+      responseBody: payload,
+      processingMs: Date.now() - startedAt,
+      packageId: matchedPackageId,
+    }).catch((err) => console.warn("WebhookLog write failed:", err?.message || err));
+    return res.status(200).json(payload);
+  };
 
+  try {
     // destructure incoming body (be defensive)
     const {
       awb,
@@ -93,7 +148,7 @@ export const updateOrderStatus = async (req, res, next) => {
 
     if (!incomingOrderId && !awbStr && !body.shipment_id) {
       // Nothing to correlate — respond 200 so webhook doesn't block
-      return res.status(200).json({
+      return respond({
         status: "ok",
         message: "No order identifier (order_id/channel_order_id/awb) provided",
       });
@@ -117,8 +172,8 @@ export const updateOrderStatus = async (req, res, next) => {
       // A webhook retries on any non-2xx — an unsupported status will
       // never become supported on retry, so this acks with 200 rather
       // than triggering an endless resend loop from Shiprocket's side.
-      if (reverse.unsupported) return res.status(200).json({ status: "ignored", message: "Unsupported reverse shipment status" });
-      return res.status(200).json({ status: "success", message: "Return pickup status processed", data: { return_request_id: reverse.request._id, pickup_status: reverse.request.pickup.status } });
+      if (reverse.unsupported) return respond({ status: "ignored", message: "Unsupported reverse shipment status" });
+      return respond({ status: "success", message: "Return pickup status processed", data: { return_request_id: reverse.request._id, pickup_status: reverse.request.pickup.status } });
     }
 
     // Multi-package fulfillment: correlate to a specific Package first — by
@@ -134,6 +189,7 @@ export const updateOrderStatus = async (req, res, next) => {
         ...(body.shipment_id ? [{ shiprocket_shipment_id: String(body.shipment_id) }] : []),
       ],
     });
+    if (pkg) matchedPackageId = pkg._id;
 
     if (pkg) {
       const packageStatus = PACKAGE_STATUS_MAP[normalizeOrderStatus(incoming.replace(/\s+/g, "_"))];
@@ -152,7 +208,7 @@ export const updateOrderStatus = async (req, res, next) => {
         if (Object.keys(metaSet).length) {
           await Package.updateOne({ _id: pkg._id }, { $set: metaSet });
         }
-        return res.status(200).json({
+        return respond({
           status: "success",
           message: "Shipment metadata updated; no package status change",
           data: { packageId: pkg._id },
@@ -169,7 +225,7 @@ export const updateOrderStatus = async (req, res, next) => {
         if (Object.keys(metaSet).length) {
           await Package.updateOne({ _id: pkg._id }, { $set: metaSet });
         }
-        return res.status(200).json({
+        return respond({
           status: "success",
           message: "Already processed (idempotent)",
           data: { packageId: pkg._id, mapped_status: packageStatus },
@@ -224,7 +280,7 @@ export const updateOrderStatus = async (req, res, next) => {
         });
       }
 
-      return res.status(200).json({
+      return respond({
         status: "success",
         message: "Package status processed",
         data: {
@@ -248,7 +304,7 @@ export const updateOrderStatus = async (req, res, next) => {
         incomingOrderId,
         awb: awbStr,
       });
-      return res.status(200).json({
+      return respond({
         status: "ok",
         message: "Order not found locally; webhook received",
         incomingOrderId,
@@ -259,7 +315,7 @@ export const updateOrderStatus = async (req, res, next) => {
     if (!newStatus) {
       // Same reasoning as the reverse-shipment branch above — ack with 200
       // so an unsupported status doesn't loop Shiprocket's retries forever.
-      return res.status(200).json({ status: "ignored", message: "Unsupported shipment status" });
+      return respond({ status: "ignored", message: "Unsupported shipment status" });
     }
     // Historical orders may predate the free-form carrier metadata object.
     // Initialize it before recording AWB/courier details so a valid webhook
@@ -406,7 +462,7 @@ export const updateOrderStatus = async (req, res, next) => {
     }
 
     // Respond 200 (Shiprocket expects success).
-    return res.status(200).json({
+    return respond({
       status: "success",
       message: "Order status processed",
       data: {
@@ -423,7 +479,7 @@ export const updateOrderStatus = async (req, res, next) => {
     // recovering. Log it for manual investigation/replay instead of
     // relying on the sender's retry to fix a bug on our side.
     console.error("Shiprocket webhook processing error:", err);
-    return res.status(200).json({
+    return respond({
       status: "error",
       message: "Failed to process webhook, logged for review",
       error: err?.message || err,

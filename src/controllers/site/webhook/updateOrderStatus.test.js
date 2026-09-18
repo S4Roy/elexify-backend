@@ -8,6 +8,7 @@ vi.mock("../../../models/ReturnRequest.js", () => ({ default: { findOne: vi.fn()
 vi.mock("../../../models/OrderScans.js", () => ({
   default: { findOne: vi.fn(), insertMany: vi.fn() },
 }));
+vi.mock("../../../models/WebhookLog.js", () => ({ default: { create: vi.fn() } }));
 vi.mock("../../../services/index.js", () => ({
   orderService: { recomputeOrderStatus: vi.fn() },
   notificationService: { sendOrderNotification: vi.fn() },
@@ -18,6 +19,7 @@ const { default: Package } = await import("../../../models/Package.js");
 const { default: Order } = await import("../../../models/Order.js");
 const { default: ReturnRequest } = await import("../../../models/ReturnRequest.js");
 const { default: OrderScans } = await import("../../../models/OrderScans.js");
+const { default: WebhookLog } = await import("../../../models/WebhookLog.js");
 const { orderService, notificationService } = await import("../../../services/index.js");
 
 const mockRes = () => {
@@ -33,6 +35,7 @@ beforeEach(() => {
   // OrderScans.findOne(...).lean() — mirror Mongoose's chainable query API.
   OrderScans.findOne.mockReturnValue({ lean: () => Promise.resolve(null) });
   OrderScans.insertMany.mockResolvedValue(undefined);
+  WebhookLog.create.mockResolvedValue({});
 });
 
 describe("updateOrderStatus — Shiprocket forward-shipment webhook", () => {
@@ -328,5 +331,96 @@ describe("updateOrderStatus — Shiprocket forward-shipment webhook", () => {
 
     expect(res.status).toHaveBeenCalledWith(200);
     expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ status: "error" }));
+  });
+});
+
+describe("updateOrderStatus — webhook audit log", () => {
+  it("records a processed call with correlation fields and the raw payload", async () => {
+    const pkg = {
+      _id: "pkg9",
+      order_id: "order9",
+      status: "shipped",
+      awb: "111",
+      courier_name: "Delhivery",
+      etd: null,
+      timeline: [{ status: "packed" }, { status: "shipped" }],
+      shipped_at: new Date("2021-06-24T00:00:00Z"),
+      delivered_at: null,
+    };
+    Package.findOne.mockResolvedValue(pkg);
+    Package.findOneAndUpdate.mockResolvedValue({ ...pkg, status: "delivered" });
+    orderService.recomputeOrderStatus.mockResolvedValue({
+      order: { _id: "order9", id: "ORD-000030", order_status: "delivered" },
+      statusChanged: true,
+    });
+
+    const body = {
+      awb: 999,
+      current_status: "Delivered",
+      order_id: "13905999",
+      channel_order_id: "ORD-000030-P1",
+      scans: [],
+    };
+    const req = { headers: {}, body };
+    const res = mockRes();
+
+    await updateOrderStatus(req, res, vi.fn());
+
+    expect(WebhookLog.create).toHaveBeenCalledTimes(1);
+    const logged = WebhookLog.create.mock.calls[0][0];
+    expect(logged).toMatchObject({
+      provider: "shiprocket",
+      event_type: "order_status",
+      order_id: "ORD-000030-P1",
+      package_id: "pkg9",
+      shiprocket_order_id: "13905999",
+      awb: "999",
+      incoming_status: "Delivered",
+      mapped_status: "delivered",
+      outcome: "processed",
+      status_code: 200,
+    });
+    expect(logged.payload).toEqual(body);
+  });
+
+  it("records an ignored call for an unsupported status with no package_id", async () => {
+    Package.findOne.mockResolvedValue(null);
+    Order.findOne.mockResolvedValue({ id: "ORD-000031", order_status: "processing", meta: {} });
+
+    const req = {
+      headers: {},
+      body: { current_status: "Some Unmapped Carrier Status", order_id: "ORD-000031", scans: [] },
+    };
+    const res = mockRes();
+
+    await updateOrderStatus(req, res, vi.fn());
+
+    expect(WebhookLog.create).toHaveBeenCalledTimes(1);
+    const logged = WebhookLog.create.mock.calls[0][0];
+    expect(logged.outcome).toBe("ignored");
+    expect(logged.package_id).toBeNull();
+  });
+
+  it("records an error outcome, and never lets a logging failure break the response", async () => {
+    WebhookLog.create.mockRejectedValue(new Error("Mongo down"));
+    Package.findOne.mockResolvedValue(null);
+    Order.findOne.mockResolvedValue({
+      id: "ORD-000032",
+      order_status: "processing",
+      meta: {},
+      save: vi.fn().mockRejectedValue(new Error("boom")),
+    });
+
+    const req = {
+      headers: {},
+      body: { current_status: "Shipped", order_id: "ORD-000032", scans: [] },
+    };
+    const res = mockRes();
+
+    await updateOrderStatus(req, res, vi.fn());
+
+    expect(WebhookLog.create).toHaveBeenCalledTimes(1);
+    expect(WebhookLog.create.mock.calls[0][0].outcome).toBe("error");
+    expect(res.status).toHaveBeenCalledWith(200);
   });
 });
