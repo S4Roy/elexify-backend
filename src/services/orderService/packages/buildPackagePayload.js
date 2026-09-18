@@ -183,29 +183,3 @@ export const extractShiprocketIds = (createOrderResp) => {
   const awb = (respData.data && respData.data.awb_code) || respData.awb_code || null;
   return { shiprocket_order_id, shiprocket_shipment_id, courier_name, awb };
 };
-
-// The create-order call above almost never returns a courier/AWB by
-// itself (Shiprocket only auto-assigns one if the account has that
-// channel setting enabled) — one has to be explicitly requested via
-// courier/assign/awb, exactly like the reverse-shipment flow already does
-// in returnService/pickup.js. Called right after a successful create with
-// no awb yet, both on the initial ship and on every retry. A failure here
-// is non-fatal — the order already exists on Shiprocket, so the package
-// stays "created" and the admin can assign a courier from the Shiprocket
-// dashboard; the webhook will backfill awb/courier_name once that happens.
-export const assignShipmentAwb = async ({ shiprocket, shiprocketShipmentId }) => {
-  if (!shiprocketShipmentId) return { awb: null, courier_name: null, error: "No shipment id to assign a courier to" };
-  let resp;
-  try {
-    resp = await shiprocket.assignAwb(shiprocketShipmentId);
-  } catch (err) {
-    resp = { success: false, error: err?.message || String(err) };
-  }
-  const awbData = resp?.data?.response?.data || resp?.data?.data || null;
-  if (resp?.success && awbData?.awb_code) {
-    return { awb: String(awbData.awb_code), courier_name: awbData.courier_name || null, error: null };
-  }
-  const message =
-    typeof resp?.error === "string" ? resp.error : JSON.stringify(resp?.data || resp?.error || "AWB assignment failed");
-  return { awb: null, courier_name: null, error: message };
-};

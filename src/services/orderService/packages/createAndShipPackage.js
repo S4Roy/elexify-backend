@@ -4,13 +4,7 @@ import OrderItem from "../../../models/OrderItem.js";
 import Package from "../../../models/Package.js";
 import { StatusError, envs } from "../../../config/index.js";
 import { getIntegrationConfig } from "../../integrationCredentials/index.js";
-import {
-  buildPackagePayload,
-  resolveBillingAddress,
-  resolvePackageDims,
-  extractShiprocketIds,
-  assignShipmentAwb,
-} from "./buildPackagePayload.js";
+import { buildPackagePayload, resolveBillingAddress, resolvePackageDims, extractShiprocketIds } from "./buildPackagePayload.js";
 import { recomputeOrderStatus } from "./recomputeOrderStatus.js";
 
 // Orders in these statuses have nothing left to ship or can never be
@@ -175,17 +169,7 @@ export const createAndShipPackage = async ({
   }
 
   if (createOrderResp?.success) {
-    let { shiprocket_order_id, shiprocket_shipment_id, courier_name, awb } = extractShiprocketIds(createOrderResp);
-    let awbError = null;
-    if (!awb && shiprocket_shipment_id) {
-      const assigned = await assignShipmentAwb({ shiprocket, shiprocketShipmentId: shiprocket_shipment_id });
-      if (assigned.awb) {
-        awb = assigned.awb;
-        courier_name = assigned.courier_name || courier_name;
-      } else {
-        awbError = assigned.error;
-      }
-    }
+    const { shiprocket_order_id, shiprocket_shipment_id, courier_name, awb } = extractShiprocketIds(createOrderResp);
     pkg = await Package.findByIdAndUpdate(
       pkg._id,
       {
@@ -196,7 +180,7 @@ export const createAndShipPackage = async ({
           courier_name,
           awb,
           booking_snapshot: payload,
-          last_error: awbError,
+          last_error: null,
         },
       },
       { new: true },
