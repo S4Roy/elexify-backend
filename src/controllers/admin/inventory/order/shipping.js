@@ -1,315 +1,59 @@
-import Order from "../../../../models/Order.js";
-import { StatusError, envs } from "../../../../config/index.js";
-import { shiprocket, inventoryService, orderService, notificationService } from "../../../../services/index.js";
-import moment from "moment-timezone";
-import { getIntegrationConfig } from "../../../../services/integrationCredentials/index.js";
-import { canTransitionOrder } from "../../../../constants/orderStatus.js";
+import { StatusError } from "../../../../config/index.js";
+import { orderService } from "../../../../services/index.js";
 
+// Every shipment — including the simple "ship the whole order in one go"
+// case (no `items` in the body, which is what today's admin panel always
+// sends) — creates exactly one Package doc under the hood via
+// orderService.createAndShipPackage. See src/services/orderService/
+// packages/createAndShipPackage.js and the approved plan at
+// /Users/subhankar/.claude/plans/optimized-sleeping-quokka.md. This keeps
+// the endpoint/response shape the existing admin panel dialog already
+// expects, while gaining an optional `items: [{order_item_id, quantity}]`
+// payload for splitting an order across multiple packages.
 export const shipping = async (req, res, next) => {
   try {
-    const user_id = req.auth?.user_id || null;
+    const admin_id = req.auth?.user_id || null;
     const {
-      weight: qWeight,
-      length: qLength,
-      width: qWidth,
-      height: qHeight,
-      pickup_location: qPickupLocation,
       _id = null,
+      items = null,
+      pickup_location,
+      weight,
+      length,
+      width,
+      height,
     } = req.body;
 
-    if (!_id) throw new StatusError(400, "_id (order id) is required in query");
+    if (!_id) throw StatusError.badRequest("_id (order id) is required in query");
 
-    const order_data = await inventoryService.orderService.details(_id);
-    if (!order_data) throw new StatusError(404, "Order not found");
+    const { pkg } = await orderService.createAndShipPackage({
+      orderId: _id,
+      items,
+      pickupLocation: pickup_location,
+      weight,
+      length,
+      width,
+      height,
+      adminId: admin_id,
+    });
 
-    // Guard against pushing an order to Shiprocket that our own state
-    // machine won't let move to "packed" afterwards (e.g. cancelled,
-    // delivered, returned) — checked up front so we never create a real
-    // shipment for an order this fails silently on later.
-    if (!canTransitionOrder(order_data.order_status, "packed")) {
-      throw StatusError.conflict(
-        `Cannot send order to Shiprocket: order is "${order_data.order_status}" and cannot transition to "packed".`
-      );
-    }
-
-    const shiprocketConfig = await getIntegrationConfig("shiprocket", { channel_id: envs.shiprocket?.channel_id });
-    if (!shiprocketConfig) throw StatusError.serviceUnavailable("Shiprocket integration is disabled");
-
-    // --- parse numeric inputs, fallback to null if not provided
-    const lengthNum = qLength ? Number(qLength) : null;
-    const widthNum = qWidth ? Number(qWidth) : null;
-    const heightNum = qHeight ? Number(qHeight) : null;
-    const weightNum = qWeight ? Number(qWeight) : null;
-
-    // --- compute volumetric weight if product dimensions exist or dimensions provided
-    const volumetricFromQuery =
-      lengthNum && widthNum && heightNum
-        ? (lengthNum * widthNum * heightNum) / 5000.0
-        : 0;
-
-    // If no query dims, try to compute from order items product dimensions (best-effort)
-    let totalVolWeightFromProducts = 0;
-    if (!volumetricFromQuery && Array.isArray(order_data.order_items)) {
-      for (const it of order_data.order_items) {
-        const prod = it.product || it.product_doc || {};
-        const dims = prod.dimensions || {};
-        const l = Number(dims.length || dims.l || 0) || 0;
-        const w = Number(dims.width || dims.w || 0) || 0;
-        const h = Number(dims.height || dims.h || 0) || 0;
-        if (l && w && h) {
-          totalVolWeightFromProducts +=
-            ((l * w * h) / 5000.0) * (it.quantity || it.units || 1);
-        }
-      }
-    }
-
-    // decide final weight: prefer provided weight -> volumetric from query -> volumetric from products -> fallback env/default
-    const DEFAULT_WEIGHT = Number(process.env.DEFAULT_WEIGHT_KG || 0.5);
-    const finalWeight =
-      weightNum ||
-      volumetricFromQuery ||
-      totalVolWeightFromProducts ||
-      DEFAULT_WEIGHT;
-
-    // decide dimensions: prefer provided or sensible default
-    const DEFAULT_DIM = Number(process.env.DEFAULT_DIM_CM || 10);
-    const finalLength = lengthNum || DEFAULT_DIM;
-    const finalWidth = widthNum || DEFAULT_DIM;
-    const finalHeight = heightNum || DEFAULT_DIM;
-
-    // --- Basic billing validation (Shiprocket requires these)
-    const billing = order_data.billing_address || {};
-    // const requiredBilling = [
-    //   "full_name",
-    //   "address_line_1",
-    //   "city",
-    //   "postcode",
-    //   "state",
-    //   "country",
-    //   "phone",
-    // ];
-    // const missingBilling = requiredBilling.filter(
-    //   (k) => !billing[k] || String(billing[k]).trim() === ""
-    // );
-    // if (missingBilling.length) {
-    //   throw new StatusError(
-    //     400,
-    //     "Please add billing address fields: " + missingBilling.join(", ")
-    //   );
-    // }
-
-    // If shipping absent, copy billing if shipping_is_billing true OR shipping fields empty
-    const shipping = order_data.shipping_address || {};
-    const shippingEmpty =
-      !shipping ||
-      !shipping.address_line_1 ||
-      !shipping.city.name ||
-      !shipping.postcode;
-    const shipping_is_billing = !!order_data.shipping_is_billing;
-
-    // Amount Shiprocket should actually record/collect for this order: the
-    // outstanding COD balance for a Partial COD order, otherwise the full
-    // order total (unchanged for prepaid and regular full-COD orders).
-    const codCollectibleAmount = Number(
-      order_data.is_partial_cod
-        ? order_data.cod_due_amount
-        : order_data.grand_total ||
-            order_data.sub_total ||
-            order_data.subtotal ||
-            0
-    );
-    const shippingChargesValue = Number(
-      order_data.shipping_charges || order_data.shipping || 0
-    );
-    const giftwrapChargesValue = Number(order_data.giftwrap_charges || 0);
-    const transactionChargesValue = Number(order_data.transaction_charges || 0);
-    const discountValue = Number(order_data.discount || 0);
-
-    // Build payload
-    const payload = {
-      order_id: order_data.id || order_data._id || `ORD-${Date.now()}`,
-      order_date: moment(order_data.created_at || new Date())
-        .tz("Asia/Kolkata")
-        .format("YYYY-MM-DD HH:mm"),
-      // Admin can pick a "ship from" address per shipment from the dropdown
-      // in the Send to Shiprocket dialog; falls back to the account-wide
-      // default configured in Settings > Integration Credentials.
-      pickup_location:
-        (qPickupLocation && String(qPickupLocation).trim()) ||
-        shiprocketConfig.pickup_location ||
-        envs.PROJECT_NAME,
-      // Optional on Shiprocket's side — omitted when unset so Shiprocket
-      // falls back to the account's default channel instead of erroring
-      // out on a stale/incorrect id.
-      ...(shiprocketConfig.channel_id ? { channel_id: shiprocketConfig.channel_id } : {}),
-      comment: order_data.note || order_data.comment || "",
-      billing_customer_name: billing.full_name,
-      billing_last_name: billing.last_name || "",
-      billing_address: billing.address_line_1,
-      billing_address_2: billing.address_line_2 || "",
-      billing_city: billing.city.name,
-      billing_pincode: String(billing.postcode),
-      billing_state: billing.state.name,
-      billing_country: billing.country.name || "India",
-      billing_email: billing.email || order_data.user?.email || "",
-      billing_phone: String(billing.phone),
-      // If shipping_is_billing true OR shipping data empty, set shipping_is_billing true and leave shipping fields blank (Shiprocket accepts)
-      shipping_is_billing: true,
-      shipping_customer_name: "",
-      shipping_last_name: "",
-      shipping_address: "",
-      shipping_address_2: "",
-      shipping_city: "",
-      shipping_pincode: "",
-      shipping_state: "",
-      shipping_country: "",
-      shipping_email: "",
-      shipping_phone: "",
-      order_items: (order_data.order_items || []).map((item) => ({
-        name: item.display_name || item.name,
-        sku:
-          item.sku ||
-          (item.product && item.product.sku) ||
-          `SKU-${item.product_id || item._id}`,
-        units: Number(item.quantity || item.units || 1),
-        selling_price: Number(
-          item.unit_price || item.selling_price || item.price || 0
-        ),
-        discount: item.discount || "",
-        tax: item.tax || "",
-        hsn: item.hsn || "",
-      })),
-      payment_method: String(order_data.payment_method || "Prepaid")
-        .toLowerCase()
-        .includes("cod")
-        ? "COD"
-        : "Prepaid",
-      shipping_charges: shippingChargesValue,
-      giftwrap_charges: giftwrapChargesValue,
-      transaction_charges: transactionChargesValue,
-      total_discount: discountValue,
-      // Shiprocket's public order-creation API has no dedicated "advance
-      // already collected" field — for a Partial COD order, the collectible
-      // COD amount is the outstanding balance, not the full order value.
-      // (order_data.is_partial_cod check comes first and short-circuits
-      // even when cod_due_amount is legitimately 0.) Shiprocket itself computes
-      // the order's total/collectible value as
-      // sub_total + shipping_charges + giftwrap_charges + transaction_charges
-      // - total_discount — so sub_total must be solved backwards from the
-      // amount we actually want collected/recorded, not set to that amount
-      // directly. Setting sub_total to the full amount while also sending the
-      // real shipping_charges (as this previously did) double-counts shipping
-      // on Shiprocket's side.
-      sub_total: Math.max(
-        0,
-        codCollectibleAmount -
-          shippingChargesValue -
-          giftwrapChargesValue -
-          transactionChargesValue +
-          discountValue
-      ),
-      length: String(Math.round(finalLength)),
-      breadth: String(Math.round(finalWidth)),
-      height: String(Math.round(finalHeight)),
-      weight: String(Number(finalWeight).toFixed(2)),
-    };
-
-    // If shipping_is_billing is false but shipping fields present and valid, copy them into payload
-    if (!shipping_is_billing && !shippingEmpty) {
-      payload.shipping_is_billing = false;
-      payload.shipping_customer_name =
-        shipping.full_name || payload.billing_customer_name;
-      payload.shipping_last_name = shipping.last_name || "";
-      payload.shipping_address =
-        shipping.address_line_1 || payload.billing_address;
-      payload.shipping_address_2 = shipping.address_line_2 || "";
-      payload.shipping_city = shipping.city.name || payload.billing_city;
-      payload.shipping_pincode = String(
-        shipping.postcode || payload.billing_pincode
-      );
-      payload.shipping_state = shipping.state.name || payload.billing_state;
-      payload.shipping_country =
-        shipping.country.name || payload.billing_country;
-      payload.shipping_email = shipping.email || payload.billing_email;
-      payload.shipping_phone = String(shipping.phone || payload.billing_phone);
-    }
-
-    // final sanity: ensure at least one order item
-    if (!payload.order_items || payload.order_items.length === 0) {
-      throw new StatusError(
-        400,
-        "Order must have at least one order_items entry"
-      );
-    }
-
-    // --- Call Shiprocket createOrder
-    const createOrderResp = await shiprocket.createOrder(payload);
-
-    if (!createOrderResp || !createOrderResp.success) {
-      // bubble up Shiprocket message (be explicit)
-      const errMsg =
-        createOrderResp?.error ||
-        createOrderResp?.data ||
-        "Shiprocket createOrder failed";
+    if (pkg.integration_status !== "created") {
+      // The package was created and its items allocated, but Shiprocket's
+      // own API call didn't confirm — surface this as an error so the
+      // admin panel doesn't treat it as success, while the package itself
+      // remains (for a "Retry" action) rather than the allocation being
+      // silently lost.
       throw new StatusError(
         502,
-        typeof errMsg === "string" ? errMsg : JSON.stringify(errMsg)
+        `Package #${pkg.package_number} was created but Shiprocket did not confirm the shipment: ${pkg.last_error}. Use Retry from Manage Packages.`,
       );
-    }
-
-    // Extract shiprocket order id if possible
-    const respData = createOrderResp.data || {};
-    const ship_order_id =
-      (respData.data && respData.data.order_id) ||
-      respData.order_id ||
-      respData.shipment_id ||
-      (respData.data && respData.data.shipment_id) ||
-      null;
-
-    // Persist mapping to Order (idempotency reference)
-    try {
-      const update = {
-        $set: {
-          shiprocket_order_id: ship_order_id,
-        },
-      };
-      await Order.updateOne({ _id: order_data._id }, update).catch(() => {});
-    } catch (err) {
-      // don't fail the whole flow for persistence error — return a warning
-      console.warn("Failed to persist Shiprocket mapping", err);
-    }
-
-    // The order is handed to the courier queue but not yet actually
-    // shipped (that's a separate "shipped" transition, fired by the
-    // Shiprocket webhook once the courier assigns an AWB) — this is the
-    // "packed and ready for dispatch" moment. Never let a transition/
-    // notification failure fail a Shiprocket call that already succeeded.
-    try {
-      const updatedOrder = await orderService.transitionOrder({
-        orderId: order_data._id,
-        orderStatus: "packed",
-        source: "application",
-      });
-      notificationService.sendOrderNotification({
-        order: updatedOrder,
-        event: "ORDER_PACKED",
-        dedupeKey: `${updatedOrder.id}:ORDER_PACKED`,
-      });
-    } catch (err) {
-      console.warn("Failed to transition order to packed / notify customer", err);
     }
 
     return res.status(200).json({
       status: "success",
-      message: "Sent to ShipRocket Successfully",
-      data: {
-        payload,
-        shiprocket: createOrderResp.data,
-        ship_order_id,
-      },
+      message: `Package #${pkg.package_number} sent to ShipRocket successfully`,
+      data: { package: pkg },
     });
   } catch (error) {
-    // if StatusError (our custom error containing status), pass through; else 500
     return next(error);
   }
 };

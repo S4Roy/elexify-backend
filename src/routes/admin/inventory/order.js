@@ -14,6 +14,9 @@ orderRouter.get(
   inventoryController.orderController.list
 );
 orderRouter.post("/shipping", inventoryController.orderController.shipping);
+orderRouter.get("/package/list", inventoryController.orderController.listPackages);
+orderRouter.post("/package/retry", inventoryController.orderController.retryPackage);
+orderRouter.post("/package/cancel", inventoryController.orderController.cancelPackage);
 
 orderRouter.get(
   "/details",

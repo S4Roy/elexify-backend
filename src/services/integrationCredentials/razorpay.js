@@ -1,12 +1,13 @@
 import Razorpay from "razorpay";
 import { envs } from "../../config/index.js";
 import { getIntegrationConfig } from "./index.js";
+import { validateProductionRazorpayConfig } from "../../config/validateProductionEnv.js";
 
 export const getRazorpayConfig = async () => {
   const credentials = await getIntegrationConfig("razorpay", envs.razorpay);
   if (!credentials) throw new Error("Razorpay integration is disabled");
   if (!credentials.key_id || !credentials.key_secret) throw new Error("Razorpay credentials are incomplete");
-  return credentials;
+  return validateProductionRazorpayConfig(credentials);
 };
 
 export const getRazorpayClient = async () => {

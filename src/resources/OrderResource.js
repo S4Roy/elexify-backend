@@ -23,6 +23,26 @@ class OrderResource extends Resource {
       is_partial_cod: this.is_partial_cod || false,
       advance_amount: this.advance_amount || 0,
       cod_due_amount: this.cod_due_amount || 0,
+      // Multi-package fulfillment. package_count/fully_packed are
+      // denormalized onto Order itself (cheap list-view gating); `packages`
+      // is a customer/admin-safe summary attached only on the order-detail
+      // aggregation (src/controllers/{admin,site}/inventory/order/list.js) —
+      // empty on the paginated list view, matching today's order-level-only
+      // list display.
+      package_count: this.package_count || 0,
+      fully_packed: this.fully_packed || false,
+      packages: (this.packages || []).map((pkg) => ({
+        package_number: pkg.package_number,
+        status: pkg.status,
+        courier_name: pkg.courier_name || null,
+        awb: pkg.awb || null,
+        etd: pkg.etd || null,
+        tracking_url: pkg.tracking_url || null,
+        item_count: pkg.item_count || 0,
+        shipped_at: pkg.shipped_at || null,
+        delivered_at: pkg.delivered_at || null,
+        cancelled_at: pkg.cancelled_at || null,
+      })),
       payment_method: this.payment_method || null,
       user: this.user ? new UserResource(this.user).exec() : null,
       billing_address: this.billing_address
@@ -50,6 +70,9 @@ class OrderResource extends Resource {
           sale_price: item.sale_price ?? null,
           discount_percent: item.discount_percent ?? null,
           currency: this.currency || "INR",
+          packed_quantity: item.packed_quantity || 0,
+          shipped_quantity: item.shipped_quantity || 0,
+          unpacked_quantity: Math.max(0, (item?.quantity || 0) - (item.packed_quantity || 0)),
 
           images: MediaResource.collection(item.product?.images || []),
           categories: CategoryResourceMinimal.collection(

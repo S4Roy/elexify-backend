@@ -13,6 +13,7 @@ import { retryRefund } from "./retryRefund.js";
 import { invoice } from "./invoice.js";
 import { zohoInvoiceStatus, syncZohoInvoice } from "./zohoInvoice.js";
 import { listReturns, reviewReturn, receiveReturn, inspectReturn, completeManualRefund, updatePickup } from "./returnRequest.js";
+import { list as listPackages, retry as retryPackage, cancel as cancelPackage } from "./package.js";
 
 export {
   add,
@@ -36,4 +37,7 @@ export {
   inspectReturn,
   completeManualRefund,
   updatePickup,
+  listPackages,
+  retryPackage,
+  cancelPackage,
 };

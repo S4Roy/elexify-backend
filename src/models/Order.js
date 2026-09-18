@@ -92,6 +92,13 @@ const OrderSchema = new Schema(
     delivered_at: { type: Date, default: null },
     is_migrated: { type: Boolean, default: false },
 
+    // Denormalized from the order's Package docs (src/models/Package.js) so
+    // the paginated admin order list can gate "Send to ShipRocket" /"Ship
+    // Remaining Items" per row without an aggregation per row. Updated
+    // transactionally by src/services/orderService/packages/*.
+    package_count: { type: Number, default: 0 },
+    fully_packed: { type: Boolean, default: false },
+
     // Set true the moment stock is actually decremented for this order
     // (COD at placement, Razorpay at payment verification). Cancel
     // flow gates inventory restoration on this flag rather than inferring

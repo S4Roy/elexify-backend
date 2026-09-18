@@ -13,6 +13,13 @@ export const ORDER_STATUS = {
   SHIPPED: "shipped",
   OUT_FOR_DELIVERY: "out_for_delivery",
   DELIVERED: "delivered",
+  // Multi-package fulfillment: an order shipped across several packages can
+  // sit between the single-shipment statuses above while some packages
+  // have progressed further than others. Derived from package statuses by
+  // src/services/orderService/derivePackageOrderStatus.js — never set
+  // directly by an admin/customer action.
+  PARTIALLY_SHIPPED: "partially_shipped",
+  PARTIALLY_DELIVERED: "partially_delivered",
   CANCEL_REQUESTED: "cancel_requested",
   CANCELLED: "cancelled",
   RETURN_REQUESTED: "return_requested",
@@ -44,9 +51,15 @@ export const PAYMENT_METHOD_VALUES = Object.values(PAYMENT_METHOD);
 const ALLOWED_TRANSITIONS = {
   pending: ["confirmed", "processing", "cancelled", "failed"],
   confirmed: ["processing", "packed", "cancelled"],
-  processing: ["packed", "shipped", "cancelled"],
-  packed: ["shipped", "cancelled"],
-  shipped: ["out_for_delivery", "delivered"],
+  // The "partially_shipped"/"partially_delivered"/"delivered" targets here
+  // (beyond "packed") let a multi-package order's derived status jump more
+  // than one nominal step when concurrent package webhooks race — the
+  // derivation function guarantees these jumps are always forward/correct.
+  processing: ["packed", "shipped", "cancelled", "partially_shipped", "partially_delivered", "delivered"],
+  packed: ["shipped", "cancelled", "partially_shipped", "partially_delivered", "delivered"],
+  partially_shipped: ["shipped", "partially_delivered", "delivered"],
+  shipped: ["out_for_delivery", "delivered", "partially_delivered"],
+  partially_delivered: ["delivered", "return_requested"],
   out_for_delivery: ["delivered"],
   delivered: ["return_requested"],
   return_requested: ["returned"],
@@ -96,6 +109,8 @@ export const INVOICE_ELIGIBLE_STATUSES = [
   ORDER_STATUS.SHIPPED,
   ORDER_STATUS.OUT_FOR_DELIVERY,
   ORDER_STATUS.DELIVERED,
+  ORDER_STATUS.PARTIALLY_SHIPPED,
+  ORDER_STATUS.PARTIALLY_DELIVERED,
 ];
 
 // Single source of truth for invoice-button visibility (frontend) and

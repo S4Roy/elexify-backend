@@ -32,12 +32,10 @@ import { razorpayWebhookRouter } from "./routes/payments/razorpayWebhook.js";
 import { fileURLToPath } from "url";
 import { envs } from "./config/index.js";
 import { buildAllowedOrigins, buildCorsOptions } from "./config/corsOptions.js";
-import { validateProductionEnv } from "./config/validateProductionEnv.js";
 import { errors } from "celebrate";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
-validateProductionEnv();
 // Initialize i18n before using it
 i18n.configure({
   locales: ["en"],

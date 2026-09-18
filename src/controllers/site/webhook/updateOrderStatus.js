@@ -2,6 +2,7 @@ import { validReturnWebhookToken } from "../../../services/returnService/webhook
 import { StatusError } from "../../../config/index.js";
 import { applyReverseEvent } from "../../../services/returnService/pickup.js";
 import Order from "../../../models/Order.js";
+import Package from "../../../models/Package.js";
 import ReturnRequest from "../../../models/ReturnRequest.js";
 import OrderScans from "../../../models/OrderScans.js";
 import moment from "moment-timezone";
@@ -9,10 +10,38 @@ import { normalizeOrderStatus } from "../../../helpers/order/normalizeOrderStatu
 import { orderService, notificationService } from "../../../services/index.js";
 import { ORDER_STATUS, PAYMENT_STATUS } from "../../../constants/orderStatus.js";
 
+// No entries for partially_shipped/partially_delivered — a lookup miss
+// there is intentional: an existing customer notification event doesn't
+// exist for those transitions, so they silently don't fire one (safe,
+// non-breaking) rather than needing new templates for this feature.
 const SHIPMENT_STATUS_EVENTS = {
   [ORDER_STATUS.SHIPPED]: "ORDER_SHIPPED",
   [ORDER_STATUS.OUT_FOR_DELIVERY]: "ORDER_OUT_FOR_DELIVERY",
   [ORDER_STATUS.DELIVERED]: "ORDER_DELIVERED",
+};
+
+// A Package only ever carries a shipment-stage status — never the order-
+// level "confirmed"/"processing"/"partially_*" values normalizeOrderStatus
+// can also return.
+const PACKAGE_STATUS_MAP = {
+  packed: "packed",
+  shipped: "shipped",
+  out_for_delivery: "out_for_delivery",
+  delivered: "delivered",
+  returned: "returned",
+};
+
+// Shiprocket's webhook deliveries aren't guaranteed in order — a stale or
+// duplicate event for a status the package has already moved past must be
+// a no-op, never a regression (and never an error that makes Shiprocket
+// retry forever).
+const PACKAGE_STATUS_ORDER = ["packed", "shipped", "out_for_delivery", "delivered"];
+const isForwardPackageTransition = (from, to) => {
+  if (to === "returned") return from === "delivered";
+  const fromIdx = PACKAGE_STATUS_ORDER.indexOf(from);
+  const toIdx = PACKAGE_STATUS_ORDER.indexOf(to);
+  if (fromIdx === -1 || toIdx === -1) return true;
+  return toIdx > fromIdx;
 };
 
 const processReverseWebhook = async ({ incomingOrderId, awbStr, incoming, courierName, eventTimestamp, shipmentId, token }) => {
@@ -78,6 +107,105 @@ export const updateOrderStatus = async (req, res, next) => {
       return res.status(200).json({ status: "success", message: "Return pickup status processed", data: { return_request_id: reverse.request._id, pickup_status: reverse.request.pickup.status } });
     }
 
+    // Multi-package fulfillment: correlate to a specific Package first — by
+    // our own composite shiprocket_order_id (e.g. "ORD-010708-P2"), else
+    // AWB, else Shiprocket's own shipment id. A pre-feature order shipped
+    // under the old single-shipment flow has zero Package docs, so this
+    // simply finds nothing and falls through to the untouched legacy path
+    // below — that's what keeps historical orders fully backward compatible.
+    const pkg = await Package.findOne({
+      $or: [
+        ...(incomingOrderId ? [{ shiprocket_order_id: String(incomingOrderId) }] : []),
+        ...(awbStr ? [{ awb: awbStr }] : []),
+        ...(body.shipment_id ? [{ shiprocket_shipment_id: String(body.shipment_id) }] : []),
+      ],
+    });
+
+    if (pkg) {
+      const packageStatus = PACKAGE_STATUS_MAP[normalizeOrderStatus(incoming.replace(/\s+/g, "_"))];
+      if (!packageStatus) {
+        return res.status(422).json({ status: "error", message: "Unsupported shipment status" });
+      }
+
+      // Idempotent replay guard — a redelivered webhook for a status
+      // already recorded in this package's timeline, or a stale/
+      // out-of-order event for a status the package has already moved
+      // past, is a no-op 200, never a regression or an error that would
+      // make Shiprocket retry indefinitely.
+      const alreadyApplied = (pkg.timeline || []).some((entry) => entry.status === packageStatus);
+      if (alreadyApplied || !isForwardPackageTransition(pkg.status, packageStatus)) {
+        return res.status(200).json({
+          status: "success",
+          message: "Already processed (idempotent)",
+          data: { packageId: pkg._id, mapped_status: packageStatus },
+        });
+      }
+
+      const set = { status: packageStatus };
+      if (awbStr) set.awb = awbStr;
+      if (courier_name) set.courier_name = courier_name;
+      if (etd) set.etd = etd;
+      if (packageStatus === "shipped" && !pkg.shipped_at) set.shipped_at = eventTimestamp;
+      if (packageStatus === "delivered" && !pkg.delivered_at) set.delivered_at = eventTimestamp;
+
+      const updatedPackage = await Package.findOneAndUpdate(
+        { _id: pkg._id },
+        { $set: set, $push: { timeline: { status: packageStatus, occurred_at: eventTimestamp, raw: body } } },
+        { new: true },
+      );
+
+      // Persist scan records against the parent order, same dedupe logic
+      // as the legacy path below.
+      if (Array.isArray(scans) && scans.length) {
+        const scanDocs = [];
+        for (const s of scans) {
+          const scanDateRaw = s.date || s.scanned_at || s.timestamp || null;
+          const scanDate = scanDateRaw ? moment(scanDateRaw).toDate() : null;
+          const activity = (s.activity || s.activity_text || s.status || "").toString();
+          const location = s.location || s.place || "";
+          if (!activity) continue;
+          const dupQuery = { order: pkg.order_id, awb: awbStr, activity };
+          if (scanDate) dupQuery.date = scanDate;
+          const exist = await OrderScans.findOne(dupQuery).lean();
+          if (exist) continue;
+          scanDocs.push({ order: pkg.order_id, awb: awbStr, activity, location, date: scanDate, raw: s, createdAt: new Date() });
+        }
+        if (scanDocs.length) {
+          await OrderScans.insertMany(scanDocs, { ordered: false }).catch((insertErr) => {
+            console.warn("OrderScans insertMany warning:", insertErr.message || insertErr);
+          });
+        }
+      }
+
+      const { order: recomputedOrder, statusChanged } = await orderService.recomputeOrderStatus({
+        orderId: pkg.order_id,
+        source: "carrier",
+      });
+
+      const shipmentEvent = SHIPMENT_STATUS_EVENTS[recomputedOrder.order_status];
+      if (statusChanged && shipmentEvent) {
+        notificationService.sendOrderNotification({
+          order: recomputedOrder,
+          event: shipmentEvent,
+          dedupeKey: `${recomputedOrder.id}:${shipmentEvent}`,
+        });
+      }
+
+      return res.status(200).json({
+        status: "success",
+        message: "Package status processed",
+        data: {
+          packageId: updatedPackage._id,
+          orderId: recomputedOrder._id,
+          mapped_status: updatedPackage.status,
+          order_status: recomputedOrder.order_status,
+        },
+      });
+    }
+
+    // ── Legacy fallback: no Package doc correlates to this webhook (a
+    // pre-feature order shipped under the old single-shipment flow) ──────
+    // Everything below is completely unchanged.
     // Try find forward order
     let order = await Order.findOne({ id: incomingOrderId });
 

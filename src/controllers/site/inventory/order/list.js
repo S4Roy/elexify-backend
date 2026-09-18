@@ -60,6 +60,43 @@ export const list = async (req, res, next) => {
     let data;
     if (slug || _id) {
       pipeline.push(
+        // Packages (multi-package fulfillment) — looked up once per order,
+        // before order_items is unwound below, so packages_raw survives
+        // unchanged on every unwound copy for the per-item packed/shipped
+        // calc further down, and the light `packages` summary here is
+        // computed exactly once. Mirrors the identical addition in the
+        // admin order list pipeline (src/controllers/admin/inventory/
+        // order/list.js) — the two pipelines are independent, not shared.
+        {
+          $lookup: {
+            from: "packages",
+            localField: "_id",
+            foreignField: "order_id",
+            as: "packages_raw",
+          },
+        },
+        {
+          $addFields: {
+            packages: {
+              $map: {
+                input: "$packages_raw",
+                as: "pkg",
+                in: {
+                  package_number: "$$pkg.package_number",
+                  status: "$$pkg.status",
+                  courier_name: "$$pkg.courier_name",
+                  awb: "$$pkg.awb",
+                  etd: "$$pkg.etd",
+                  tracking_url: "$$pkg.tracking_url",
+                  shipped_at: "$$pkg.shipped_at",
+                  delivered_at: "$$pkg.delivered_at",
+                  cancelled_at: "$$pkg.cancelled_at",
+                  item_count: { $size: { $ifNull: ["$$pkg.items", []] } },
+                },
+              },
+            },
+          },
+        },
         // Lookup user
         {
           $lookup: {
@@ -353,6 +390,50 @@ export const list = async (req, res, next) => {
         // --- REBUILD order_item (null-safe) ---
         {
           $addFields: {
+            // Sum this item's quantity across every non-cancelled package
+            // that includes it ("packed"), and separately across packages
+            // that have actually left the warehouse ("shipped") — powers
+            // the Unpacked/Packed/Shipped display.
+            "order_items.packed_quantity": {
+              $sum: {
+                $map: {
+                  input: { $filter: { input: "$packages_raw", as: "pkg", cond: { $ne: ["$$pkg.status", "cancelled"] } } },
+                  as: "pkg",
+                  in: {
+                    $sum: {
+                      $map: {
+                        input: { $filter: { input: "$$pkg.items", as: "it", cond: { $eq: ["$$it.order_item_id", "$order_items._id"] } } },
+                        as: "it",
+                        in: "$$it.quantity",
+                      },
+                    },
+                  },
+                },
+              },
+            },
+            "order_items.shipped_quantity": {
+              $sum: {
+                $map: {
+                  input: {
+                    $filter: {
+                      input: "$packages_raw",
+                      as: "pkg",
+                      cond: { $in: ["$$pkg.status", ["shipped", "out_for_delivery", "delivered", "return_requested", "returned"]] },
+                    },
+                  },
+                  as: "pkg",
+                  in: {
+                    $sum: {
+                      $map: {
+                        input: { $filter: { input: "$$pkg.items", as: "it", cond: { $eq: ["$$it.order_item_id", "$order_items._id"] } } },
+                        as: "it",
+                        in: "$$it.quantity",
+                      },
+                    },
+                  },
+                },
+              },
+            },
             "order_items.product": {
               $cond: [
                 { $ne: ["$product_doc", null] },
