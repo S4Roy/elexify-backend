@@ -32,6 +32,7 @@ class OrderResource extends Resource {
       package_count: this.package_count || 0,
       fully_packed: this.fully_packed || false,
       packages: (this.packages || []).map((pkg) => ({
+        package_id: pkg.package_id || null,
         package_number: pkg.package_number,
         status: pkg.status,
         courier_name: pkg.courier_name || null,
@@ -43,8 +44,10 @@ class OrderResource extends Resource {
           order_item_id: line.order_item_id,
           quantity: line.quantity,
         })) } : {}),
+        tracking_events: pkg.tracking_events || [],
         shipped_at: pkg.shipped_at || null,
         delivered_at: pkg.delivered_at || null,
+        created_at: pkg.created_at || null,
         cancelled_at: pkg.cancelled_at || null,
       })),
       payment_method: this.payment_method || null,

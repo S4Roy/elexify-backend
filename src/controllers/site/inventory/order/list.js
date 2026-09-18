@@ -82,6 +82,7 @@ export const list = async (req, res, next) => {
                 input: "$packages_raw",
                 as: "pkg",
                 in: {
+                  package_id: "$$pkg._id",
                   package_number: "$$pkg.package_number",
                   status: "$$pkg.status",
                   courier_name: "$$pkg.courier_name",
@@ -91,7 +92,16 @@ export const list = async (req, res, next) => {
                   shipped_at: "$$pkg.shipped_at",
                   delivered_at: "$$pkg.delivered_at",
                   cancelled_at: "$$pkg.cancelled_at",
+                  created_at: "$$pkg.created_at",
                   item_count: { $size: { $ifNull: ["$$pkg.items", []] } },
+                  items: { $ifNull: ["$$pkg.items", []] },
+                  tracking_events: {
+                    $map: {
+                      input: { $ifNull: ["$$pkg.timeline", []] },
+                      as: "event",
+                      in: { status: "$$event.status", occurred_at: "$$event.occurred_at" },
+                    },
+                  },
                 },
               },
             },
