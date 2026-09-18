@@ -10,6 +10,7 @@ import User from "../../models/User.js";
 import { envs, StatusError } from "../../config/index.js";
 import { ORDER_STATUS, PAYMENT_STATUS } from "../../constants/orderStatus.js";
 import { getRazorpayConfig } from "../integrationCredentials/razorpay.js";
+import { sendOrderNotification } from "../notification/sendOrderNotification.js";
 
 const normalize = (value) => String(value || "").toUpperCase();
 
@@ -58,6 +59,11 @@ export const finalizeCapturedPayment = async ({
   validateCapturedPayment(existing, paymentData, credentials.account_id);
 
   if (isPaymentClearedStatus(existing.payment_status) && existing.stock_reserved) {
+    sendOrderNotification({
+      order: existing,
+      event: "ORDER_PLACED",
+      dedupeKey: `${existing.id}:ORDER_PLACED`,
+    });
     return { order: existing, alreadyFinalized: true };
   }
 
@@ -154,5 +160,13 @@ export const finalizeCapturedPayment = async ({
   } finally {
     await session.endSession();
   }
+  // All payment entry points (browser, webhook, admin and cron) call this
+  // service. Enqueue only after the transaction commits; the dedupe key also
+  // makes a concurrent callback or retry safe.
+  sendOrderNotification({
+    order: finalized,
+    event: "ORDER_PLACED",
+    dedupeKey: `${finalized.id}:ORDER_PLACED`,
+  });
   return { order: finalized, alreadyFinalized: false };
 };

@@ -624,13 +624,16 @@ const address = await Address.findOne({
     dbSession = null;
     await injectPlacementFault(req, "after_commit");
 
-    // Fire-and-forget — the order is already committed; a notification
-    // provider being slow/down must never affect this response.
-    notificationService.sendOrderNotification({
-      order,
-      event: "ORDER_PLACED",
-      dedupeKey: `${order.id}:ORDER_PLACED`,
-    });
+    // Full COD is confirmed at placement. Razorpay and advance COD are still
+    // pending here; their order confirmation is sent after captured payment
+    // is finalized, not before the customer has paid.
+    if (payment_method === "cod" && !advanceEnabled) {
+      notificationService.sendOrderNotification({
+        order,
+        event: "ORDER_PLACED",
+        dedupeKey: `${order.id}:ORDER_PLACED`,
+      });
+    }
 
     // ── Response ─────────────────────────────────────────────────────────────
     return res.status(200).json({
