@@ -405,7 +405,7 @@ const address = await Address.findOne({
             receipt: providerAttempt.local_order_id,
           };
         } else {
-          preparedRazorpayOrder = await createRazorpayOrder(providerAmount, currency, order_id);
+          preparedRazorpayOrder = await createRazorpayOrder(providerAmount, currency, order_id, { order_id: String(order_id) });
           providerOrderCreated = true;
           // Test-only fault boundary for the irreducible provider/local
           // persistence gap. injectPlacementFault is inert unless NODE_ENV is

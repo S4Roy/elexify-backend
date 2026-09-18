@@ -221,7 +221,8 @@ export const add = async (req, res, next) => {
       const razorpayOrder = await paymentService.createRazorpayOrder(
         sub_total,
         currency,
-        order_id
+        order_id,
+        { order_id: String(order_id) }
       );
       await Order.findOneAndUpdate(
         { id: order_id },

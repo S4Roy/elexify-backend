@@ -16,13 +16,14 @@ export const findRazorpayOrderByReceipt = async ({ receipt, amount, currency }) 
   return candidates[0] || null;
 };
 
-export const createRazorpayOrder = async (totalAmount, currency, receipt) => {
+export const createRazorpayOrder = async (totalAmount, currency, receipt, notes = {}) => {
   try {
     const { client: razorpay, credentials } = await getRazorpayContext();
     const options = {
       amount: Math.round(totalAmount * 100), // 🔧 FIXED: ensure integer
       currency,
       receipt: receipt,
+      ...(Object.keys(notes).length ? { notes } : {}),
     };
 
     const order = await razorpay.orders.create(options);

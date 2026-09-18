@@ -28,7 +28,8 @@ export const paymentInitiate = async (req, res, next) => {
       razorpay = await paymentService.createRazorpayOrder(
         order?.grand_total,
         order?.currency || "INR",
-        order?.id
+        order?.id,
+        { order_id: String(order.id) }
       );
     }
     return res.status(200).json({
