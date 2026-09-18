@@ -123,8 +123,26 @@ export const updateOrderStatus = async (req, res, next) => {
 
     if (pkg) {
       const packageStatus = PACKAGE_STATUS_MAP[normalizeOrderStatus(incoming.replace(/\s+/g, "_"))];
+
+      // Courier is picked manually in the Shiprocket dashboard, so the AWB/
+      // courier_name arrive on whichever webhook event happens to carry them
+      // first — often "AWB Assigned" or similar, which isn't one of our
+      // package statuses. Persist them regardless of whether this event also
+      // maps to a status transition, instead of discarding the whole event.
+      const metaSet = {};
+      if (awbStr && awbStr !== pkg.awb) metaSet.awb = awbStr;
+      if (courier_name && courier_name !== pkg.courier_name) metaSet.courier_name = courier_name;
+      if (etd && etd !== pkg.etd) metaSet.etd = etd;
+
       if (!packageStatus) {
-        return res.status(422).json({ status: "error", message: "Unsupported shipment status" });
+        if (Object.keys(metaSet).length) {
+          await Package.updateOne({ _id: pkg._id }, { $set: metaSet });
+        }
+        return res.status(200).json({
+          status: "success",
+          message: "Shipment metadata updated; no package status change",
+          data: { packageId: pkg._id },
+        });
       }
 
       // Idempotent replay guard — a redelivered webhook for a status
@@ -134,6 +152,9 @@ export const updateOrderStatus = async (req, res, next) => {
       // make Shiprocket retry indefinitely.
       const alreadyApplied = (pkg.timeline || []).some((entry) => entry.status === packageStatus);
       if (alreadyApplied || !isForwardPackageTransition(pkg.status, packageStatus)) {
+        if (Object.keys(metaSet).length) {
+          await Package.updateOne({ _id: pkg._id }, { $set: metaSet });
+        }
         return res.status(200).json({
           status: "success",
           message: "Already processed (idempotent)",
@@ -141,10 +162,7 @@ export const updateOrderStatus = async (req, res, next) => {
         });
       }
 
-      const set = { status: packageStatus };
-      if (awbStr) set.awb = awbStr;
-      if (courier_name) set.courier_name = courier_name;
-      if (etd) set.etd = etd;
+      const set = { status: packageStatus, ...metaSet };
       if (packageStatus === "shipped" && !pkg.shipped_at) set.shipped_at = eventTimestamp;
       if (packageStatus === "delivered" && !pkg.delivered_at) set.delivered_at = eventTimestamp;
 
