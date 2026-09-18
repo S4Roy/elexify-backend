@@ -32,7 +32,7 @@ class OrderResource extends Resource {
       package_count: this.package_count || 0,
       fully_packed: this.fully_packed || false,
       packages: (this.packages || []).map((pkg) => ({
-        package_id: pkg.package_id || null,
+        reference_id: pkg.reference_id || null,
         package_number: pkg.package_number,
         status: pkg.status,
         courier_name: pkg.courier_name || null,

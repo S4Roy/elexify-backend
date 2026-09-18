@@ -17,6 +17,7 @@ const PackageSchema = new Schema(
   {
     order_id: { type: Types.ObjectId, ref: "orders", required: true, index: true },
     package_number: { type: Number, required: true },
+    reference_id: { type: String, default: null },
 
     // Logistics state, once the Shiprocket API call itself is confirmed
     // successful (see integration_status below for the API-call outcome).
@@ -92,6 +93,10 @@ const PackageSchema = new Schema(
 );
 
 PackageSchema.index({ order_id: 1, package_number: 1 }, { unique: true });
+PackageSchema.index(
+  { reference_id: 1 },
+  { unique: true, partialFilterExpression: { reference_id: { $type: "string" } } },
+);
 PackageSchema.index(
   { shiprocket_order_id: 1 },
   { unique: true, partialFilterExpression: { shiprocket_order_id: { $type: "string" } } },

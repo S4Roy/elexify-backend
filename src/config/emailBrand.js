@@ -13,7 +13,7 @@ export const emailBrand = {
   brandName: envs.PROJECT_NAME || "Elexify",
   logoUrl: process.env.EMAIL_BRAND_LOGO_URL || `${backendUrl}/public/images/logo/logo.png`,
   storefrontUrl: frontendUrl,
-  supportEmail: envs.smtp.fromEmail || "support@example.com",
+  supportEmail: "support@elexify.online",
   supportPhone: process.env.EMAIL_BRAND_SUPPORT_PHONE || "",
   companyAddress: process.env.EMAIL_BRAND_COMPANY_ADDRESS || "",
   privacyUrl: `${frontendUrl}/page/privacy-policy`,

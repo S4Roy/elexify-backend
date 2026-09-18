@@ -82,7 +82,12 @@ export const list = async (req, res, next) => {
                 input: "$packages_raw",
                 as: "pkg",
                 in: {
-                  package_id: "$$pkg._id",
+                  reference_id: {
+                    $ifNull: [
+                      "$$pkg.reference_id",
+                      { $concat: ["$id", "-P", { $toString: "$$pkg.package_number" }] },
+                    ],
+                  },
                   package_number: "$$pkg.package_number",
                   status: "$$pkg.status",
                   courier_name: "$$pkg.courier_name",

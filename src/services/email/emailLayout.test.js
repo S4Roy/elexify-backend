@@ -13,6 +13,8 @@ describe("renderEmailShell", () => {
     expect(html).toContain("<p>Hello</p>");
     expect(html).toContain("Privacy Policy");
     expect(html).toContain("Terms &amp; Conditions");
+    expect(html).toContain('mailto:support@elexify.online');
+    expect(html).toContain('Need help? <a href="mailto:support@elexify.online"');
   });
 
   it("omits the 'manage preferences' link by default (mandatory transactional template)", () => {

@@ -1,5 +1,6 @@
 import moment from "moment-timezone";
 import { envs } from "../../../config/index.js";
+import { packageReference } from "./packageReference.js";
 
 // Builds the Shiprocket adhoc-order payload for one package. Mirrors
 // src/controllers/admin/inventory/order/shipping.js's payload exactly
@@ -72,7 +73,7 @@ export const buildPackagePayload = ({ order_data, shiprocketConfig, pkg, pickupL
   const packageDiscount = scale(discountValue);
 
   const payload = {
-    order_id: `${order_data.id}-P${pkg.package_number}`,
+    order_id: packageReference(order_data.id, pkg.package_number),
     order_date: moment(order_data.created_at || new Date()).tz("Asia/Kolkata").format("YYYY-MM-DD HH:mm"),
     pickup_location: (pickupLocation && String(pickupLocation).trim()) || shiprocketConfig.pickup_location || envs.PROJECT_NAME,
     ...(shiprocketConfig.channel_id ? { channel_id: shiprocketConfig.channel_id } : {}),

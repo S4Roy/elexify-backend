@@ -9,6 +9,7 @@ class PackageResource extends Resource {
     return {
       _id: this._id || null,
       package_number: this.package_number,
+      reference_id: this.reference_id || null,
       status: this.status,
       integration_status: this.integration_status,
       items: (this.items || []).map((line) => ({

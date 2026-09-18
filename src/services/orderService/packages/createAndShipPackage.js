@@ -6,6 +6,7 @@ import { StatusError, envs } from "../../../config/index.js";
 import { getIntegrationConfig } from "../../integrationCredentials/index.js";
 import { buildPackagePayload, resolveBillingAddress, resolvePackageDims, extractShiprocketIds } from "./buildPackagePayload.js";
 import { recomputeOrderStatus } from "./recomputeOrderStatus.js";
+import { packageReference } from "./packageReference.js";
 
 // Orders in these statuses have nothing left to ship or can never be
 // shipped — creating a package is refused outright rather than relying
@@ -111,6 +112,7 @@ export const createAndShipPackage = async ({
         {
           order_id: order._id,
           package_number: nextPackageNumber,
+          reference_id: packageReference(order.id, nextPackageNumber),
           items: requestedItems,
           weight: dims.weight,
           length: dims.length,
