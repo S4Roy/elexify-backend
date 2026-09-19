@@ -51,9 +51,9 @@ const isForwardPackageTransition = (from, to) => {
   return toIdx > fromIdx;
 };
 
-const processReverseWebhook = async ({ incomingOrderId, awbStr, incoming, courierName, eventTimestamp, shipmentId, token }) => {
+const processReverseWebhook = async ({ orderIds, awbStr, incoming, courierName, eventTimestamp, shipmentId, token }) => {
   const refs = [
-    ...(incomingOrderId ? [{ request_number: String(incomingOrderId) }, { 'pickup.shiprocket_order_id': String(incomingOrderId) }] : []),
+    ...orderIds.flatMap(id => [{ request_number: id }, { 'pickup.shiprocket_order_id': id }]),
     ...(awbStr ? [{ 'pickup.shiprocket_awb': awbStr }, { 'pickup.tracking_number': awbStr }] : []),
     ...(shipmentId ? [{ 'pickup.shiprocket_shipment_id': String(shipmentId) }] : []),
   ];
@@ -144,7 +144,10 @@ export const updateOrderStatus = async (req, res, next) => {
 
     // Accept numeric AWB as string
     const awbStr = awb != null ? String(awb) : null;
-    const incomingOrderId = order_id || channel_order_id || null;
+    const orderIds = [...new Set([order_id, channel_order_id]
+      .filter(value => typeof value === 'string' || typeof value === 'number')
+      .map(value => String(value).trim()).filter(Boolean))];
+    const incomingOrderId = orderIds[0] || null;
 
     if (!incomingOrderId && !awbStr && !body.shipment_id) {
       // Nothing to correlate — respond 200 so webhook doesn't block
@@ -167,7 +170,7 @@ export const updateOrderStatus = async (req, res, next) => {
 
     // Reverse shipments are correlated by the return number/Shiprocket id/AWB
     // and update the same customer-visible event log as manual admin actions.
-    const reverse = await processReverseWebhook({ incomingOrderId, awbStr, incoming, courierName: courier_name, eventTimestamp, shipmentId: body.shipment_id, token: req.headers["x-api-key"] });
+    const reverse = await processReverseWebhook({ orderIds, awbStr, incoming, courierName: courier_name, eventTimestamp, shipmentId: body.shipment_id, token: req.headers["x-api-key"] });
     if (reverse) {
       // A webhook retries on any non-2xx — an unsupported status will
       // never become supported on retry, so this acks with 200 rather
@@ -184,7 +187,7 @@ export const updateOrderStatus = async (req, res, next) => {
     // below — that's what keeps historical orders fully backward compatible.
     const pkg = await Package.findOne({
       $or: [
-        ...(incomingOrderId ? [{ shiprocket_order_id: String(incomingOrderId) }] : []),
+        ...orderIds.flatMap(id => [{ shiprocket_order_id: id }, { reference_id: id }]),
         ...(awbStr ? [{ awb: awbStr }] : []),
         ...(body.shipment_id ? [{ shiprocket_shipment_id: String(body.shipment_id) }] : []),
       ],
@@ -294,9 +297,12 @@ export const updateOrderStatus = async (req, res, next) => {
 
     // ── Legacy fallback: no Package doc correlates to this webhook (a
     // pre-feature order shipped under the old single-shipment flow) ──────
-    // Everything below is completely unchanged.
     // Try find forward order
-    let order = await Order.findOne({ id: incomingOrderId });
+    const orderRefs = [
+      ...orderIds.flatMap(id => [{ id }, { shiprocket_order_id: id }]),
+      ...(awbStr ? [{ awb: awbStr }] : []),
+    ];
+    let order = orderRefs.length ? await Order.findOne({ $or: orderRefs }) : null;
 
     if (!order) {
       // Not found: log and return success (to avoid retries). You can persist webhook for later if you want.

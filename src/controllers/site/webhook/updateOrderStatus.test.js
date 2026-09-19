@@ -31,6 +31,8 @@ const mockRes = () => {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  Package.findOne.mockResolvedValue(null);
+  Order.findOne.mockResolvedValue(null);
   ReturnRequest.findOne.mockResolvedValue(null);
   // OrderScans.findOne(...).lean() — mirror Mongoose's chainable query API.
   OrderScans.findOne.mockReturnValue({ lean: () => Promise.resolve(null) });
@@ -80,7 +82,11 @@ describe("updateOrderStatus — Shiprocket forward-shipment webhook", () => {
     await updateOrderStatus(req, res, vi.fn());
 
     expect(Package.findOne).toHaveBeenCalledWith({
-      $or: [{ shiprocket_order_id: "13905312" }, { awb: "59629792084" }],
+      $or: [
+        { shiprocket_order_id: "13905312" }, { reference_id: "13905312" },
+        { shiprocket_order_id: "ORD-000019-P1" }, { reference_id: "ORD-000019-P1" },
+        { awb: "59629792084" },
+      ],
     });
     expect(Package.updateOne).toHaveBeenCalledWith(
       { _id: "pkg1" },
@@ -422,5 +428,28 @@ describe("updateOrderStatus — webhook audit log", () => {
     expect(WebhookLog.create).toHaveBeenCalledTimes(1);
     expect(WebhookLog.create.mock.calls[0][0].outcome).toBe("error");
     expect(res.status).toHaveBeenCalledWith(200);
+  });
+});
+
+
+describe('Shiprocket legacy identifier correlation', () => {
+  it('checks both channel and provider IDs plus AWB for legacy orders', async () => {
+    const res = mockRes();
+    await updateOrderStatus({ headers: {}, body: {
+      order_id: '15781', channel_order_id: 'ORD-000019', awb: 'FH010390455IN', current_status: 'shipped',
+    } }, res, vi.fn());
+    expect(Order.findOne).toHaveBeenCalledWith({ $or: [
+      { id: '15781' }, { shiprocket_order_id: '15781' },
+      { id: 'ORD-000019' }, { shiprocket_order_id: 'ORD-000019' },
+      { awb: 'FH010390455IN' },
+    ] });
+  });
+  it('can correlate historical orders using only AWB', async () => {
+    await updateOrderStatus({ headers: {}, body: { awb: 'FH010390455IN', current_status: 'shipped' } }, mockRes(), vi.fn());
+    expect(Order.findOne).toHaveBeenCalledWith({ $or: [{ awb: 'FH010390455IN' }] });
+  });
+  it('does not query legacy orders with an empty selector for shipment-only events', async () => {
+    await updateOrderStatus({ headers: {}, body: { shipment_id: 'shipment-1', current_status: 'shipped' } }, mockRes(), vi.fn());
+    expect(Order.findOne).not.toHaveBeenCalled();
   });
 });
