@@ -43,10 +43,25 @@ export const createOptions = async (req, res, next) => {
     const search = String(req.query.search || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const active = { status: 'active', deleted_at: null };
     let data;
-    if (req.query.customer_id && req.query.kind !== 'customers') {
-      data = await Address.find({ ...active, user: req.query.customer_id }).select('full_name phone address_line_1 address_line_2 city_name state_name postcode').limit(50).lean();
-    } else if (req.query.kind === 'customers') {
-      data = await User.find({ ...active, role: 'customer', ...(req.query.customer_id ? { _id: req.query.customer_id } : {}), $or: [{ name: new RegExp(search, 'i') }, { email: new RegExp(search, 'i') }, { mobile: new RegExp(search, 'i') }] }).select('name email mobile phone_code').limit(20).lean();
+    const page = Number(req.query.page || 1);
+    const limit = Number(req.query.limit || 20);
+    let pagination;
+    if (req.query.kind === 'customers' || req.query.customer_id) {
+      const isCustomer = req.query.kind === 'customers';
+      const model = isCustomer ? User : Address;
+      const fields = isCustomer ? ['name', 'email', 'mobile'] : ['full_name', 'phone', 'address_line_1', 'address_line_2', 'city_name', 'state_name', 'postcode'];
+      const filter = { ...active,
+        ...(isCustomer ? { role: 'customer', ...(req.query.customer_id ? { _id: req.query.customer_id } : {}) } : { user: req.query.customer_id }),
+        ...(search ? { $or: fields.map(field => ({ [field]: new RegExp(search, 'i') })) } : {}),
+      };
+      const [records, total] = await Promise.all([
+        model.find(filter).select(isCustomer ? 'name email mobile phone_code' : 'full_name phone phone_code address_line_1 address_line_2 city_name state_name postcode')
+          .sort(isCustomer ? { name: 1, _id: 1 } : { is_default: -1, created_at: -1, _id: -1 })
+          .skip((page - 1) * limit).limit(limit).lean(),
+        model.countDocuments(filter),
+      ]);
+      data = records;
+      pagination = { page, limit, total, has_more: page * limit < total };
     } else {
       const matchingVariants = search ? await ProductVariation.find({ ...active, sku: new RegExp(search, 'i') }).select('product_id').limit(20).lean() : [];
       const products = await Product.find({ ...active, $or: [{ name: new RegExp(search, 'i') }, { sku: new RegExp(search, 'i') }, { _id: { $in: matchingVariants.map(v => v.product_id) } }] }).select('name sku type stock_quantity regular_price sale_price').limit(20).lean();
@@ -55,6 +70,6 @@ export const createOptions = async (req, res, next) => {
         ? variations.filter(v => String(v.product_id) === String(p._id)).map(v => ({ ...v, product_id: p._id, variation_id: v._id, name: `${p.name} — ${v.combination_key}` }))
         : [{ ...p, product_id: p._id, variation_id: null }]);
     }
-    res.json({ status: 'success', data });
+    res.json({ status: 'success', data, ...(pagination ? { pagination } : {}) });
   } catch (error) { next(error); }
 };

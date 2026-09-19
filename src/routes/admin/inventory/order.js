@@ -38,7 +38,7 @@ orderRouter.post('/payment/manual',
   }) }), recordManualPayment,
 );
 
-orderRouter.get("/create-options", requirePermission(PERMISSIONS.ORDER_CREATE), celebrate({ query: Joi.object({ kind: Joi.string().valid("customers", "products"), search: Joi.string().max(100).allow(""), customer_id: Joi.string().hex().length(24) }) }), createOptions);
+orderRouter.get("/create-options", requirePermission(PERMISSIONS.ORDER_CREATE), celebrate({ query: Joi.object({ page: Joi.number().integer().min(1).max(100000).default(1), limit: Joi.number().integer().min(1).max(50).default(20), kind: Joi.string().valid("customers", "products"), search: Joi.string().max(100).allow(""), customer_id: Joi.string().hex().length(24) }) }), createOptions);
 orderRouter.post("/quote", requirePermission(PERMISSIONS.ORDER_CREATE), quote, inventoryController.orderController.add);
 
 orderRouter.get(

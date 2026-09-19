@@ -1,7 +1,8 @@
+import Address from '../../../../models/Address.js';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 vi.mock('../../../site/inventory/order/add.js', () => ({ add: vi.fn() }));
 import { add as checkout } from '../../../site/inventory/order/add.js';
-import { add, loadAdminItems } from './add.js';
+import { add, loadAdminItems, createOptions } from './add.js';
 import Product from '../../../../models/Product.js';
 import ProductVariation from '../../../../models/ProductVariation.js';
 import User from '../../../../models/User.js';
@@ -46,5 +47,41 @@ describe('catalogue selection', () => {
   it('rejects unavailable products', async () => {
     vi.spyOn(Product, 'findOne').mockResolvedValue(null);
     await expect(loadAdminItems([{ product_id: 'p', quantity: 1 }])).rejects.toThrow('no longer available');
+  });
+});
+
+describe('paginated order lookups', () => {
+  const query = records => {
+    const chain = { select: vi.fn(), sort: vi.fn(), skip: vi.fn(), limit: vi.fn(), lean: vi.fn().mockResolvedValue(records) };
+    for (const key of ['select', 'sort', 'skip', 'limit']) chain[key].mockReturnValue(chain);
+    return chain;
+  };
+  it('paginates customers with stable sorting and literal search', async () => {
+    const chain = query([{ _id: 'customer', name: 'A.*' }]);
+    vi.spyOn(User, 'find').mockReturnValue(chain);
+    vi.spyOn(User, 'countDocuments').mockResolvedValue(41);
+    const res = { json: vi.fn() }, next = vi.fn();
+    await createOptions({ query: { kind: 'customers', search: 'A.*', page: 2, limit: 20 } }, res, next);
+    expect(next).not.toHaveBeenCalled();
+    expect(chain.skip).toHaveBeenCalledWith(20);
+    expect(chain.limit).toHaveBeenCalledWith(20);
+    expect(chain.sort).toHaveBeenCalledWith({ name: 1, _id: 1 });
+    const filter = User.find.mock.calls[0][0];
+    expect(filter.$or[0].name.test('A.*')).toBe(true);
+    expect(filter.$or[0].name.test('Alice')).toBe(false);
+    expect(User.countDocuments).toHaveBeenCalledWith(filter);
+    expect(res.json.mock.calls[0][0].pagination).toEqual({ page: 2, limit: 20, total: 41, has_more: true });
+  });
+  it('scopes address search and count to the chosen customer', async () => {
+    const chain = query([]);
+    vi.spyOn(Address, 'find').mockReturnValue(chain);
+    vi.spyOn(Address, 'countDocuments').mockResolvedValue(0);
+    const res = { json: vi.fn() }, next = vi.fn();
+    await createOptions({ query: { customer_id: 'customer', search: '700001' } }, res, next);
+    const filter = Address.find.mock.calls[0][0];
+    expect(filter).toMatchObject({ user: 'customer', deleted_at: null, status: 'active' });
+    expect(filter.$or.some(field => field.postcode?.test('700001'))).toBe(true);
+    expect(Address.countDocuments).toHaveBeenCalledWith(filter);
+    expect(res.json.mock.calls[0][0].pagination.has_more).toBe(false);
   });
 });
