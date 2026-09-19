@@ -1,3 +1,6 @@
+import { updateAddress } from "../../../controllers/admin/inventory/order/updateAddress.js";
+import { addressOptions } from "../../../controllers/admin/customerAccount/address.js";
+import { addressEditSchema } from "../../../validations/admin/customerAccount/address.js";
 import { recordManualPayment } from "../../../controllers/admin/inventory/order/recordManualPayment.js";
 import { celebrate, Joi } from "celebrate";
 import { returnOperation } from "../../../controllers/admin/inventory/order/returnOperations.js";
@@ -8,6 +11,16 @@ import { requirePermission } from "../../../middleware/requirePermission.js";
 import { PERMISSIONS } from "../../../constants/adminPermissions.js";
 
 const orderRouter = Router();
+
+orderRouter.get('/address/options', requirePermission(PERMISSIONS.ORDER_ADDRESS_MANAGE),
+  celebrate({ query: Joi.object({ country: Joi.number().integer().positive() }) }), addressOptions);
+orderRouter.put('/address', requirePermission(PERMISSIONS.ORDER_ADDRESS_MANAGE),
+  celebrate({ body: addressEditSchema.keys({
+    order_id: Joi.string().hex().length(24).required(),
+    address_kind: Joi.string().valid('shipping', 'billing').required(),
+    expected_address_id: Joi.string().hex().length(24).required(),
+    charges_confirmed: Joi.boolean().valid(true).required(),
+  }) }), updateAddress);
 
 orderRouter.post('/payment/manual',
   requirePermission(PERMISSIONS.ORDER_PAYMENT_MANAGE),

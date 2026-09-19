@@ -35,7 +35,7 @@ export const buildPackagePayload = ({ order_data, shiprocketConfig, pkg, pickupL
   const placeName = (value, fallback) =>
     (typeof value === "object" ? value?.name : typeof value === "string" ? value : null) || fallback || "";
   const shippingEmpty =
-    !shippingAddr || !shippingAddr.address_line_1 || !shippingAddr.city?.name || !shippingAddr.postcode;
+    !shippingAddr || !shippingAddr.address_line_1 || !placeName(shippingAddr.city, shippingAddr.city_name) || !shippingAddr.postcode;
   const shipping_is_billing = !!order_data.shipping_is_billing;
 
   const allOrderItems = order_data.order_items || [];

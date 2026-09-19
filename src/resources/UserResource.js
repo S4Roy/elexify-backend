@@ -7,6 +7,7 @@ class UserResource extends Resource {
       role: this.role || null,
       name: this.name || null,
       email: this.email || null,
+      phone_code: this.phone_code || null,
       mobile: this.mobile || null,
       address: this.address || null,
       status: this.status || null,

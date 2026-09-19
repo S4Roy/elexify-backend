@@ -6,6 +6,7 @@
 // new routes in routes/admin/customer.js and routes/admin/notification.js.
 
 export const PERMISSIONS = {
+  CUSTOMER_ADDRESS_MANAGE: "customer.address.manage",
   CUSTOMER_VIEW: "customer.view",
   CUSTOMER_CONTACT_VIEW: "customer.contact.view",
   CUSTOMER_VERIFICATION_OVERRIDE: "customer.verification.override",
@@ -23,6 +24,7 @@ export const PERMISSIONS = {
   ZOHO_INVOICE_MANAGE: "zoho_invoice.manage",
   RETURN_VIEW: "return.view",
   RETURN_REVIEW: "return.review",
+  ORDER_ADDRESS_MANAGE: "order.address.manage",
   ORDER_PAYMENT_MANAGE: "order.payment.manage",
   ORDER_STATUS_MANAGE: "order.status.manage",
   ORDER_CANCEL_MANAGE: "order.cancel.manage",
@@ -72,6 +74,7 @@ export const ROLE_PERMISSIONS = {
   manager: [
     ...VIEW_ONLY,
     PERMISSIONS.CUSTOMER_VERIFICATION_OVERRIDE,
+    PERMISSIONS.CUSTOMER_ADDRESS_MANAGE,
     PERMISSIONS.CUSTOMER_NOTIFICATION_RETRY,
     PERMISSIONS.CUSTOMER_PREFERENCE_MANAGE,
     PERMISSIONS.EMAIL_TEMPLATE_MANAGE,
@@ -81,6 +84,7 @@ export const ROLE_PERMISSIONS = {
     PERMISSIONS.RETURN_REVIEW,
     PERMISSIONS.ORDER_STATUS_MANAGE,
     PERMISSIONS.ORDER_PAYMENT_MANAGE,
+    PERMISSIONS.ORDER_ADDRESS_MANAGE,
     PERMISSIONS.ORDER_CANCEL_MANAGE,
     PERMISSIONS.ORDER_REOPEN_MANAGE,
     // View-only for Data Operations — no execute permissions, matching the

@@ -1,3 +1,5 @@
+import { listAddresses, editAddress, addressOptions } from "../../controllers/admin/customerAccount/address.js";
+import { validateAddressList, validateAddressEdit, validateAddressOptions } from "../../validations/admin/customerAccount/address.js";
 import { Router } from "express";
 import { customerAccountController } from "../../controllers/admin/index.js";
 import { customerAccountValidation } from "../../validations/admin/index.js";
@@ -9,6 +11,10 @@ import { PERMISSIONS } from "../../constants/adminPermissions.js";
 // ./customer.js, to avoid touching that already-working list/add/edit/
 // remove/change-status surface.
 const customersRouter = Router();
+
+customersRouter.get('/:id/addresses', requirePermission(PERMISSIONS.CUSTOMER_CONTACT_VIEW), validateAddressList, listAddresses);
+customersRouter.get('/:id/address-options', requirePermission(PERMISSIONS.CUSTOMER_ADDRESS_MANAGE), validateAddressOptions, addressOptions);
+customersRouter.put('/:id/addresses/:addressId', requirePermission(PERMISSIONS.CUSTOMER_ADDRESS_MANAGE), validateAddressEdit, editAddress);
 
 customersRouter.get(
   "/:id/details",

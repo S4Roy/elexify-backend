@@ -138,12 +138,15 @@ export const createAndShipPackage = async ({
       updatedAllocated.set(key, (updatedAllocated.get(key) || 0) + line.quantity);
     }
     const fullyPacked = orderItems.every((oi) => (updatedAllocated.get(String(oi._id)) || 0) >= oi.quantity);
-    await Order.updateOne(
-      { _id: order._id },
+    const packageClaim = await Order.updateOne(
+      { _id: order._id, shipping_address: order.shipping_address, billing_address: order.billing_address },
       { $set: { package_count: nonCancelledPackages.length + 1, fully_packed: fullyPacked } },
       { session: dbSession },
     );
 
+    if (packageClaim.matchedCount !== 1) {
+      throw StatusError.conflict("Order address changed while preparing the shipment. Refresh and try again.");
+    }
     await dbSession.commitTransaction();
   } catch (error) {
     await dbSession.abortTransaction().catch(() => {});

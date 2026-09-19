@@ -16,6 +16,8 @@ const AuditLogSchema = new Schema(
       enum: [
         "EMAIL_CHANGE_REQUESTED",
         "EMAIL_CHANGED",
+        "CUSTOMER_ADDRESS_UPDATED",
+        "ORDER_ADDRESS_UPDATED",
         "MOBILE_CHANGE_REQUESTED",
         "MOBILE_CHANGED",
         "NOTIFICATION_PREFERENCES_CHANGED",

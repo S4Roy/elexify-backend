@@ -17,6 +17,17 @@ const build = (order_data) => buildPackagePayload({
 });
 
 describe("Shiprocket package address", () => {
+  it("uses an edited shipping address with a free-text city instead of the billing address", () => {
+    const payload = build({
+      billing_address: { address_line_1: "Original Billing Street", city_name: "Delhi", postcode: "110001" },
+      shipping_address: { address_line_1: "Corrected Delivery Street", city: null, city_name: "Kolkata",
+        state_name: "West Bengal", country_name: "India", postcode: "700001" },
+    });
+    expect(payload.shipping_is_billing).toBe(false);
+    expect(payload.shipping_address).toBe("Corrected Delivery Street");
+    expect(payload.shipping_city).toBe("Kolkata");
+    expect(payload.billing_address).toBe("Original Billing Street");
+  });
   it("uses the order-time billing snapshot when the live address is missing", () => {
     const payload = build({
       billing_address: null,

@@ -95,7 +95,7 @@ export const getOrGenerateInvoice = async ({ orderId, actorType }) => {
     throw StatusError.notFound("Order not found");
   }
 
-  const order = await Order.findOne({ _id: orderId, deleted_at: null });
+  let order = await Order.findOne({ _id: orderId, deleted_at: null });
   if (!order) {
     throw StatusError.notFound("Order not found");
   }
@@ -144,6 +144,8 @@ export const getOrGenerateInvoice = async ({ orderId, actorType }) => {
     );
   }
 
+  // Use the address version that won the invoice claim, including any prior admin correction.
+  order = claimed;
   const now = new Date();
   const { invoiceNumber, financialYear } = await nextInvoiceNumber(now);
 
