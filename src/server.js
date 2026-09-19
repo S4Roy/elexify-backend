@@ -105,6 +105,7 @@ const allowedOrigins = buildAllowedOrigins(
   "http://localhost:3000",
   "http://localhost:5173",
   "https://www.elexify.online",
+  "https://elexify.online",
   "https://elexify.baseweb.in",
   "https://inventory.elexify.online",
   "https://api.elexify.online",
@@ -121,15 +122,17 @@ app.use(
     verify: (req, res, buf) => {
       req.rawBody = buf;
     },
-  })
+  }),
 );
 app.use(express.urlencoded({ limit: "5mb", extended: true }));
-app.use(fileUpload({
-  limits: { fileSize: 50 * 1024 * 1024 },
-  abortOnLimit: true,
-  safeFileNames: true,
-  preserveExtension: 5,
-}));
+app.use(
+  fileUpload({
+    limits: { fileSize: 50 * 1024 * 1024 },
+    abortOnLimit: true,
+    safeFileNames: true,
+    preserveExtension: 5,
+  }),
+);
 app.use(express.static("public"));
 app.use(bearerToken());
 app.use(StatusSuccess);
@@ -191,12 +194,20 @@ cron.schedule("* * * * *", async () => {
 // touches SystemOperationExecution summaries or AuditLog — those are the
 // long-retention, audit-purpose records per the data-operations plan; only
 // the verbose per-line logs are short-retention. Runs once a day.
-const SYSTEM_OPERATION_LOG_RETENTION_DAYS = Number(process.env.SYSTEM_OPERATION_LOG_RETENTION_DAYS) || 30;
+const SYSTEM_OPERATION_LOG_RETENTION_DAYS =
+  Number(process.env.SYSTEM_OPERATION_LOG_RETENTION_DAYS) || 30;
 cron.schedule("30 2 * * *", async () => {
   try {
-    const cutoff = new Date(Date.now() - SYSTEM_OPERATION_LOG_RETENTION_DAYS * 24 * 60 * 60 * 1000);
-    const result = await SystemOperationLog.deleteMany({ created_at: { $lt: cutoff } });
-    if (result.deletedCount) console.log(`SystemOperationLog retention cleanup: deleted ${result.deletedCount} log line(s) older than ${SYSTEM_OPERATION_LOG_RETENTION_DAYS} day(s).`);
+    const cutoff = new Date(
+      Date.now() - SYSTEM_OPERATION_LOG_RETENTION_DAYS * 24 * 60 * 60 * 1000,
+    );
+    const result = await SystemOperationLog.deleteMany({
+      created_at: { $lt: cutoff },
+    });
+    if (result.deletedCount)
+      console.log(
+        `SystemOperationLog retention cleanup: deleted ${result.deletedCount} log line(s) older than ${SYSTEM_OPERATION_LOG_RETENTION_DAYS} day(s).`,
+      );
   } catch (e) {
     console.error("SystemOperationLog retention cleanup Cron Failed", e);
   }
