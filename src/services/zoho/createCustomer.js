@@ -1,35 +1,32 @@
-import { getTokens } from "./getTokens.js";
-import { envs } from "../../config/index.js";
-import axios from "axios";
-import { getIntegrationConfig } from "../integrationCredentials/index.js";
+import { booksRequest, zohoErrorMessage } from './booksRequest.js';
 
-export const createCustomer = async (customerData) => {
+export const createCustomer = async (customerData, { recoverExisting = false } = {}) => {
+  const findExisting = async () => {
+    const response = await booksRequest('GET', 'contacts', { params: {
+      contact_name: customerData.contact_name, contact_type: 'customer', per_page: 200,
+    } });
+    const matches = (response.contacts || []).filter(c => c.contact_name === customerData.contact_name && c.contact_type === 'customer');
+    if (matches.length > 1) throw new Error('Multiple Zoho contacts match this customer. Reconcile the duplicate contacts before retrying.');
+    if (matches[0]?.status === 'inactive') throw new Error('The linked Zoho contact is inactive. Activate it in Zoho Books before retrying.');
+    return matches[0] || null;
+  };
   try {
-    const accessToken = await getTokens();
-    const credentials = await getIntegrationConfig("zoho", { org_id: envs.zoho.ORG_ID, base_url: envs.zoho.BASE_URL });
-    if (!credentials) throw new Error("Zoho integration is disabled");
-    const url = `${credentials.base_url || "https://www.zohoapis.in/books/v3"}/contacts`;
-
-    const response = await axios.post(url, customerData, {
-      headers: {
-        Authorization: `Zoho-oauthtoken ${accessToken}`,
-        "X-com-zoho-invoice-organizationid": `${credentials.org_id}`,
-        "Content-Type": "application/json",
-      },
-    });
-
-    return {
-      success: true,
-      data: response.data,
-    };
+    if (recoverExisting) {
+      const existing = await findExisting();
+      if (existing) return { success: true, data: { contact: existing } };
+    }
+    try {
+      const data = await booksRequest('POST', 'contacts', { data: customerData });
+      if (!data.contact?.contact_id) throw new Error('Zoho Books did not return a customer ID');
+      return { success: true, data };
+    } catch (error) {
+      if (recoverExisting) {
+        const existing = await findExisting().catch(() => null);
+        if (existing) return { success: true, data: { contact: existing } };
+      }
+      throw error;
+    }
   } catch (error) {
-    console.error(
-      "Zoho Create Customer Error:",
-      error.response?.data || error.message
-    );
-    return {
-      success: false,
-      error: error.response?.data || error.message,
-    };
+    return { success: false, error: zohoErrorMessage(error) };
   }
 };

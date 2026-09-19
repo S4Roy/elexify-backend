@@ -1,3 +1,4 @@
+import { customerPayload } from "./customerPayload.js";
 import Invoice from "../../models/Invoice.js";
 import Order from "../../models/Order.js";
 import User from "../../models/User.js";
@@ -12,24 +13,15 @@ const safeError = (error) => {
 };
 
 const ensureZohoCustomer = async (order, invoice) => {
-  const user = await User.findById(order.user);
-  if (!user) throw StatusError.badRequest("Order customer is unavailable");
-  if (user.zoho_customer_id) return user.zoho_customer_id;
-  const address = invoice.billing_address || {};
-  const response = await createCustomer({
-    contact_name: user.name,
-    email: user.email,
-    billing_address: {
-      address: [address.address_line_1, address.address_line_2].filter(Boolean).join(", "),
-      city: address.city_name || address.city?.name || "",
-      state: address.state_name || address.state?.name || "",
-      zip: address.postcode || "",
-      country: address.country_name || address.country?.name || "India",
-    },
-  });
+  const user = order.user ? await User.findById(order.user) : null;
+  if (user?.zoho_customer_id) return user.zoho_customer_id;
+  const identity = user ? String(user._id) : `order-${order.id}`;
+  const response = await createCustomer(customerPayload(user, invoice, identity), { recoverExisting: true });
   const customerId = response?.data?.contact?.contact_id;
-  if (!response?.success || !customerId) throw new Error("Unable to create the customer in Zoho Books");
-  await User.updateOne({ _id: user._id }, { $set: { zoho_customer_id: customerId } });
+  if (!response?.success || !customerId) {
+    throw new Error(`Unable to create the customer in Zoho Books: ${safeError(response?.error || 'No customer ID returned')}`);
+  }
+  if (user) await User.updateOne({ _id: user._id }, { $set: { zoho_customer_id: customerId } });
   return customerId;
 };
 

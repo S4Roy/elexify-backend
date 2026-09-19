@@ -19,6 +19,7 @@ const ProductSchema = new Schema(
       unique: true,
       maxlength: [200, "Product name cannot exceed 200 characters"],
     },
+    legacy_slugs: { type: [String], default: [], index: true },
     slug: {
       type: String,
       required: true,

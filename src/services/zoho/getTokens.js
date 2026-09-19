@@ -7,7 +7,7 @@ import { getIntegrationConfig } from "../integrationCredentials/index.js";
 
 const ZOHO_TOKEN_URL = "https://accounts.zoho.in/oauth/v2/token";
 
-export const getTokens = async () => {
+export const getTokens = async ({ forceRefresh = false } = {}) => {
   const credentials = await getIntegrationConfig("zoho", {
     org_id: envs.zoho.ORG_ID,
     client_id: envs.zoho.CLIENT_ID,
@@ -28,8 +28,8 @@ export const getTokens = async () => {
 
   // Return existing valid token
   if (
-    tokenData.access_token &&
-    moment().tz("Asia/Kolkata").isBefore(moment(tokenData.expires_at))
+    !forceRefresh && tokenData.access_token &&
+    moment().add(60, "seconds").tz("Asia/Kolkata").isBefore(moment(tokenData.expires_at))
   ) {
     return tokenData.access_token;
   }
@@ -44,10 +44,14 @@ export const getTokens = async () => {
     };
 
     const response = await axios.post(ZOHO_TOKEN_URL, qs.stringify(data), {
+      timeout: 20000,
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
     });
 
     const { access_token, expires_in } = response.data;
+    if (!access_token || !Number.isFinite(Number(expires_in)) || Number(expires_in) <= 0) {
+      throw new Error(`Zoho OAuth rejected token refresh: ${response.data?.error || 'invalid token response'}`);
+    }
 
     tokenData.access_token = access_token;
     tokenData.expires_at = moment()
@@ -59,10 +63,7 @@ export const getTokens = async () => {
 
     return access_token;
   } catch (error) {
-    console.error(
-      "Zoho token refresh failed:",
-      error.response?.data || error.message
-    );
-    throw new Error("Failed to refresh Zoho access token");
+    const reason = error.response?.data?.error || error.message || 'unknown error';
+    throw new Error(`Failed to refresh Zoho access token: ${String(reason).slice(0, 200)}. Check the Zoho OAuth credentials and data center.`);
   }
 };

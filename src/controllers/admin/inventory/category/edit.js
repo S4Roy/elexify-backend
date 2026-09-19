@@ -43,7 +43,7 @@ export const edit = async (req, res, next) => {
 
       // Check if another category with the same slug exists
       let existingCategory = await Category.findOne({
-        slug,
+        $or: [{ slug }, { legacy_slugs: slug }],
         _id: { $ne: _id },
       }).exec();
       let count = 1;
@@ -52,7 +52,7 @@ export const edit = async (req, res, next) => {
       while (existingCategory) {
         slug = generalHelper.generateSlugName(`${name}-${count}`);
         existingCategory = await Category.findOne({
-          slug,
+          $or: [{ slug }, { legacy_slugs: slug }],
           _id: { $ne: _id },
         }).exec();
         count++;
@@ -112,7 +112,7 @@ export const edit = async (req, res, next) => {
     // Update the category
     const updatedCategory = await Category.findByIdAndUpdate(
       _id,
-      { $set: updateData },
+      { $set: updateData, ...(category.slug && slug !== category.slug ? { $addToSet: { legacy_slugs: category.slug } } : {}) },
       { new: true }
     );
 

@@ -26,12 +26,12 @@ export const add = async (req, res, next) => {
     } = req.body;
     // Generate a unique slug
     let slug = generalHelper.generateSlugName(name);
-    let existingCategory = await Category.findOne({ slug }).exec();
+    let existingCategory = await Category.findOne({ $or: [{ slug }, { legacy_slugs: slug }] }).exec();
     let count = 1;
 
     while (existingCategory) {
       slug = generalHelper.generateSlugName(`${name}-${count}`);
-      existingCategory = await Category.findOne({ slug }).exec();
+      existingCategory = await Category.findOne({ $or: [{ slug }, { legacy_slugs: slug }] }).exec();
       count++;
     }
 

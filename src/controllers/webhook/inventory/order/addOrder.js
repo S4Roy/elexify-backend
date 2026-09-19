@@ -131,8 +131,9 @@ export const addOrder = async (req, res, next) => {
     }
     if (!user?.zoho_customer_id) {
       let zoho_customer = {
-        contact_name: user.name,
-        email: user.email,
+        contact_name: `Elexify ${user._id}`,
+        contact_type: "customer",
+        notes: `${user.name} — Elexify customer ${user._id}`,
         billing_address: {
           address: `${billing_address.address_1} ${
             billing_address.address_2 || ""
@@ -163,10 +164,9 @@ export const addOrder = async (req, res, next) => {
           },
         ],
       };
-      console.log(`📝 Creating Zoho customer for ${zoho_customer}`);
 
       const createCustomerResponse = await zohoService.createCustomer(
-        zoho_customer
+        zoho_customer, { recoverExisting: true }
       );
 
       if (createCustomerResponse?.data?.contact?.contact_id) {

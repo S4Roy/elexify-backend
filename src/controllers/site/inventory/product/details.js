@@ -1,3 +1,4 @@
+import { resolveCatalogSlug, LEGACY_PRODUCT_SLUGS } from "../../../../services/inventory/resolveCatalogSlug.js";
 import Product from "../../../../models/Product.js";
 import ExchangeRate from "../../../../models/ExchangeRate.js";
 import { StatusError } from "../../../../config/index.js";
@@ -16,8 +17,10 @@ export const details = async (req, res, next) => {
 
     if (!slug) throw StatusError.badRequest("Slug is required");
 
+    const resolved = await resolveCatalogSlug(Product, slug, LEGACY_PRODUCT_SLUGS);
+    if (!resolved) throw StatusError.notFound("Product not found");
     const pipeline = [
-      { $match: { slug, deleted_at: null } },
+      { $match: { _id: resolved._id, deleted_at: null, status: "active" } },
 
       // categories (sorted)
       {

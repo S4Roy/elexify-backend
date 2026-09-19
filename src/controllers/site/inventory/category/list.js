@@ -1,3 +1,4 @@
+import { resolveCatalogSlug } from "../../../../services/inventory/resolveCatalogSlug.js";
 import Category from "../../../../models/Category.js";
 import { StatusError, envs } from "../../../../config/index.js";
 import CategoryResource from "../../../../resources/CategoryResource.js";
@@ -279,10 +280,7 @@ export const list = async (req, res, next) => {
     let data;
     if (slug) {
       // For details: add banners and details blocks then run aggregation
-      let slug_details = await Category.findOne({
-        slug: slug,
-        deleted_at: null,
-      }).lean();
+      const slug_details = await resolveCatalogSlug(Category, slug);
 
       if (!slug_details) {
         throw StatusError.notFound(req.__("Category not found"));

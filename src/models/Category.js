@@ -10,6 +10,7 @@ const CategorySchema = new Schema(
       // unique: true,
     },
     path: { type: String, index: true },
+    legacy_slugs: { type: [String], default: [], index: true },
     slug: {
       type: String,
       required: true,

@@ -70,7 +70,7 @@ export const edit = async (req, res, next) => {
     if (name && name !== product.name) {
       slug = generalHelper.generateSlugName(name);
       let count = 1;
-      while (await Product.exists({ slug, _id: { $ne: _id } })) {
+      while (await Product.exists({ $or: [{ slug }, { legacy_slugs: slug }], _id: { $ne: _id } })) {
         slug = generalHelper.generateSlugName(`${name}-${count}`);
         count++;
       }
@@ -101,6 +101,9 @@ export const edit = async (req, res, next) => {
     const classificationsArray = Array.isArray(classifications)
       ? classifications.filter((id) => /^[0-9a-fA-F]{24}$/.test(id))
       : [];
+    if (product.slug && slug !== product.slug) {
+      product.legacy_slugs = [...new Set([...(product.legacy_slugs || []), product.slug])];
+    }
     // 🔹 Update product fields
     Object.assign(product, {
       name,

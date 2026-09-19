@@ -64,7 +64,7 @@ export const add = async (req, res, next) => {
     // 🔹 Slug generation
     let slug = generalHelper.generateSlugName(name);
     let count = 1;
-    while (await Product.exists({ slug })) {
+    while (await Product.exists({ $or: [{ slug }, { legacy_slugs: slug }] })) {
       slug = generalHelper.generateSlugName(`${name}-${count}`);
       count++;
     }

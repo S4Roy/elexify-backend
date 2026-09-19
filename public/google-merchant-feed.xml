@@ -64,7 +64,7 @@
       <g:title><![CDATA[UNO R3 SMD Board compatible with Ardiuno Development Board]]></g:title>
       <g:description><![CDATA[UNO R3 SMD Board compatible with Ardiuno Development Board]]></g:description>
       <g:link><![CDATA[http://localhost:4100/product/uno-r3-smd-board-compatible-with-ardiuno-development-board/]]></g:link>
-      <g:availability>in stock</g:availability>
+      <g:availability>out of stock</g:availability>
       <g:price>450.00 INR</g:price>
       <g:condition>new</g:condition>
       <g:mpn>ELX-0006</g:mpn>
@@ -75,7 +75,7 @@
       <g:title><![CDATA[PAUDIO SPEAKER 12 INCH (E12 200S)]]></g:title>
       <g:description><![CDATA[PAUDIO SPEAKER 12 INCH (E12 200S)]]></g:description>
       <g:link><![CDATA[http://localhost:4100/product/paudio-speaker-12-inch-e12-200s/]]></g:link>
-      <g:availability>in stock</g:availability>
+      <g:availability>out of stock</g:availability>
       <g:price>3490.00 INR</g:price>
       <g:condition>new</g:condition>
       <g:mpn>ELX-0007</g:mpn>
@@ -94,9 +94,9 @@
     </item>
     <item>
       <g:id>ELX-0009</g:id>
-      <g:title><![CDATA[2 pin Male and Female 2.5mm Cable Micro Male and Female Connector Plug with Silicone 10 Inch Wire - PACK OF 20]]></g:title>
-      <g:description><![CDATA[2 pin Male and Female 2.5mm Cable Micro Male and Female Connector Plug with Silicone 10 Inch Wire - PACK OF 20]]></g:description>
-      <g:link><![CDATA[http://localhost:4100/product/2-pin-male-and-female-2-5mm-cable-micro-male-and-female-connector-plug-with-silicone-10-inch-wire-pack-of-20/]]></g:link>
+      <g:title><![CDATA[2 pin Male and Female 2.5mm 2515 Connector Plug with Silicone 10 Inch Wire - PACK OF 20]]></g:title>
+      <g:description><![CDATA[2 pin Male and Female 2.5mm 2515 Connector Plug with Silicone 10 Inch Wire - PACK OF 20]]></g:description>
+      <g:link><![CDATA[http://localhost:4100/product/2-pin-male-and-female-2-5mm-2515-connector-plug-with-silicone-10-inch-wire-pack-of-20/]]></g:link>
       <g:availability>out of stock</g:availability>
       <g:price>100.00 INR</g:price>
       <g:condition>new</g:condition>
@@ -468,9 +468,9 @@
     </item>
     <item>
       <g:id>ELX-0043</g:id>
-      <g:title><![CDATA[ELEXIFY 1000W Amplifier Board With Speaker Protection Thermal Protection OCP Protection Automatic DC Offset Controlling.]]></g:title>
-      <g:description><![CDATA[ELEXIFY 1000W Amplifier Board With Speaker Protection Thermal Protection OCP Protection Automatic DC Offset Controlling.]]></g:description>
-      <g:link><![CDATA[http://localhost:4100/product/elexify-1000w-amplifier-board-with-speaker-protection-thermal-protection-ocp-protection-automatic-dc-offset-controlling/]]></g:link>
+      <g:title><![CDATA[ELEXIFY 1000W Amplifier Board With Speaker Protection Thermal, OCP, DC Offset, Controlling.]]></g:title>
+      <g:description><![CDATA[ELEXIFY 1000W Amplifier Board With Speaker Protection Thermal, OCP, DC Offset, Controlling.]]></g:description>
+      <g:link><![CDATA[http://localhost:4100/product/elexify-1000w-amplifier-board-with-speaker-protection-thermal-ocp-dc-offset-controlling/]]></g:link>
       <g:availability>in stock</g:availability>
       <g:price>8999.00 INR</g:price>
       <g:condition>new</g:condition>
@@ -633,9 +633,9 @@
     </item>
     <item>
       <g:id>ELX-0059</g:id>
-      <g:title><![CDATA[Amplifier Power Supply Board with NTC Soft Starter 10000uF 100V X 6 with 5V 7805 REGULATOR  & 12 0 12]]></g:title>
-      <g:description><![CDATA[Amplifier Power Supply Board with NTC Soft Starter 10000uF 100V X 6 with 5V 7805 REGULATOR  & 12 0 12]]></g:description>
-      <g:link><![CDATA[http://localhost:4100/product/amplifier-power-supply-board-with-ntc-soft-starter-10000u-f-100v-x-6-with-5v-7805-regulator-12-0-12/]]></g:link>
+      <g:title><![CDATA[Amplifier Power Supply Soft Starter 10000uF 100V X 6 with 5V 7805 REGULATOR]]></g:title>
+      <g:description><![CDATA[Amplifier Power Supply Soft Starter 10000uF 100V X 6 with 5V 7805 REGULATOR]]></g:description>
+      <g:link><![CDATA[http://localhost:4100/product/amplifier-power-supply-soft-starter-10000u-f-100v-x-6-with-5v-7805-regulator/]]></g:link>
       <g:availability>in stock</g:availability>
       <g:price>6499.00 INR</g:price>
       <g:condition>new</g:condition>
@@ -757,7 +757,7 @@
       <g:title><![CDATA[10000uF 100V Capacitor 35 X 70 (Sanxi)]]></g:title>
       <g:description><![CDATA[10000uF 100V Capacitor 35 X 70 (Sanxi)]]></g:description>
       <g:link><![CDATA[http://localhost:4100/product/10000u-f-100v-capacitor-35-x-70-sanxi/]]></g:link>
-      <g:availability>in stock</g:availability>
+      <g:availability>out of stock</g:availability>
       <g:price>499.00 INR</g:price>
       <g:condition>new</g:condition>
       <g:mpn>ELX-0070</g:mpn>
@@ -977,7 +977,7 @@
       <g:title><![CDATA[Nickel Strip H-Type For 32140 Size LiFePO4 (100g.)]]></g:title>
       <g:description><![CDATA[Nickel Strip H-Type For 32140 Size LiFePO4 (100g.)]]></g:description>
       <g:link><![CDATA[http://localhost:4100/product/nickel-strip-h-type-for-32140-size-li-fe-po4-100g/]]></g:link>
-      <g:availability>in stock</g:availability>
+      <g:availability>out of stock</g:availability>
       <g:price>599.00 INR</g:price>
       <g:condition>new</g:condition>
       <g:mpn>ELX-0090</g:mpn>
@@ -999,7 +999,7 @@
       <g:title><![CDATA[12V Battery Spot Welding Machine Circuit Board]]></g:title>
       <g:description><![CDATA[12V Battery Spot Welding Machine Circuit Board]]></g:description>
       <g:link><![CDATA[http://localhost:4100/product/12v-battery-spot-welding-machine-circuit-board/]]></g:link>
-      <g:availability>in stock</g:availability>
+      <g:availability>out of stock</g:availability>
       <g:price>2999.00 INR</g:price>
       <g:condition>new</g:condition>
       <g:mpn>ELX-0092</g:mpn>
@@ -1087,7 +1087,7 @@
       <g:title><![CDATA[Inverter Cabinet 200W]]></g:title>
       <g:description><![CDATA[Inverter Cabinet 200W]]></g:description>
       <g:link><![CDATA[http://localhost:4100/product/inverter-cabinet-200w/]]></g:link>
-      <g:availability>in stock</g:availability>
+      <g:availability>out of stock</g:availability>
       <g:price>999.00 INR</g:price>
       <g:condition>new</g:condition>
       <g:mpn>ELX-0100</g:mpn>
@@ -1098,7 +1098,7 @@
       <g:title><![CDATA[Inverter Cabinet 300W]]></g:title>
       <g:description><![CDATA[Inverter Cabinet 300W]]></g:description>
       <g:link><![CDATA[http://localhost:4100/product/inverter-cabinet-300w/]]></g:link>
-      <g:availability>in stock</g:availability>
+      <g:availability>out of stock</g:availability>
       <g:price>1499.00 INR</g:price>
       <g:condition>new</g:condition>
       <g:mpn>ELX-0101</g:mpn>
@@ -1109,7 +1109,7 @@
       <g:title><![CDATA[Inverter Cabinet 500W]]></g:title>
       <g:description><![CDATA[Inverter Cabinet 500W]]></g:description>
       <g:link><![CDATA[http://localhost:4100/product/inverter-cabinet-500w/]]></g:link>
-      <g:availability>in stock</g:availability>
+      <g:availability>out of stock</g:availability>
       <g:price>1999.00 INR</g:price>
       <g:condition>new</g:condition>
       <g:mpn>ELX-0102</g:mpn>
@@ -1120,7 +1120,7 @@
       <g:title><![CDATA[ELEXIFY 12.8V 15000mAh LiFePO4 Rechargeable Battery Pack with BMS]]></g:title>
       <g:description><![CDATA[ELEXIFY 12.8V 15000mAh LiFePO4 Rechargeable Battery Pack with BMS]]></g:description>
       <g:link><![CDATA[http://localhost:4100/product/elexify-12-8v-15000m-ah-li-fe-po4-rechargeable-battery-pack-with-bms/]]></g:link>
-      <g:availability>in stock</g:availability>
+      <g:availability>out of stock</g:availability>
       <g:price>4299.00 INR</g:price>
       <g:condition>new</g:condition>
       <g:mpn>ELX-0103</g:mpn>
@@ -1208,7 +1208,7 @@
       <g:title><![CDATA[ELEXIFY 12.8V 30000mAh (30Ah) LiFePO4 Rechargeable Battery Pack with BMS]]></g:title>
       <g:description><![CDATA[ELEXIFY 12.8V 30000mAh (30Ah) LiFePO4 Rechargeable Battery Pack with BMS]]></g:description>
       <g:link><![CDATA[http://localhost:4100/product/elexify-12-8v-30000m-ah-30ah-li-fe-po4-rechargeable-battery-pack-with-bms/]]></g:link>
-      <g:availability>in stock</g:availability>
+      <g:availability>out of stock</g:availability>
       <g:price>8299.00 INR</g:price>
       <g:condition>new</g:condition>
       <g:mpn>ELX-0111</g:mpn>
@@ -1259,14 +1259,14 @@
       <g:identifier_exists>yes</g:identifier_exists>
     </item>
     <item>
-      <g:id>ELX-0116</g:id>
-      <g:title><![CDATA[7V-120V Battery Capacity Indicator Power Display Meter Li-Ion - LiFePO4 - Lead-acid Battery Power Display.]]></g:title>
-      <g:description><![CDATA[7V-120V Battery Capacity Indicator Power Display Meter Li-Ion - LiFePO4 - Lead-acid Battery Power Display.]]></g:description>
-      <g:link><![CDATA[http://localhost:4100/product/7v-120v-battery-capacity-indicator-power-display-meter-li-ion-li-fe-po4-lead-acid-battery-power-display/]]></g:link>
+      <g:id>INVE-7V12-1110</g:id>
+      <g:title><![CDATA[7V-120V Battery Capacity Display Meter Li-Ion - LiFePO4 - Lead-acid Battery Power Display.]]></g:title>
+      <g:description><![CDATA[7V-120V Battery Capacity Display Meter Li-Ion - LiFePO4 - Lead-acid Battery Power Display.]]></g:description>
+      <g:link><![CDATA[http://localhost:4100/product/7v-120v-battery-capacity-display-meter-li-ion-li-fe-po4-lead-acid-battery-power-display/]]></g:link>
       <g:availability>in stock</g:availability>
       <g:price>799.00 INR</g:price>
       <g:condition>new</g:condition>
-      <g:mpn>ELX-0116</g:mpn>
+      <g:mpn>INVE-7V12-1110</g:mpn>
       <g:identifier_exists>yes</g:identifier_exists>
     </item>
     <item>
@@ -1296,7 +1296,7 @@
       <g:title><![CDATA[ELEXIFY 12.8V 45000mAh (45Ah) LiFePO4 Rechargeable Battery Pack with BMS]]></g:title>
       <g:description><![CDATA[ELEXIFY 12.8V 45000mAh (45Ah) LiFePO4 Rechargeable Battery Pack with BMS]]></g:description>
       <g:link><![CDATA[http://localhost:4100/product/elexify-12-8v-45000m-ah-45ah-li-fe-po4-rechargeable-battery-pack-with-bms/]]></g:link>
-      <g:availability>in stock</g:availability>
+      <g:availability>out of stock</g:availability>
       <g:price>11999.00 INR</g:price>
       <g:condition>new</g:condition>
       <g:mpn>ELX-0119</g:mpn>
@@ -1318,7 +1318,7 @@
       <g:title><![CDATA[14 Volt 2amp Charger Adapter 28W]]></g:title>
       <g:description><![CDATA[14 Volt 2amp Charger Adapter 28W]]></g:description>
       <g:link><![CDATA[http://localhost:4100/product/14-volt-2amp-charger-adapter-28w/]]></g:link>
-      <g:availability>in stock</g:availability>
+      <g:availability>out of stock</g:availability>
       <g:price>1299.00 INR</g:price>
       <g:condition>new</g:condition>
       <g:mpn>ELX-0121</g:mpn>
@@ -1480,9 +1480,9 @@
     </item>
     <item>
       <g:id>ELX-0136</g:id>
-      <g:title><![CDATA[Solar Charge Controller 10A – 12V/24V Auto with Battery Type Selection (Li-ion / LiFePO4 / Lead-Acid)]]></g:title>
-      <g:description><![CDATA[Solar Charge Controller 10A – 12V/24V Auto with Battery Type Selection (Li-ion / LiFePO4 / Lead-Acid)]]></g:description>
-      <g:link><![CDATA[http://localhost:4100/product/solar-charge-controller-10a-12v-24v-auto-with-battery-type-selection-li-ion-li-fe-po4-lead-acid/]]></g:link>
+      <g:title><![CDATA[Solar Charge Controller 10A – 12V/24V Auto (Li-ion / LiFePO4 / Lead-Acid)]]></g:title>
+      <g:description><![CDATA[Solar Charge Controller 10A – 12V/24V Auto (Li-ion / LiFePO4 / Lead-Acid)]]></g:description>
+      <g:link><![CDATA[http://localhost:4100/product/solar-charge-controller-10a-12v-24v-auto-li-ion-li-fe-po4-lead-acid/]]></g:link>
       <g:availability>in stock</g:availability>
       <g:price>1899.00 INR</g:price>
       <g:condition>new</g:condition>
@@ -1491,9 +1491,9 @@
     </item>
     <item>
       <g:id>ELX-0137</g:id>
-      <g:title><![CDATA[Solar Charge Controller 20A – 12V/24V Auto with Battery Type Selection (Li-ion / LiFePO4 / Lead-Acid)]]></g:title>
-      <g:description><![CDATA[Solar Charge Controller 20A – 12V/24V Auto with Battery Type Selection (Li-ion / LiFePO4 / Lead-Acid)]]></g:description>
-      <g:link><![CDATA[http://localhost:4100/product/solar-charge-controller-20a-12v-24v-auto-with-battery-type-selection-li-ion-li-fe-po4-lead-acid/]]></g:link>
+      <g:title><![CDATA[Solar Charge Controller 20A – 12V/24V Auto (Li-ion / LiFePO4 / Lead-Acid)]]></g:title>
+      <g:description><![CDATA[Solar Charge Controller 20A – 12V/24V Auto (Li-ion / LiFePO4 / Lead-Acid)]]></g:description>
+      <g:link><![CDATA[http://localhost:4100/product/solar-charge-controller-20a-12v-24v-auto-li-ion-li-fe-po4-lead-acid/]]></g:link>
       <g:availability>in stock</g:availability>
       <g:price>1999.00 INR</g:price>
       <g:condition>new</g:condition>
@@ -1502,9 +1502,9 @@
     </item>
     <item>
       <g:id>ELX-0138</g:id>
-      <g:title><![CDATA[Solar Charge Controller 30A – 12V/24V Auto with Battery Type Selection (Li-ion / LiFePO4 / Lead-Acid)]]></g:title>
-      <g:description><![CDATA[Solar Charge Controller 30A – 12V/24V Auto with Battery Type Selection (Li-ion / LiFePO4 / Lead-Acid)]]></g:description>
-      <g:link><![CDATA[http://localhost:4100/product/solar-charge-controller-30a-12v-24v-auto-with-battery-type-selection-li-ion-li-fe-po4-lead-acid/]]></g:link>
+      <g:title><![CDATA[Solar Charge Controller 30A – 12V/24V Auto (Li-ion / LiFePO4 / Lead-Acid)]]></g:title>
+      <g:description><![CDATA[Solar Charge Controller 30A – 12V/24V Auto (Li-ion / LiFePO4 / Lead-Acid)]]></g:description>
+      <g:link><![CDATA[http://localhost:4100/product/solar-charge-controller-30a-12v-24v-auto-li-ion-li-fe-po4-lead-acid/]]></g:link>
       <g:availability>in stock</g:availability>
       <g:price>2099.00 INR</g:price>
       <g:condition>new</g:condition>
@@ -1678,9 +1678,9 @@
     </item>
     <item>
       <g:id>ELX-0154</g:id>
-      <g:title><![CDATA[ELEXIFY Premium Series 12.8V 30000mAh (30Ah) LiFePO4 Rechargeable Battery Pack with 40A DALY BMS (1 Year Warranty)]]></g:title>
-      <g:description><![CDATA[ELEXIFY Premium Series 12.8V 30000mAh (30Ah) LiFePO4 Rechargeable Battery Pack with 40A DALY BMS (1 Year Warranty)]]></g:description>
-      <g:link><![CDATA[http://localhost:4100/product/elexify-premium-series-12-8v-30000m-ah-30ah-li-fe-po4-rechargeable-battery-pack-with-40a-daly-bms-1-year-warranty/]]></g:link>
+      <g:title><![CDATA[ELEXIFY Premium 12.8V 30000mAh (30Ah) LiFePO4 Battery with 40A DALY BMS (1 Year Warranty)]]></g:title>
+      <g:description><![CDATA[ELEXIFY Premium 12.8V 30000mAh (30Ah) LiFePO4 Battery with 40A DALY BMS (1 Year Warranty)]]></g:description>
+      <g:link><![CDATA[http://localhost:4100/product/elexify-premium-12-8v-30000m-ah-30ah-li-fe-po4-battery-with-40a-daly-bms-1-year-warranty/]]></g:link>
       <g:availability>in stock</g:availability>
       <g:price>8299.00 INR</g:price>
       <g:condition>new</g:condition>
@@ -1703,7 +1703,7 @@
       <g:title><![CDATA[5 amp LiFePO4/Li-Ion 42V Charger Adapter 210W for 36V Battery Pack]]></g:title>
       <g:description><![CDATA[5 amp LiFePO4/Li-Ion 42V Charger Adapter 210W for 36V Battery Pack]]></g:description>
       <g:link><![CDATA[http://localhost:4100/product/5-amp-li-fe-po4-li-ion-42v-charger-adapter-210w-for-36v-battery-pack/]]></g:link>
-      <g:availability>in stock</g:availability>
+      <g:availability>out of stock</g:availability>
       <g:price>4999.00 INR</g:price>
       <g:condition>new</g:condition>
       <g:mpn>ELX-0156</g:mpn>
@@ -1758,7 +1758,7 @@
       <g:title><![CDATA[Jiabaida (JBD) 40A BMS 12.8V 4S LiFePO4 Battery Management System - HP04S024]]></g:title>
       <g:description><![CDATA[Jiabaida (JBD) 40A BMS 12.8V 4S LiFePO4 Battery Management System - HP04S024]]></g:description>
       <g:link><![CDATA[http://localhost:4100/product/jiabaida-jbd-40a-bms-12-8v-4s-li-fe-po4-battery-management-system-hp04s024/]]></g:link>
-      <g:availability>in stock</g:availability>
+      <g:availability>out of stock</g:availability>
       <g:price>1999.00 INR</g:price>
       <g:condition>new</g:condition>
       <g:mpn>ELX-0161</g:mpn>
@@ -1912,7 +1912,7 @@
       <g:title><![CDATA[Highstar Prismatic A Grade LiFePO₄ Battery Cell – 3.2V 100Ah]]></g:title>
       <g:description><![CDATA[The Highstar A Grade Prismatic LiFePO₄ Battery Cell (3.2V 100Ah) is a high-performance lithium iron...]]></g:description>
       <g:link><![CDATA[http://localhost:4100/product/highstar-prismatic-a-grade-li-fe-po4-battery-cell-3-2v-100ah/]]></g:link>
-      <g:availability>in stock</g:availability>
+      <g:availability>out of stock</g:availability>
       <g:price>6299.00 INR</g:price>
       <g:condition>new</g:condition>
       <g:mpn>ELX-0175</g:mpn>
@@ -1920,9 +1920,9 @@
     </item>
     <item>
       <g:id>ELX-0176</g:id>
-      <g:title><![CDATA[ELEXIFY Premium Series 12.8V 45000mAh (45Ah) LiFePO4 Rechargeable Battery Pack with 60A DALY BMS (1 Year Warranty)]]></g:title>
+      <g:title><![CDATA[ELEXIFY Premium Series 12.8V 45000mAh (45Ah) LiFePO4 Battery Pack 60A DALY BMS (1 Year Warranty)]]></g:title>
       <g:description><![CDATA[12.8V 45Ah 32140 4S3P LiFePO₄ Battery Pack with High Quality 60A DALY BMS – High Current, Long Life Power Solution Deliver powerful, reliable energy with the 12.8V...]]></g:description>
-      <g:link><![CDATA[http://localhost:4100/product/elexify-premium-series-12-8v-45000m-ah-45ah-li-fe-po4-rechargeable-battery-pack-with-60a-daly-bms-1-year-warranty/]]></g:link>
+      <g:link><![CDATA[http://localhost:4100/product/elexify-premium-series-12-8v-45000m-ah-45ah-li-fe-po4-battery-pack-60a-daly-bms-1-year-warranty/]]></g:link>
       <g:availability>in stock</g:availability>
       <g:price>10299.00 INR</g:price>
       <g:condition>new</g:condition>
@@ -2447,14 +2447,14 @@
       <g:identifier_exists>yes</g:identifier_exists>
     </item>
     <item>
-      <g:id>ELX-224</g:id>
+      <g:id>ELX-0224</g:id>
       <g:title><![CDATA[TS to TS 6.35mm (1/4") 2 Meter Audio Cable – Premium Mono Instrument Cable]]></g:title>
       <g:description><![CDATA[TS to TS 6.35mm 2 Meter...]]></g:description>
       <g:link><![CDATA[http://localhost:4100/product/ts-to-ts-6-35mm-1-4-2-meter-audio-cable-premium-mono-instrument-cable/]]></g:link>
       <g:availability>in stock</g:availability>
       <g:price>599.00 INR</g:price>
       <g:condition>new</g:condition>
-      <g:mpn>ELX-224</g:mpn>
+      <g:mpn>ELX-0224</g:mpn>
       <g:identifier_exists>yes</g:identifier_exists>
     </item>
   </channel>
