@@ -29,6 +29,10 @@ export const PERMISSIONS = {
   // list, packed-order courier check) — deliberately not granted to manager,
   // only superadmin. See services/orderService/cancelOrder.js `force` path.
   ORDER_FORCE_CANCEL: "order.force_cancel.manage",
+  // Undoes a cancellation back to "processing" — refused outright if a
+  // refund already went through or is in flight. See
+  // services/orderService/reopenOrder.js.
+  ORDER_REOPEN_MANAGE: "order.reopen.manage",
 
   // Centralized Data Operations (seeders/migrations/backfills/repairs) —
   // see routes/admin/dataOperations.js and scripts/runner.js. View
@@ -76,6 +80,7 @@ export const ROLE_PERMISSIONS = {
     PERMISSIONS.RETURN_REVIEW,
     PERMISSIONS.ORDER_STATUS_MANAGE,
     PERMISSIONS.ORDER_CANCEL_MANAGE,
+    PERMISSIONS.ORDER_REOPEN_MANAGE,
     // View-only for Data Operations — no execute permissions, matching the
     // existing "view-only for non-superadmin" pattern used elsewhere in
     // this file. Adjustable later if a manager role needs to run LOW-risk

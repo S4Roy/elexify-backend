@@ -55,6 +55,12 @@ orderRouter.post(
   inventoryController.orderController.forceCancel
 );
 orderRouter.post(
+  "/reopen",
+  requirePermission(PERMISSIONS.ORDER_REOPEN_MANAGE),
+  inventoryValidation.orderValidation.reopen,
+  inventoryController.orderController.reopen
+);
+orderRouter.post(
   "/status",
   requirePermission(PERMISSIONS.ORDER_STATUS_MANAGE),
   celebrate({ body: Joi.object({

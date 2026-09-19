@@ -3,7 +3,7 @@ import { edit } from "./edit.js";
 import { list } from "./list.js";
 import { details } from "./details.js";
 import { remove } from "./remove.js";
-import { cancel, forceCancel, retryRefund } from "./cancel.js";
+import { cancel, forceCancel, reopen, retryRefund } from "./cancel.js";
 import { listReturns, reviewReturn, receiveReturn, inspectReturn, completeManualRefund, updatePickup } from "./returnRequest.js";
 
-export { place, edit, list, details, remove, cancel, forceCancel, retryRefund, listReturns, reviewReturn, receiveReturn, inspectReturn, completeManualRefund, updatePickup };
+export { place, edit, list, details, remove, cancel, forceCancel, reopen, retryRefund, listReturns, reviewReturn, receiveReturn, inspectReturn, completeManualRefund, updatePickup };

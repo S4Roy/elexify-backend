@@ -54,6 +54,29 @@ export const forceCancel = celebrate({
   }),
 });
 
+// Reopening a cancelled order back to "processing" always takes a free-text
+// reason for the same audit-trail reasons as forceCancel.
+export const reopen = celebrate({
+  body: Joi.object({
+    order_id: Joi.string()
+      .regex(/^[0-9a-fA-F]{24}$/)
+      .required()
+      .messages({
+        "string.empty": "Order ID is required",
+        "string.pattern.base": "Invalid Order ID format",
+      }),
+    reason: Joi.string()
+      .trim()
+      .min(10)
+      .max(500)
+      .required()
+      .messages({
+        "string.empty": "A reason is required to reopen an order",
+        "string.min": "Please explain why this order needs to be reopened (min 10 characters)",
+      }),
+  }),
+});
+
 export const retryRefund = celebrate({
   body: Joi.object({
     order_id: Joi.string()
