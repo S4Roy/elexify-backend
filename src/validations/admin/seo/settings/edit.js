@@ -5,9 +5,11 @@ export const edit = celebrate({
     site_name: Joi.string().allow("", null).optional(),
     product_title_template: Joi.string().allow("", null).optional(),
     product_description_template: Joi.string().allow("", null).optional(),
-    title_min_length: Joi.number().integer().min(0).optional(),
-    title_max_length: Joi.number().integer().min(0).optional(),
-    description_min_length: Joi.number().integer().min(0).optional(),
-    description_max_length: Joi.number().integer().min(0).optional(),
+    // Bounds mirror models/SEO.js's meta_title/meta_description maxlength —
+    // a generator target beyond that would just fail to save.
+    title_min_length: Joi.number().integer().min(0).max(60).optional(),
+    title_max_length: Joi.number().integer().min(0).max(60).optional(),
+    description_min_length: Joi.number().integer().min(0).max(160).optional(),
+    description_max_length: Joi.number().integer().min(0).max(160).optional(),
   }),
 });

@@ -9,7 +9,7 @@ export const edit = celebrate({
         "string.empty": "Product ID is required",
         "string.pattern.base": "Invalid Product ID format",
       }),
-    name: Joi.string().min(2).max(100).required(),
+    name: Joi.string().min(2).max(200).required(),
     rarity: Joi.string().optional().allow(null, ""),
     ask_for_price: Joi.boolean().optional().allow(null, ""),
     enable_enquiry: Joi.boolean().optional().allow(null, ""),
@@ -45,9 +45,13 @@ export const edit = celebrate({
       )
       .optional(),
 
-    meta_title: Joi.string().max(255).optional().allow("", null),
-    meta_description: Joi.string().max(1000).optional().allow("", null),
-    meta_keywords: Joi.string().optional().allow("", null),
+    // Industry-standard SEO length caps — see models/SEO.js for the same
+    // limits enforced at the schema level (meta_title ~60 chars is where
+    // Google truncates SERP titles, meta_description ~160 is where it
+    // truncates snippets).
+    meta_title: Joi.string().max(60).optional().allow("", null),
+    meta_description: Joi.string().max(160).optional().allow("", null),
+    meta_keywords: Joi.string().max(500).optional().allow("", null),
 
     // Physical attributes (nullable number fields)
     power_level: Joi.number().optional().allow(null),

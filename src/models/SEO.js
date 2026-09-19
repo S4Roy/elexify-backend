@@ -15,20 +15,27 @@ const SEOSchema = new Schema(
     },
 
     // ✅ Basic Meta Tags
-    meta_title: { type: String, trim: true, required: true },
-    meta_description: { type: String, trim: true, default: null },
-    meta_keywords: [{ type: String, trim: true, lowercase: true }],
-    canonical_url: { type: String, default: null },
+    // Length caps follow current SERP/social-card truncation behavior:
+    // meta_title/og_title/twitter_title ~55-60 chars is where Google
+    // truncates search result titles (Twitter Cards truncate at 70);
+    // meta/og/twitter descriptions ~155-160 chars is where Google truncates
+    // snippets, with a little extra headroom for social previews.
+    meta_title: { type: String, trim: true, required: true, maxlength: 60 },
+    meta_description: { type: String, trim: true, default: null, maxlength: 160 },
+    meta_keywords: [{ type: String, trim: true, lowercase: true, maxlength: 80 }],
+    canonical_url: { type: String, default: null, maxlength: 2048 },
 
     // ✅ Open Graph (OG) for Facebook & Social Sharing
     og_title: {
       type: String,
+      maxlength: 70,
       default: function () {
         return this.meta_title;
       },
     },
     og_description: {
       type: String,
+      maxlength: 200,
       default: function () {
         return this.meta_description;
       },
@@ -43,12 +50,14 @@ const SEOSchema = new Schema(
     // ✅ Twitter Meta Tags
     twitter_title: {
       type: String,
+      maxlength: 70,
       default: function () {
         return this.meta_title;
       },
     },
     twitter_description: {
       type: String,
+      maxlength: 200,
       default: function () {
         return this.meta_description;
       },
@@ -64,7 +73,7 @@ const SEOSchema = new Schema(
     json_ld: { type: String, default: null }, // Store JSON-LD schema markup as a string
 
     // ✅ Focus keyword & indexing control
-    focus_keyword: { type: String, trim: true, default: null },
+    focus_keyword: { type: String, trim: true, default: null, maxlength: 100 },
     robots: {
       type: String,
       enum: ["index,follow", "noindex,follow", "index,nofollow", "noindex,nofollow"],

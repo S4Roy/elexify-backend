@@ -15,10 +15,14 @@ const SeoSettingsSchema = new Schema(
       default:
         "Buy {productName} online. Explore {categoryName} with quality products, secure ordering and reliable delivery.",
     },
-    title_min_length: { type: Number, min: 0, default: 50 },
-    title_max_length: { type: Number, min: 0, default: 60 },
-    description_min_length: { type: Number, min: 0, default: 140 },
-    description_max_length: { type: Number, min: 0, default: 160 },
+    // Upper bounds match the hard caps enforced on models/SEO.js
+    // (meta_title/meta_description maxlength) — configuring a generator
+    // target beyond what the schema will actually accept would just fail
+    // on save, so it's capped here too.
+    title_min_length: { type: Number, min: 0, max: 60, default: 50 },
+    title_max_length: { type: Number, min: 0, max: 60, default: 60 },
+    description_min_length: { type: Number, min: 0, max: 160, default: 140 },
+    description_max_length: { type: Number, min: 0, max: 160, default: 160 },
     updated_at: { type: Date, default: null },
     updated_by: { type: Types.ObjectId, ref: "users", default: null },
   },
