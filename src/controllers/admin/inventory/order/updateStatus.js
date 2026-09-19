@@ -28,9 +28,9 @@ export const updateStatus = async (req, res, next) => {
         await Package.exists({ order_id: order._id, status: { $ne: "cancelled" } })) {
       throw StatusError.conflict("This order has packages or tracking. Update its shipment status through the package workflow");
     }
-    if (order.payment_method === "razorpay" && !["paid", "advance_paid"].includes(order.payment_status) &&
+    if ((order.payment_method === "razorpay" || order.is_partial_cod) && !["paid", "advance_paid"].includes(order.payment_status) &&
         !["pending", "failed"].includes(status)) {
-      throw StatusError.conflict("Confirm the online payment before advancing fulfillment");
+      throw StatusError.conflict("Record the received payment from the Payment section before advancing fulfillment");
     }
 
     const changedAt = new Date();

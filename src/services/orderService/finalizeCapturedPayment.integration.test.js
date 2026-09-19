@@ -61,6 +61,35 @@ const seedOrder = async ({ productIds, quantities, suffix, coupon = false }) => 
 };
 
 suite("finalizeCapturedPayment replica-set integration", () => {
+  it('records a manual payment and reserves stock once', async () => {
+    const productId = oid();
+    await Product.collection.insertOne({ _id: productId, stock_quantity: 5, status: 'active' });
+    const order = await seedOrder({ productIds: [productId], quantities: [2], suffix: 'manual' });
+    const manualPayment = { amount: 100, currency: 'INR', method: 'bank_transfer',
+      reference: 'UTR-TEST-123', reason: 'Verified bank statement', received_at: new Date(), recorded_by: oid() };
+    const result = await finalizeCapturedPayment({ orderId: String(order._id), manualPayment });
+    expect(result.order.payment_status).toBe('paid');
+    expect(result.order.order_status).toBe('processing');
+    expect(result.order.manual_payment.reference).toBe('UTR-TEST-123');
+    expect(result.order.payment_meta.razorpay_payment_id).toBeUndefined();
+    expect((await Product.findById(productId)).stock_quantity).toBe(3);
+    await expect(finalizeCapturedPayment({ orderId: String(order._id), manualPayment })).rejects.toThrow();
+    expect((await Product.findById(productId)).stock_quantity).toBe(3);
+  });
+
+  it('rolls back manual payment when stock cannot be reserved', async () => {
+    const productId = oid();
+    await Product.collection.insertOne({ _id: productId, stock_quantity: 0, status: 'active' });
+    const order = await seedOrder({ productIds: [productId], quantities: [1], suffix: 'manual-no-stock' });
+    await expect(finalizeCapturedPayment({ orderId: String(order._id), manualPayment: {
+      amount: 100, currency: 'INR', method: 'cash', reference: 'CASH-123',
+      reason: 'Verified cash receipt', received_at: new Date(), recorded_by: oid(),
+    } })).rejects.toThrow('OUT_OF_STOCK');
+    const unchanged = await Order.findById(order._id);
+    expect(unchanged.payment_status).toBe('pending');
+    expect(unchanged.manual_payment).toBeUndefined();
+  });
+
   beforeAll(async () => {
     await mongoose.connect(uri);
   });

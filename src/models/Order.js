@@ -76,6 +76,15 @@ const OrderSchema = new Schema(
     idempotency_fingerprint: { type: String, default: null },
     idempotency_fingerprint_version: { type: Number, default: 1 },
     payment_meta: { type: Object, default: {} }, // optional Razorpay response etc.
+    manual_payment: {
+      type: new Schema({
+        amount: Number, currency: String, method: String, reference: String,
+        received_at: Date, reason: String,
+        recorded_by: { type: Schema.Types.ObjectId, ref: "users" },
+        recorded_at: Date,
+      }, { _id: false }),
+      default: undefined,
+    },
     manual_status_history: [{
       from: String,
       to: String,
@@ -194,6 +203,12 @@ OrderSchema.index(
 );
 
 OrderSchema.index({ replacement_return_id: 1 }, { unique: true, partialFilterExpression: { replacement_return_id: { $type: "objectId" } } });
+
+// A receipt may settle only one order; the partial index excludes gateway payments.
+OrderSchema.index(
+  { "manual_payment.method": 1, "manual_payment.reference": 1 },
+  { unique: true, partialFilterExpression: { "manual_payment.reference": { $type: "string" } } },
+);
 
 // Apply pagination plugin
 OrderSchema.plugin(mongooseAggregatePaginate);

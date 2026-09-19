@@ -12,6 +12,8 @@ import { ORDER_STATUS, PAYMENT_STATUS } from "../../constants/orderStatus.js";
 import { getRazorpayConfig } from "../integrationCredentials/razorpay.js";
 import { sendOrderNotification } from "../notification/sendOrderNotification.js";
 
+import { validateManualPayment } from "./validateManualPayment.js";
+
 const normalize = (value) => String(value || "").toUpperCase();
 
 // A captured payment finalizes to PAID for a normal prepaid order, or to
@@ -42,6 +44,7 @@ export const finalizeCapturedPayment = async ({
   paymentData,
   source,
   userId = null,
+  manualPayment = null,
 }) => {
   const lookup = {
     deleted_at: null,
@@ -54,8 +57,15 @@ export const finalizeCapturedPayment = async ({
 
   const existing = await Order.findOne(lookup);
   if (!existing) throw StatusError.notFound("Order not found");
-  await getRazorpayConfig();
-  validateCapturedPayment(existing, paymentData);
+  if (manualPayment) {
+    validateManualPayment(existing, manualPayment);
+  } else {
+    if (existing.payment_meta?.payment_provider === "manual") {
+      throw StatusError.conflict("A manual payment is already recorded. Reconcile this gateway payment separately.");
+    }
+    await getRazorpayConfig();
+    validateCapturedPayment(existing, paymentData);
+  }
 
   if (isPaymentClearedStatus(existing.payment_status) && existing.stock_reserved) {
     sendOrderNotification({
@@ -77,13 +87,21 @@ export const finalizeCapturedPayment = async ({
       }).session(session);
 
       if (!order) {
+        if (manualPayment) throw StatusError.conflict("Order payment changed. Refresh the order.");
         finalized = await Order.findById(existing._id).session(session);
+        if (finalized?.payment_meta?.payment_provider === "manual") {
+          throw StatusError.conflict("Manual payment already recorded. Reconcile the gateway payment separately.");
+        }
         if (!finalized?.stock_reserved || !isPaymentClearedStatus(finalized.payment_status)) {
           throw StatusError.conflict("Payment finalization is already in progress");
         }
         return;
       }
 
+      if (manualPayment) validateManualPayment(order, manualPayment);
+      if (!manualPayment && order.payment_meta?.payment_provider === "manual") {
+        throw StatusError.conflict("Manual payment already recorded");
+      }
       const items = await OrderItem.find({ order_id: order._id }).session(session);
       if (!items.length) throw StatusError.conflict("Order has no purchasable items");
 
@@ -139,9 +157,18 @@ export const finalizeCapturedPayment = async ({
         { $set: {
           payment_status: order.is_partial_cod ? PAYMENT_STATUS.ADVANCE_PAID : PAYMENT_STATUS.PAID,
           order_status: ORDER_STATUS.PROCESSING,
-          paid_at: new Date(),
+          paid_at: manualPayment ? new Date(manualPayment.received_at) : new Date(),
+          updated_at: new Date(),
           stock_reserved: true,
-          payment_meta: {
+          ...(manualPayment ? { manual_payment: {
+            ...manualPayment, recorded_at: new Date(),
+          } } : {}),
+          payment_meta: manualPayment ? {
+            payment_provider: "manual",
+            razorpay_order_id: order.payment_meta?.razorpay_order_id,
+            method: manualPayment.method,
+            finalized_by: "admin_manual_payment",
+          } : {
             payment_provider: "razorpay",
             razorpay_order_id: paymentData.order_id,
             razorpay_payment_id: paymentData.id,

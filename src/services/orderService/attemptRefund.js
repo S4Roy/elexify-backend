@@ -54,6 +54,9 @@ export const attemptRefund = async (order) => {
   const razorpayPaymentId = claimed.payment_meta?.razorpay_payment_id;
 
   try {
+    if (claimed.payment_meta?.payment_provider === 'manual') {
+      throw new Error("Manual payment: refund through the original payment method and reconcile offline. Do not retry through Razorpay.");
+    }
     if (!razorpayPaymentId) {
       throw new Error("No Razorpay payment id recorded on this order.");
     }

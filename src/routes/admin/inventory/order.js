@@ -1,3 +1,4 @@
+import { recordManualPayment } from "../../../controllers/admin/inventory/order/recordManualPayment.js";
 import { celebrate, Joi } from "celebrate";
 import { returnOperation } from "../../../controllers/admin/inventory/order/returnOperations.js";
 import { Router } from "express";
@@ -7,6 +8,20 @@ import { requirePermission } from "../../../middleware/requirePermission.js";
 import { PERMISSIONS } from "../../../constants/adminPermissions.js";
 
 const orderRouter = Router();
+
+orderRouter.post('/payment/manual',
+  requirePermission(PERMISSIONS.ORDER_PAYMENT_MANAGE),
+  celebrate({ body: Joi.object({
+    order_id: Joi.string().hex().length(24).required(),
+    amount: Joi.number().positive().precision(2).strict().required(),
+    currency: Joi.string().length(3).uppercase().required(),
+    method: Joi.string().valid('bank_transfer', 'upi', 'cash').required(),
+    reference: Joi.string().trim().min(3).max(100).required(),
+    received_at: Joi.date().iso().max('now').required(),
+    reason: Joi.string().trim().min(10).max(500).required(),
+    confirmed: Joi.boolean().valid(true).required(),
+  }) }), recordManualPayment,
+);
 
 orderRouter.get(
   "/list",

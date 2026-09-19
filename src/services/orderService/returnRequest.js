@@ -169,7 +169,7 @@ export const inspectReturnRequest = async ({ requestId, adminId, items, note }) 
         if (refundPaise + used > paise(order.grand_total)) throw StatusError.conflict('Refund exceeds remaining paid amount');
         request.refund.amount = refundPaise / 100;
         request.refund.idempotency_key = `${request.request_number}-refund`;
-        const online = order.payment_method === 'razorpay' && ['paid', 'partially_refunded', 'refund_pending'].includes(order.payment_status);
+        const online = order.payment_meta?.payment_provider !== 'manual' && order.payment_method === 'razorpay' && ['paid', 'partially_refunded', 'refund_pending'].includes(order.payment_status);
         request.status = !refundPaise ? 'completed' : online ? 'refund_pending' : 'manual_action_required';
         request.refund.status = !refundPaise ? 'not_required' : online ? 'pending' : 'manual_required';
         request.refund.provider = order.payment_method;

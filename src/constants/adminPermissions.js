@@ -23,6 +23,7 @@ export const PERMISSIONS = {
   ZOHO_INVOICE_MANAGE: "zoho_invoice.manage",
   RETURN_VIEW: "return.view",
   RETURN_REVIEW: "return.review",
+  ORDER_PAYMENT_MANAGE: "order.payment.manage",
   ORDER_STATUS_MANAGE: "order.status.manage",
   ORDER_CANCEL_MANAGE: "order.cancel.manage",
   // Bypasses the normal cancellation eligibility rules (configured status
@@ -79,6 +80,7 @@ export const ROLE_PERMISSIONS = {
     PERMISSIONS.RETURN_VIEW,
     PERMISSIONS.RETURN_REVIEW,
     PERMISSIONS.ORDER_STATUS_MANAGE,
+    PERMISSIONS.ORDER_PAYMENT_MANAGE,
     PERMISSIONS.ORDER_CANCEL_MANAGE,
     PERMISSIONS.ORDER_REOPEN_MANAGE,
     // View-only for Data Operations — no execute permissions, matching the
