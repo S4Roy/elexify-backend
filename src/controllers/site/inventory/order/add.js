@@ -32,7 +32,7 @@ import { injectPlacementFault } from "../../../../services/orderService/injectPl
 import { nextOrderNumber } from "../../../../services/orderService/generateOrderNumber.js";
 import { notificationService } from "../../../../services/index.js";
 
-export const add = async (req, res, next) => {
+export const add = async (req, res, next, adminContext = null) => {
   let dbSession = null;
   let providerAttempt = null;
   let providerOrderCreated = false;
@@ -87,9 +87,10 @@ export const add = async (req, res, next) => {
       coupon_code: coupon_code || null,
       isDirectCheckout: Boolean(isDirectCheckout),
       expected_total: expected_total == null ? null : Number(expected_total),
+      ...(adminContext ? { admin: String(adminContext.actor), items: req.body.items, note: req.body.note || "" } : {}),
     })).digest("hex");
 
-    const replayedOrder = await Order.findOne({ user: user_id, idempotency_key: idempotencyKey });
+    const replayedOrder = adminContext?.quote ? null : await Order.findOne({ user: user_id, idempotency_key: idempotencyKey });
     if (replayedOrder) {
       if (
         replayedOrder.idempotency_fingerprint_version === 2 &&
@@ -119,7 +120,7 @@ export const add = async (req, res, next) => {
     const exchangeRate = ratesDoc?.rates?.get(currency) ?? 1;
 
     // ── Fetch carts ──────────────────────────────────────────────────────────
-    const carts = await (isDirectCheckout ? TempCart : Cart)
+    const carts = adminContext ? await adminContext.loadItems() : await (isDirectCheckout ? TempCart : Cart)
       .find({
         deleted_at: null,
         ...(user_id ? { user: user_id } : { guest_id }),
@@ -319,6 +320,10 @@ const address = await Address.findOne({
       ? parseFloat((grandTotal - advanceAmount).toFixed(2))
       : 0;
 
+    if (adminContext?.quote) {
+      return res.status(200).json({ status: "success", data: { subtotal: sub_total, discount: discountAmount, shipping: shippingAmount, cod_fee: codFee, grand_total: grandTotal, advance_amount: advanceAmount, currency, payment_required: payment_method === "razorpay" || advanceEnabled } });
+    }
+
     // ── Create order ─────────────────────────────────────────────────────────
     const existingOrder = await Order.findOne({ user: user._id, idempotency_key });
     if (existingOrder) {
@@ -445,7 +450,8 @@ const address = await Address.findOne({
       idempotency_key,
       idempotency_fingerprint: requestFingerprint,
       idempotency_fingerprint_version: 2,
-      note: "Checkout",
+      note: adminContext ? req.body.note || "Admin order" : "Checkout",
+      ...(adminContext ? { source: "admin", created_by_admin: adminContext.actor } : {}),
       exchange_rate: exchangeRate,
       // Item count means purchasable units, not distinct order lines.
       total_items: items.reduce((sum, item) => sum + item.quantity, 0),
@@ -582,7 +588,9 @@ const address = await Address.findOne({
     }
 
     // ── Cart cleanup ─────────────────────────────────────────────────────────
-    if (isDirectCheckout) {
+    if (adminContext) {
+      // Admin orders never mutate the customer’s shopping cart.
+    } else if (isDirectCheckout) {
       await TempCart.deleteMany({
         deleted_at: null,
         ...(user_id ? { user: user_id } : { guest_id }),
@@ -684,7 +692,7 @@ const address = await Address.findOne({
       /retry your operation or multi-document transaction/i.test(error?.message || "");
     if (isTransientTransactionError && (req._checkoutRetryCount || 0) < 2) {
       req._checkoutRetryCount = (req._checkoutRetryCount || 0) + 1;
-      return add(req, res, next);
+      return add(req, res, next, adminContext);
     }
     if (isTransientTransactionError) {
       return next(StatusError.serviceUnavailable(

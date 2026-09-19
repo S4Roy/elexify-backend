@@ -1,3 +1,5 @@
+import { createOptions } from "../../../controllers/admin/inventory/order/add.js";
+import { quote } from "../../../validations/admin/inventory/order/place.js";
 import { updateAddress } from "../../../controllers/admin/inventory/order/updateAddress.js";
 import { addressOptions } from "../../../controllers/admin/customerAccount/address.js";
 import { addressEditSchema } from "../../../validations/admin/customerAccount/address.js";
@@ -36,6 +38,9 @@ orderRouter.post('/payment/manual',
   }) }), recordManualPayment,
 );
 
+orderRouter.get("/create-options", requirePermission(PERMISSIONS.ORDER_CREATE), celebrate({ query: Joi.object({ kind: Joi.string().valid("customers", "products"), search: Joi.string().max(100).allow(""), customer_id: Joi.string().hex().length(24) }) }), createOptions);
+orderRouter.post("/quote", requirePermission(PERMISSIONS.ORDER_CREATE), quote, inventoryController.orderController.add);
+
 orderRouter.get(
   "/list",
   inventoryValidation.orderValidation.list,
@@ -53,6 +58,7 @@ orderRouter.get(
 );
 orderRouter.post(
   "/place",
+  requirePermission(PERMISSIONS.ORDER_CREATE),
   inventoryValidation.orderValidation.place,
   inventoryController.orderController.add
 );

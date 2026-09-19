@@ -16,6 +16,8 @@ const OrderSchema = new Schema(
       unique: true,
       index: true,
     },
+    created_by_admin: { type: Schema.Types.ObjectId, ref: "users", default: null },
+    source: { type: String, enum: ["storefront", "admin"], default: "storefront" },
     replacement_return_id: { type: Schema.Types.ObjectId, ref: "return_requests", default: null },
     original_order_id: { type: Schema.Types.ObjectId, ref: "orders", default: null },
     user: {

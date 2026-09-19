@@ -1,256 +1,60 @@
-import mongoose from "mongoose";
-import Cart from "../../../../models/Cart.js";
-import Order from "../../../../models/Order.js";
-import OrderItem from "../../../../models/OrderItem.js";
-import User from "../../../../models/User.js";
-import Address from "../../../../models/Address.js";
-import Product from "../../../../models/Product.js";
-import ProductVariation from "../../../../models/ProductVariation.js";
-import ExchangeRate from "../../../../models/ExchangeRate.js"; // ✅
-import { StatusError } from "../../../../config/index.js";
-import { paymentService } from "../../../../services/index.js";
-import { snapshotAddress } from "../../../../services/invoiceService/snapshotAddress.js";
-import { roundShippingCharge } from "../../../../services/shipping/roundShippingCharge.js";
-import { nextOrderNumber } from "../../../../services/orderService/generateOrderNumber.js";
+import Product from '../../../../models/Product.js';
+import ProductVariation from '../../../../models/ProductVariation.js';
+import User from '../../../../models/User.js';
+import Address from '../../../../models/Address.js';
+import { StatusError } from '../../../../config/index.js';
+import { add as checkout } from '../../../site/inventory/order/add.js';
+
+export async function loadAdminItems(lines) {
+  const seen = new Set();
+  return Promise.all(lines.map(async (line) => {
+    const key = `${line.product_id}:${line.variation_id || ''}`;
+    if (seen.has(key)) throw StatusError.badRequest('Combine duplicate products into one line.');
+    seen.add(key);
+    const product = await Product.findOne({ _id: line.product_id, status: 'active', deleted_at: null });
+    if (!product) throw StatusError.badRequest('Product is no longer available.');
+    const variation = line.variation_id ? await ProductVariation.findOne({
+      _id: line.variation_id, product_id: product._id, status: 'active', deleted_at: null,
+    }) : null;
+    if ((line.variation_id && !variation) || (product.type === 'variable' && !variation)) {
+      throw StatusError.badRequest('Select an available product variation.');
+    }
+    if (product.ask_for_price || variation?.ask_for_price) throw StatusError.badRequest('This product requires a price enquiry.');
+    return { product, variation, quantity: line.quantity };
+  }));
+}
 
 export const add = async (req, res, next) => {
   try {
-    const {
-      currency = "INR",
-      receipt,
-      email,
-      phone,
-      first_name,
-      last_name,
-      address,
-      payment_method,
-      discount = 0,
-      shipping = 0,
-    } = req.body;
+    const customer = await User.findOne({ _id: req.body.customer_id, role: 'customer', status: 'active', deleted_at: null });
+    if (!customer) throw StatusError.badRequest('Select an active customer.');
+    const checkoutReq = Object.create(req);
+    checkoutReq.auth = { user_id: customer._id };
+    checkoutReq.body = { ...req.body, currency: 'INR', idempotency_key: `admin:${req.body.idempotency_key}` };
+    return checkout(checkoutReq, res, next, {
+      actor: req.auth.user_id, quote: req.path === '/quote',
+      loadItems: () => loadAdminItems(req.body.items),
+    });
+  } catch (error) { next(error); }
+};
 
-    const user_id = req.auth?.user_id || null;
-    const guest_id = req.auth?.guest_id || null;
-
-    if (!user_id && !guest_id) {
-      throw StatusError.unauthorized("Invalid access token.");
-    }
-
-    // ✅ Get latest exchange rate
-    const ratesDoc = await ExchangeRate.findOne().sort({ updated_at: -1 });
-    const exchangeRate = ratesDoc?.rates?.get(currency) ?? 1;
-
-    const carts = await Cart.find({
-      deleted_at: null,
-      ...(user_id ? { user: user_id } : { guest_id }),
-    }).populate("product variation");
-
-    if (!carts.length) {
-      throw StatusError.badRequest("No carts found for the user.");
-    }
-
-    const items = [];
-    let total = 0;
-
-    for (const cart of carts) {
-      const product = cart.product;
-      const variation = cart.variation;
-
-      if (!product && !variation) {
-        console.warn(
-          `Skipping cart with missing product/variation: ${cart._id}`
-        );
-        continue;
-      }
-
-      const quantity = cart.quantity;
-      const base_unit_price = parseFloat(cart.price);
-      const base_total_price = parseFloat(
-        cart.total_price || base_unit_price * quantity
-      );
-
-      const converted_unit_price = parseFloat(
-        (base_unit_price * exchangeRate).toFixed(2)
-      );
-      const converted_total_price = parseFloat(
-        (base_total_price * exchangeRate).toFixed(2)
-      );
-
-      items.push({
-        product_id: product._id,
-        variation_id: variation?._id || null,
-        quantity,
-        unit_price: converted_unit_price,
-        total_price: converted_total_price,
-        base_unit_price,
-        base_total_price,
-      });
-
-      total += converted_total_price;
-    }
-
-    if (!items.length) {
-      throw StatusError.badRequest("No valid products found in the cart.");
-    }
-
-    const order_id = await nextOrderNumber();
-    const customer = {
-      first_name: first_name || "Guest",
-      last_name: last_name || "User",
-      email: email || "guest@example.com",
-      phone: phone || null,
-    };
-
-    let user = null;
-    if (user_id) {
-      user = await User.findOne({ _id: new mongoose.Types.ObjectId(user_id) });
+export const createOptions = async (req, res, next) => {
+  try {
+    const search = String(req.query.search || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const active = { status: 'active', deleted_at: null };
+    let data;
+    if (req.query.customer_id && req.query.kind !== 'customers') {
+      data = await Address.find({ ...active, user: req.query.customer_id }).select('full_name phone address_line_1 address_line_2 city_name state_name postcode').limit(50).lean();
+    } else if (req.query.kind === 'customers') {
+      data = await User.find({ ...active, role: 'customer', ...(req.query.customer_id ? { _id: req.query.customer_id } : {}), $or: [{ name: new RegExp(search, 'i') }, { email: new RegExp(search, 'i') }, { mobile: new RegExp(search, 'i') }] }).select('name email mobile').limit(20).lean();
     } else {
-      user = await User.findOne({ email: customer.email });
+      const matchingVariants = search ? await ProductVariation.find({ ...active, sku: new RegExp(search, 'i') }).select('product_id').limit(20).lean() : [];
+      const products = await Product.find({ ...active, $or: [{ name: new RegExp(search, 'i') }, { sku: new RegExp(search, 'i') }, { _id: { $in: matchingVariants.map(v => v.product_id) } }] }).select('name sku type stock_quantity regular_price sale_price').limit(20).lean();
+      const variations = await ProductVariation.find({ ...active, product_id: { $in: products.map(p => p._id) } }).select('product_id combination_key sku stock_quantity regular_price sale_price').lean();
+      data = products.flatMap(p => p.type === 'variable'
+        ? variations.filter(v => String(v.product_id) === String(p._id)).map(v => ({ ...v, product_id: p._id, variation_id: v._id, name: `${p.name} — ${v.combination_key}` }))
+        : [{ ...p, product_id: p._id, variation_id: null }]);
     }
-
-    if (!user) {
-      user = await User.create({
-        role: "customer",
-        name: `${customer.first_name} ${customer.last_name}`,
-        email: customer.email,
-        mobile: customer.phone,
-        password: "external_order",
-        status: "active",
-      });
-    }
-
-    // 📦 Create/find billing address
-    let billingAddress = null;
-    if (address?.address_line_1) {
-      const billingFilter = {
-        user: user._id,
-        full_name: `${customer.first_name} ${customer.last_name}`,
-        phone: customer.phone,
-        email: customer.email,
-        address_line_1: address.address_line_1,
-        city: address.city || "",
-        state: address.state || "",
-        country: address.country || "",
-        postcode: address.postcode || "",
-      };
-
-      billingAddress = await Address.findOne(billingFilter);
-      if (!billingAddress) {
-        billingAddress = await Address.create({
-          ...billingFilter,
-          address_line_2: address.address_line_2 || "",
-          land_mark: address.land_mark || "",
-          address_type: "home",
-          purpose: "billing",
-          is_default: true,
-          created_by: user._id,
-        });
-      }
-    }
-
-    const discountAmount = parseFloat((discount * exchangeRate).toFixed(2));
-    const shippingAmount = roundShippingCharge(shipping * exchangeRate, currency);
-    const grandTotal = parseFloat(total.toFixed(2));
-    const sub_total = parseFloat(
-      (grandTotal - discountAmount + shippingAmount).toFixed(2)
-    );
-
-    const order = await Order.create({
-      id: order_id,
-      user: user._id,
-      billing_address: billingAddress?._id ?? null,
-      shipping_address: billingAddress?._id ?? null,
-      billing_address_snapshot: snapshotAddress(billingAddress),
-      shipping_address_snapshot: snapshotAddress(billingAddress),
-      payment_status: "pending",
-      order_status: "pending",
-      total_amount: sub_total,
-      discount: discountAmount,
-      shipping: shippingAmount,
-      grand_total: grandTotal,
-      currency, // ✅ Save currency
-      payment_method,
-      transaction_id: `EXT-${order_id}`,
-      note: "Guest Checkout",
-      currency: currency,
-      exchnage_rate: exchangeRate,
-    });
-
-    const orderItems = [];
-
-    for (const item of items) {
-      const productDoc = await Product.findOne({ _id: item.product_id });
-      if (!productDoc) {
-        console.warn(`Product not found for ID: ${item.product_id}`);
-        continue;
-      }
-
-      const variationDoc = item.variation_id
-        ? await ProductVariation.findById(item.variation_id)
-        : null;
-
-      orderItems.push({
-        order_id: order._id,
-        product_id: productDoc._id,
-        variation_id: item.variation_id,
-        quantity: item.quantity,
-        unit_price: item.unit_price,
-        total_price: item.total_price,
-        regular_price: item.base_unit_price,
-        sale_price: item.unit_price, // Assume current unit_price is final
-        currency: currency,
-        exchnage_rate: exchangeRate,
-        product_name: productDoc.name || null,
-        sku: variationDoc?.sku || productDoc.sku || null,
-        variation_name: variationDoc?.combination_key || null,
-      });
-    }
-
-    if (!orderItems.length) {
-      throw StatusError.badRequest("No valid order items to save.");
-    }
-
-    await OrderItem.insertMany(orderItems);
-
-    // 🧹 Clear cart
-    await Cart.deleteMany({
-      deleted_at: null,
-      ...(user_id ? { user: user_id } : { guest_id }),
-    });
-
-    let razorpay = null;
-    if (payment_method === "razorpay") {
-      const razorpayOrder = await paymentService.createRazorpayOrder(
-        sub_total,
-        currency,
-        order_id,
-        { order_id: String(order_id) }
-      );
-      await Order.findOneAndUpdate(
-        { id: order_id },
-        {
-          payment_meta: {
-            payment_provider: "razorpay",
-            razorpay_order_id: razorpayOrder.id,
-            razorpay_payment_id: null,
-            razorpay_signature: null,
-          },
-        }
-      );
-
-      razorpay = razorpayOrder;
-    }
-
-    return res.status(200).json({
-      status: "success",
-      message: "Order placed successfully",
-      data: {
-        order,
-        razorpay,
-        items: orderItems,
-      },
-    });
-  } catch (error) {
-    console.error("❌ Order creation failed:", error.message);
-    next(error);
-  }
+    res.json({ status: 'success', data });
+  } catch (error) { next(error); }
 };
