@@ -14,6 +14,7 @@ import homePage from "./operations/home-page.js";
 import shipping from "./operations/shipping.js";
 import companySettings from "./operations/company-settings.js";
 import contactSettings from "./operations/contact-settings.js";
+import analyticsSettings from "./operations/analytics-settings.js";
 import pincodes from "./operations/pincodes.js";
 import restrictCountries from "./operations/restrict-countries.js";
 import coreSiteBootstrap from "./operations/core-site-bootstrap.js";
@@ -43,6 +44,7 @@ const RAW_ENTRIES = [
   shipping,
   companySettings,
   contactSettings,
+  analyticsSettings,
   pincodes,
   restrictCountries,
   coreSiteBootstrap,
