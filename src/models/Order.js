@@ -124,6 +124,9 @@ const OrderSchema = new Schema(
       // explicit enum member. Leaving it undefined until actually set
       // lets enum validation skip unset orders (the vast majority).
       cancelled_by: { type: String, enum: ["customer", "admin"] },
+      // True only when cancelled via the superadmin force-cancel override
+      // (bypassed the normal eligibility rules) — see cancelOrder.js `force`.
+      forced: { type: Boolean, default: false },
     },
 
     refund: {

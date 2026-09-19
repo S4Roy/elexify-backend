@@ -30,6 +30,30 @@ export const cancel = celebrate({
   }),
 });
 
+// Force-cancel always takes a free-text reason rather than the preset
+// CANCELLATION_REASONS list — it's an exceptional override, not a routine
+// customer-facing cancellation reason.
+export const forceCancel = celebrate({
+  body: Joi.object({
+    order_id: Joi.string()
+      .regex(/^[0-9a-fA-F]{24}$/)
+      .required()
+      .messages({
+        "string.empty": "Order ID is required",
+        "string.pattern.base": "Invalid Order ID format",
+      }),
+    reason: Joi.string()
+      .trim()
+      .min(10)
+      .max(500)
+      .required()
+      .messages({
+        "string.empty": "A reason is required to force-cancel an order",
+        "string.min": "Please explain why this order needs to be force-cancelled (min 10 characters)",
+      }),
+  }),
+});
+
 export const retryRefund = celebrate({
   body: Joi.object({
     order_id: Joi.string()

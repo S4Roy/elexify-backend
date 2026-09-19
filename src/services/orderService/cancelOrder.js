@@ -5,14 +5,16 @@ import Product from "../../models/Product.js";
 import ProductVariation from "../../models/ProductVariation.js";
 import StockTransaction from "../../models/StockTransaction.js";
 import { StatusError } from "../../config/index.js";
-import { ORDER_STATUS } from "../../constants/orderStatus.js";
+import { FORCE_CANCELLABLE_ORDER_STATUSES, ORDER_STATUS } from "../../constants/orderStatus.js";
 import { attemptRefund } from "./attemptRefund.js";
 import { getCancellationEligibility, getOrderPolicy } from "./orderPolicy.js";
 
 // Shared by both the customer-facing and admin-facing cancel endpoints, so
 // eligibility rules, inventory restoration, and refund initiation are
-// defined exactly once.
-export const cancelOrder = async ({ orderId, actorType, actorId, reason, comment }) => {
+// defined exactly once. `force` (superadmin-only, see routes/admin/inventory
+// /order.js) overrides the configured eligibility policy — see
+// getCancellationEligibility's force branch.
+export const cancelOrder = async ({ orderId, actorType, actorId, reason, comment, force = false }) => {
   if (!mongoose.Types.ObjectId.isValid(orderId)) {
     throw StatusError.notFound("Order not found");
   }
@@ -35,11 +37,28 @@ export const cancelOrder = async ({ orderId, actorType, actorId, reason, comment
   }
 
   const policy = await getOrderPolicy();
-  const eligibility = getCancellationEligibility(order, actorType, policy);
+  const eligibility = getCancellationEligibility(order, actorType, policy, { force });
   if (!eligibility.allowed) throw StatusError.badRequest(eligibility.reason);
-  const allowedStatuses = actorType === "customer"
-    ? policy.customer_cancellation_statuses
-    : policy.admin_cancellation_statuses;
+  const allowedStatuses = force
+    ? FORCE_CANCELLABLE_ORDER_STATUSES
+    : (actorType === "customer" ? policy.customer_cancellation_statuses : policy.admin_cancellation_statuses);
+
+  // Force-cancelling a packed order that already has courier details means
+  // Shiprocket may hold an active shipment for it — cancel that first so the
+  // courier doesn't still attempt pickup/delivery on an order we're about to
+  // mark cancelled+refunded. A Shiprocket rejection (e.g. already picked up)
+  // blocks the force-cancel entirely instead of silently proceeding.
+  if (force && order.order_status === ORDER_STATUS.PACKED && order.shiprocket_order_id) {
+    const { shiprocket } = await import("../index.js");
+    const result = await shiprocket
+      .cancelOrder(order.shiprocket_order_id)
+      .catch((err) => ({ success: false, error: err?.message }));
+    if (!result?.success) {
+      throw StatusError.badRequest(
+        "Could not cancel the shipment on Shiprocket — it may already be with the courier. Cancel it there directly before force-cancelling this order."
+      );
+    }
+  }
 
   // Claim: atomically flip to cancelled only if it's still in an eligible
   // status. If this loses a race to a concurrent cancel request, treat it
@@ -55,6 +74,7 @@ export const cancelOrder = async ({ orderId, actorType, actorId, reason, comment
           requested_at: new Date(),
           cancelled_at: new Date(),
           cancelled_by: actorType,
+          forced: force,
         },
       },
     },

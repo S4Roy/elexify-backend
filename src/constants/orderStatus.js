@@ -80,6 +80,18 @@ export const CANCELLABLE_ORDER_STATUSES = [
 export const isPackedOrderCancellable = (order) =>
   !order.awb && !order.shiprocket_order_id && !order.courier_name;
 
+// A superadmin "force cancel" bypasses the configured admin_cancellation_statuses
+// policy list and the isPackedOrderCancellable courier check, but never reaches
+// past "packed" — shipped/out_for_delivery/delivered orders may already be with
+// the courier or in the customer's hands, and cancelling those in-system can't
+// stop the physical delivery. Use the return workflow for those instead.
+export const FORCE_CANCELLABLE_ORDER_STATUSES = [
+  ORDER_STATUS.PENDING,
+  ORDER_STATUS.CONFIRMED,
+  ORDER_STATUS.PROCESSING,
+  ORDER_STATUS.PACKED,
+];
+
 export const isOrderCancellable = (order) => {
   if (CANCELLABLE_ORDER_STATUSES.includes(order.order_status)) return true;
   if (order.order_status === ORDER_STATUS.PACKED) {

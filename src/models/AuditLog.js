@@ -43,6 +43,8 @@ const AuditLogSchema = new Schema(
         "RETURN_INSPECTED",
         "RETURN_REFUND_RECORDED",
         "RETURN_PICKUP_UPDATED",
+        "ORDER_CANCELLED",
+        "ORDER_FORCE_CANCELLED",
       ],
     },
     // Set for admin-initiated events (verification override, manual retry,

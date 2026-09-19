@@ -44,8 +44,15 @@ orderRouter.get(
 );
 orderRouter.post(
   "/cancel",
+  requirePermission(PERMISSIONS.ORDER_CANCEL_MANAGE),
   inventoryValidation.orderValidation.cancel,
   inventoryController.orderController.cancel
+);
+orderRouter.post(
+  "/cancel/force",
+  requirePermission(PERMISSIONS.ORDER_FORCE_CANCEL),
+  inventoryValidation.orderValidation.forceCancel,
+  inventoryController.orderController.forceCancel
 );
 orderRouter.post(
   "/status",

@@ -1,16 +1,32 @@
 import ShippingSettings from "../../models/ShippingSettings.js";
-import { isPackedOrderCancellable, ORDER_STATUS } from "../../constants/orderStatus.js";
+import { FORCE_CANCELLABLE_ORDER_STATUSES, isPackedOrderCancellable, ORDER_STATUS } from "../../constants/orderStatus.js";
 
-export const getCancellationEligibility = (order, actorType, policy) => {
+export const getCancellationEligibility = (order, actorType, policy, { force = false } = {}) => {
   const isCustomer = actorType === "customer";
   const enabled = isCustomer
     ? policy.customer_cancellation_enabled
     : policy.admin_cancellation_enabled;
+
+  if (!enabled) return { allowed: false, reason: "Cancellation is disabled by policy." };
+
+  // Force-cancel (admin-only, superadmin-gated at the route level) ignores
+  // the configured admin_cancellation_statuses list and the packed-order
+  // courier check, but is still capped at FORCE_CANCELLABLE_ORDER_STATUSES —
+  // see its definition for why shipped+ orders are excluded even here.
+  if (force && !isCustomer) {
+    if (!FORCE_CANCELLABLE_ORDER_STATUSES.includes(order?.order_status)) {
+      return {
+        allowed: false,
+        reason: "This order's status can no longer be force-cancelled — once a shipment has left, use the return workflow instead.",
+      };
+    }
+    return { allowed: true, reason: null };
+  }
+
   const allowedStatuses = isCustomer
     ? policy.customer_cancellation_statuses
     : policy.admin_cancellation_statuses;
 
-  if (!enabled) return { allowed: false, reason: "Cancellation is disabled by policy." };
   if (!allowedStatuses.includes(order?.order_status)) {
     return { allowed: false, reason: "The current order status is not eligible for cancellation." };
   }
