@@ -1,3 +1,4 @@
+import { englishAddressLine } from "../../englishAddressLine.js";
 import { celebrate, Joi } from 'celebrate';
 
 export const addressParams = Joi.object({
@@ -11,8 +12,8 @@ export const addressEditSchema = Joi.object({
   phone_code: Joi.string().pattern(/^\d{1,4}$/).required(),
   phone: Joi.string().pattern(/^\d{6,14}$/).required(),
   email: Joi.string().trim().email().max(254).allow('').required(),
-  address_line_1: Joi.string().trim().min(5).max(200).required(),
-  address_line_2: Joi.string().trim().max(200).allow('').required(),
+  address_line_1: englishAddressLine().trim().min(5).max(200).required(),
+  address_line_2: englishAddressLine().trim().max(200).allow('').required(),
   land_mark: Joi.string().trim().max(100).allow('').required(),
   country: Joi.number().integer().positive().required(),
   state: Joi.number().integer().positive().required(),

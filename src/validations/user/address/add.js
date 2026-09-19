@@ -1,3 +1,4 @@
+import { englishAddressLine } from "../../englishAddressLine.js";
 import { celebrate, Joi } from "celebrate";
 
 export const add = celebrate({
@@ -40,7 +41,7 @@ export const add = celebrate({
       "string.email": "Email must be a valid email address",
     }),
 
-    address_line_1: Joi.string().min(5).max(200).required().messages({
+    address_line_1: englishAddressLine().min(5).max(200).required().messages({
       "string.base": "Address Line 1 must be a string",
       "string.empty": "Address Line 1 is required",
       "string.min": "Address Line 1 must be at least 5 characters",
@@ -48,7 +49,7 @@ export const add = celebrate({
       "any.required": "Address Line 1 is required",
     }),
 
-    address_line_2: Joi.string().max(200).optional().allow(null, "").messages({
+    address_line_2: englishAddressLine().max(200).optional().allow(null, "").messages({
       "string.max": "Address Line 2 cannot exceed 200 characters",
     }),
 
