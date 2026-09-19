@@ -55,6 +55,9 @@ const CouponUsageSchema = new Schema(
   { versionKey: false }
 );
 
+CouponUsageSchema.index({ coupon: 1, applied_at: -1, _id: -1 });
+CouponUsageSchema.index({ applied_at: -1, _id: -1 });
+
 // Helps enforce usage_per_email
 CouponUsageSchema.index({ coupon: 1, email: 1 });
 CouponUsageSchema.index({ order: 1 }, { unique: true });

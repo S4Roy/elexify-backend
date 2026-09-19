@@ -1,3 +1,4 @@
+import { couponSchema } from "../../../../validations/admin/inventory/coupon/add.js";
 import Coupon from "../../../../models/Coupon.js";
 import { StatusError } from "../../../../config/index.js";
 import CouponResource from "../../../../resources/CouponResource.js";
@@ -135,13 +136,30 @@ export const edit = async (req, res, next) => {
       updated_at: new Date(),
     };
 
+    const fields = Object.keys(couponSchema.describe().keys);
+    const candidate = Object.fromEntries(fields.map(key => [key, updateData[key] !== undefined ? updateData[key] : coupon[key]]));
+    for (const [scope, field] of Object.entries({ product: 'applicable_products', variation: 'applicable_variations', category: 'applicable_categories', brand: 'applicable_brands' })) {
+      if (candidate.applicable_scope !== scope) {
+        delete candidate[field];
+        updateData[field] = [];
+      } else {
+        candidate[field] = (candidate[field] || []).map(id => String(id));
+      }
+    }
+    if (candidate.discount_type !== 'percentage') {
+      delete candidate.max_discount_amount;
+      updateData.max_discount_amount = null;
+    }
+    const { error } = couponSchema.validate(candidate);
+    if (error) throw StatusError.badRequest(error.details[0].message);
+
     /* =========================
        UPDATE COUPON
     ========================== */
     const updatedCoupon = await Coupon.findByIdAndUpdate(
       _id,
       { $set: updateData },
-      { new: true }
+      { new: true, runValidators: true }
     );
 
     /* =========================

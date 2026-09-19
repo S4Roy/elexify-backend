@@ -5,3 +5,5 @@ import { details } from "./details.js";
 import { remove } from "./remove.js";
 
 export { add, edit, list, details, remove };
+
+export { usage } from "./usage.js";

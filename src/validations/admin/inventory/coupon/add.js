@@ -1,7 +1,6 @@
 import { celebrate, Joi } from "celebrate";
 
-export const add = celebrate({
-  body: Joi.object({
+export const couponSchema = Joi.object({
     /* =========================
        BASIC INFO
     ========================== */
@@ -17,7 +16,7 @@ export const add = celebrate({
       "string.max": "Title cannot exceed 100 characters",
     }),
 
-    description: Joi.string().max(500).optional().allow("").messages({
+    description: Joi.string().max(500).optional().allow("", null).messages({
       "string.max": "Description cannot exceed 500 characters",
     }),
 
@@ -31,7 +30,7 @@ export const add = celebrate({
         "any.only": "Discount type must be percentage or fixed",
       }),
 
-    discount_value: Joi.number().positive().required().messages({
+    discount_value: Joi.number().positive().when("discount_type", { is: "percentage", then: Joi.number().max(100) }).required().messages({
       "number.base": "Discount value must be a number",
       "number.positive": "Discount value must be greater than 0",
     }),
@@ -69,25 +68,25 @@ export const add = celebrate({
 
     applicable_products: Joi.when("applicable_scope", {
       is: "product",
-      then: Joi.array().items(Joi.string().required()).min(1).required(),
+      then: Joi.array().items(Joi.string().hex().length(24).required()).unique().min(1).required(),
       otherwise: Joi.forbidden(),
     }),
 
     applicable_variations: Joi.when("applicable_scope", {
       is: "variation",
-      then: Joi.array().items(Joi.string().required()).min(1).required(),
+      then: Joi.array().items(Joi.string().hex().length(24).required()).unique().min(1).required(),
       otherwise: Joi.forbidden(),
     }),
 
     applicable_categories: Joi.when("applicable_scope", {
       is: "category",
-      then: Joi.array().items(Joi.string().required()).min(1).required(),
+      then: Joi.array().items(Joi.string().hex().length(24).required()).unique().min(1).required(),
       otherwise: Joi.forbidden(),
     }),
 
     applicable_brands: Joi.when("applicable_scope", {
       is: "brand",
-      then: Joi.array().items(Joi.string().required()).min(1).required(),
+      then: Joi.array().items(Joi.string().hex().length(24).required()).unique().min(1).required(),
       otherwise: Joi.forbidden(),
     }),
 
@@ -136,5 +135,6 @@ export const add = celebrate({
       .messages({
         "any.only": "Status must be either active or inactive",
       }),
-  }),
-});
+  });
+
+export const add = celebrate({ body: couponSchema });

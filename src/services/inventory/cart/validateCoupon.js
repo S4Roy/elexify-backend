@@ -23,7 +23,7 @@ export const validateCoupon = async ({
      FETCH COUPON
   ========================== */
   const coupon = await Coupon.findOne({
-    code: code.toUpperCase(),
+    code: code.trim().toUpperCase(),
     status: "active",
     deleted_at: null,
     start_date: { $lte: new Date() },
@@ -191,6 +191,7 @@ export const validateCoupon = async ({
   /* =========================
      MULTICURRENCY
   ========================== */
+  discountINR = Math.min(discountINR, eligibleSubtotalINR);
   const discountConverted = Number((discountINR * rate).toFixed(2));
   const subtotalConverted = Number((cartSubtotalINR * rate).toFixed(2));
   const totalConverted = Number(

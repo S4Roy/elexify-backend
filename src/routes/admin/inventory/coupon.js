@@ -4,6 +4,8 @@ import { inventoryValidation } from "../../../validations/admin/index.js";
 
 const couponRouter = Router();
 
+couponRouter.get("/usage", inventoryValidation.couponValidation.usage, inventoryController.couponController.usage);
+
 couponRouter.get(
   "/list",
   inventoryValidation.couponValidation.list,
