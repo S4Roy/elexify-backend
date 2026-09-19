@@ -88,3 +88,27 @@ export const resolveAddressFields = async (fields) => {
     const city = await City.findOne({ name: fields.city_name, state_id: fields.state, country_id: fields.country, status: 'active' }).lean();
   return { country_name: country.name, state_name: state.name, city: city?.id || null };
 };
+
+export const createAddress = async (req, res, next) => {
+  let session;
+  try {
+    const resolved = await resolveAddressFields(req.body);
+    session = await mongoose.startSession();
+    let address;
+    await session.withTransaction(async () => {
+      if (!await User.exists({ ...customerFilter(req.params.id), status: 'active' }).session(session)) {
+        throw StatusError.notFound('Active customer not found');
+      }
+      [address] = await Address.create([{ ...req.body, ...resolved, user: req.params.id,
+        created_by: req.auth.user_id, is_default: false,
+      }], { session });
+      await AuditLog.create([{
+        user_id: req.params.id, actor_id: req.auth.user_id, event: 'CUSTOMER_ADDRESS_CREATED',
+        ip: req.ip, user_agent: req.get('user-agent'),
+        metadata: { address_id: address._id },
+      }], { session });
+    });
+    res.status(201).json({ status: 'success', message: 'Customer address created', data: new AddressResource(address).exec() });
+  } catch (error) { next(error); }
+  finally { if (session) await session.endSession(); }
+};

@@ -2,7 +2,7 @@
 
 Superadmins and managers can use **Orders → Create order**. Other admin roles cannot access the creation, quotation, or lookup endpoints.
 
-Select an existing active customer and saved delivery address, add catalogue products or variations and quantities, select COD or online payment, and review the calculated total before creating. Customer profiles remain the place to add customers and addresses. This flow currently uses INR and the delivery address for billing as well.
+Select an existing active customer and saved delivery address, add catalogue products or variations and quantities, select COD or online payment, and review the calculated total before creating. Use Add customer or Add address in the order dialog to create and select records without leaving the order. New addresses use the existing location, contact and serviceability checks and are saved with an admin audit event. This flow currently uses INR and the delivery address for billing as well.
 
 The admin endpoint reuses storefront checkout for authoritative prices, quantity discounts, shipping, GST snapshots, COD eligibility/fees/advance requirements, payment provider setup, transactional writes and stock reservation. It never modifies the customer's cart. The server requires the reviewed total and rejects price changes. Order source and creating admin are stored on the order. A namespaced idempotency key and request fingerprint protect identical submission retries.
 

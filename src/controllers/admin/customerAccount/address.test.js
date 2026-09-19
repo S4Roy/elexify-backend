@@ -6,8 +6,8 @@ import Country from '../../../models/Country.js';
 import State from '../../../models/State.js';
 import City from '../../../models/City.js';
 import AuditLog from '../../../models/AuditLog.js';
-import { editAddress } from './address.js';
-import { addressEditSchema } from '../../../validations/admin/customerAccount/address.js';
+import { editAddress, createAddress } from './address.js';
+import { addressEditSchema, addressCreateSchema } from '../../../validations/admin/customerAccount/address.js';
 import { requirePermission } from '../../../middleware/requirePermission.js';
 import { PERMISSIONS } from '../../../constants/adminPermissions.js';
 import { assertPincodeServiceable } from '../../../services/shipping/assertPincodeServiceable.js';
@@ -65,6 +65,38 @@ describe('customer address correction', () => {
   });
   afterEach(() => { vi.restoreAllMocks(); vi.clearAllMocks(); });
 
+  it('creates a customer-owned address and audit together without changing existing addresses', async () => {
+    const { expected_updated_at, reason, ...fields } = req.body;
+    req.body = fields;
+    res.status = vi.fn().mockReturnValue(res);
+    await createAddress(req, res, next);
+    expect(next).not.toHaveBeenCalled();
+    expect(res.status).toHaveBeenCalledWith(201);
+    expect(Address.create.mock.calls[0][0][0]).toMatchObject({ user: req.params.id, created_by: req.auth.user_id, is_default: false, country_name: 'India' });
+    expect(Address.create.mock.calls[0][1].session).toBe(session);
+    expect(AuditLog.create.mock.calls[0][0][0].event).toBe('CUSTOMER_ADDRESS_CREATED');
+    expect(AuditLog.create.mock.calls[0][1].session).toBe(session);
+    expect(Address.updateOne).not.toHaveBeenCalled();
+  });
+  it('rejects creation for missing or inactive customers', async () => {
+    User.exists.mockReturnValue({ session: async () => null });
+    await createAddress(req, res, next);
+    expect(next.mock.calls[0][0].statusCode).toBe(404);
+    expect(Address.create).not.toHaveBeenCalled();
+  });
+  it('requires serviceability before creating a shipping address', async () => {
+    assertPincodeServiceable.mockRejectedValue(new Error('Unserviceable postcode'));
+    await createAddress(req, res, next);
+    expect(next.mock.calls[0][0].message).toBe('Unserviceable postcode');
+    expect(Address.create).not.toHaveBeenCalled();
+  });
+  it('validates creation without edit-only fields and rejects ownership overrides', () => {
+    const { expected_updated_at, reason, ...fields } = input;
+    expect(addressCreateSchema.validate(fields).error).toBeUndefined();
+    expect(addressCreateSchema.validate({ ...fields, user: 'forged' }).error).toBeDefined();
+    expect(addressCreateSchema.validate({ ...fields, postcode: '000000' }).error).toBeDefined();
+    expect(addressCreateSchema.validate({ ...fields, expected_updated_at: null }).error).toBeDefined();
+  });
   it('preserves the original address and writes the replacement and audit in the same transaction', async () => {
     await editAddress(req, res, next);
     expect(next).not.toHaveBeenCalled();

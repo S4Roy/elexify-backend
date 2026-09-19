@@ -46,7 +46,7 @@ export const createOptions = async (req, res, next) => {
     if (req.query.customer_id && req.query.kind !== 'customers') {
       data = await Address.find({ ...active, user: req.query.customer_id }).select('full_name phone address_line_1 address_line_2 city_name state_name postcode').limit(50).lean();
     } else if (req.query.kind === 'customers') {
-      data = await User.find({ ...active, role: 'customer', ...(req.query.customer_id ? { _id: req.query.customer_id } : {}), $or: [{ name: new RegExp(search, 'i') }, { email: new RegExp(search, 'i') }, { mobile: new RegExp(search, 'i') }] }).select('name email mobile').limit(20).lean();
+      data = await User.find({ ...active, role: 'customer', ...(req.query.customer_id ? { _id: req.query.customer_id } : {}), $or: [{ name: new RegExp(search, 'i') }, { email: new RegExp(search, 'i') }, { mobile: new RegExp(search, 'i') }] }).select('name email mobile phone_code').limit(20).lean();
     } else {
       const matchingVariants = search ? await ProductVariation.find({ ...active, sku: new RegExp(search, 'i') }).select('product_id').limit(20).lean() : [];
       const products = await Product.find({ ...active, $or: [{ name: new RegExp(search, 'i') }, { sku: new RegExp(search, 'i') }, { _id: { $in: matchingVariants.map(v => v.product_id) } }] }).select('name sku type stock_quantity regular_price sale_price').limit(20).lean();

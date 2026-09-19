@@ -17,6 +17,7 @@ const AuditLogSchema = new Schema(
         "EMAIL_CHANGE_REQUESTED",
         "EMAIL_CHANGED",
         "CUSTOMER_ADDRESS_UPDATED",
+        "CUSTOMER_ADDRESS_CREATED",
         "ORDER_ADDRESS_UPDATED",
         "MOBILE_CHANGE_REQUESTED",
         "MOBILE_CHANGED",

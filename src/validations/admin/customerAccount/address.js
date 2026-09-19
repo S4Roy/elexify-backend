@@ -37,3 +37,6 @@ export const validateAddressEdit = celebrate({
   params: addressParams.keys({ addressId: Joi.string().hex().length(24).required() }),
   body: addressEditSchema,
 });
+
+export const addressCreateSchema = addressEditSchema.keys({ expected_updated_at: Joi.forbidden(), reason: Joi.forbidden() });
+export const validateAddressCreate = celebrate({ params: addressParams, body: addressCreateSchema });
