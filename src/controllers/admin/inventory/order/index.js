@@ -11,6 +11,7 @@ import { shipping } from "./shipping.js";
 import { cancel, forceCancel, reopen } from "./cancel.js";
 import { updateStatus } from "./updateStatus.js";
 import { bulkUpdateStatus } from "./bulkUpdateStatus.js";
+import { customerOptions } from "./customerOptions.js";
 import { retryRefund } from "./retryRefund.js";
 import { invoice } from "./invoice.js";
 import { zohoInvoiceStatus, syncZohoInvoice } from "./zohoInvoice.js";
@@ -33,6 +34,7 @@ export {
   reopen,
   updateStatus,
   bulkUpdateStatus,
+  customerOptions,
   retryRefund,
   invoice,
   zohoInvoiceStatus,

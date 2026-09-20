@@ -47,6 +47,11 @@ orderRouter.get(
   inventoryValidation.orderValidation.list,
   inventoryController.orderController.list
 );
+orderRouter.get(
+  "/customer-options",
+  celebrate({ query: Joi.object({ search: Joi.string().max(100).allow("") }) }),
+  inventoryController.orderController.customerOptions,
+);
 orderRouter.post("/shipping", inventoryController.orderController.shipping);
 orderRouter.get("/package/list", inventoryController.orderController.listPackages);
 orderRouter.post("/package/retry", inventoryController.orderController.retryPackage);
