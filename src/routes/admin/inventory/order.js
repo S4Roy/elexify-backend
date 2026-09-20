@@ -153,6 +153,14 @@ orderRouter.post(
   inventoryController.orderController.registerExternalPackage,
 );
 orderRouter.post(
+  "/sync-shiprocket-status",
+  requirePermission(PERMISSIONS.ORDER_STATUS_MANAGE),
+  celebrate({ body: Joi.object({
+    order_id: Joi.string().hex().length(24).required(),
+  }) }),
+  inventoryController.orderController.syncShiprocketStatus,
+);
+orderRouter.post(
   "/reconciliation/audit",
   requirePermission(PERMISSIONS.ORDER_STATUS_MANAGE),
   inventoryController.orderController.reconciliationAudit,

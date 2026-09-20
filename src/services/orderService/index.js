@@ -9,6 +9,7 @@ import { retryPackageShipment } from "./packages/retryPackageShipment.js";
 import { cancelPackage } from "./packages/cancelPackage.js";
 import { recomputeOrderStatus } from "./packages/recomputeOrderStatus.js";
 import { registerExternalPackage } from "./packages/registerExternalPackage.js";
+import { syncShiprocketStatus } from "./packages/syncShiprocketStatus.js";
 import { applyManualOrderStatusChange, MANUAL_ORDER_STATUSES, PACKAGE_CASCADE_STATUSES } from "./manualOrderStatus.js";
 import { reconcileShiprocketOrderStatus, parseCsvBuffer } from "./reconcileShiprocketOrderStatus.js";
 
@@ -21,6 +22,7 @@ export {
   updateReturnPickup,
   createAndShipPackage, retryPackageShipment, cancelPackage, recomputeOrderStatus,
   registerExternalPackage,
+  syncShiprocketStatus,
   applyManualOrderStatusChange, MANUAL_ORDER_STATUSES, PACKAGE_CASCADE_STATUSES,
   reconcileShiprocketOrderStatus, parseCsvBuffer,
 };

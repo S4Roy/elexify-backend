@@ -13,6 +13,7 @@ import { updateStatus } from "./updateStatus.js";
 import { bulkUpdateStatus } from "./bulkUpdateStatus.js";
 import { customerOptions } from "./customerOptions.js";
 import { registerExternalPackage } from "./registerExternalPackage.js";
+import { syncShiprocketStatus } from "./syncShiprocketStatus.js";
 import { audit as reconciliationAudit } from "./reconciliation/audit.js";
 import { apply as reconciliationApply } from "./reconciliation/apply.js";
 import { list as reconciliationList } from "./reconciliation/list.js";
@@ -40,6 +41,7 @@ export {
   bulkUpdateStatus,
   customerOptions,
   registerExternalPackage,
+  syncShiprocketStatus,
   reconciliationAudit,
   reconciliationApply,
   reconciliationList,
