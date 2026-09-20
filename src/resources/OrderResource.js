@@ -89,7 +89,13 @@ class OrderResource extends Resource {
           categories: CategoryResourceMinimal.collection(
             item.product?.categories || []
           ),
-          rating_summary: item.rating_summary || null,
+          rating_summary: item.rating_summary ? {
+            ...item.rating_summary,
+            user_review: item.rating_summary.user_review ? {
+              ...item.rating_summary.user_review,
+              media: MediaResource.collection(item.rating_summary.user_review.media || []),
+            } : null,
+          } : null,
         };
       }),
       currency: this.currency || "INR",

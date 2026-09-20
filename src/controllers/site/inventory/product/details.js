@@ -4,6 +4,7 @@ import ExchangeRate from "../../../../models/ExchangeRate.js";
 import { StatusError } from "../../../../config/index.js";
 import { envs } from "../../../../config/index.js";
 import mongoose from "mongoose";
+import { productHighlights } from "../../../../helpers/productHighlights.js";
 
 export const details = async (req, res, next) => {
   try {
@@ -627,6 +628,7 @@ export const details = async (req, res, next) => {
 
     const data = await Product.aggregate(pipeline);
     if (!data.length) throw StatusError.notFound("Product not found");
+    data[0].short_description = productHighlights(data[0].short_description);
 
     res.status(200).json({
       status: "success",

@@ -1,4 +1,5 @@
 import Resource from "resources.js";
+import { productHighlights } from "../helpers/productHighlights.js";
 import SEOResource from "./SEOResource.js";
 import CategoryResourceMinimal from "./CategoryResourceMinimal.js";
 import MediaResource from "./MediaResource.js";
@@ -24,7 +25,7 @@ class ProductResource extends Resource {
       is_featured: this.is_featured || false,
       is_bestseller: this.is_bestseller || false,
       description: this.description || null,
-      short_description: this.short_description || null,
+      short_description: productHighlights(this.short_description),
 
       regular_price: this.regular_price ?? 0,
       sale_price: this.sale_price ?? null,
