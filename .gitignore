@@ -38,3 +38,7 @@ public/**/Invoice-*.pdf
 uploads/
 tmp/
 db-backups/
+
+# Regenerated at runtime (cron + on product add/edit/remove/status-update) —
+# never a deliberate code change, so it doesn't belong in version control.
+public/google-merchant-feed.xml
