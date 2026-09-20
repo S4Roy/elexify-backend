@@ -31,6 +31,17 @@ const fmtDate = (date) =>
       })
     : "-";
 
+// Billing and shipping are almost always the same snapshot (checkout only
+// ever collects one address) — an admin can correct just one side
+// pre-invoice (see controllers/admin/inventory/order/updateAddress.js),
+// which is the one legitimate case where they diverge. Both snapshots are
+// always built by snapshotAddress.js, so a plain field comparison is safe.
+const sameAddress = (a, b) => {
+  if (!a || !b) return false;
+  return ["full_name", "phone", "address_line_1", "address_line_2", "city", "state", "postcode"]
+    .every((field) => (a[field] || null) === (b[field] || null));
+};
+
 const addressLines = (address) => {
   if (!address) return ["Address unavailable"];
   const locality = [address.address_line_1, address.address_line_2, address.land_mark].filter(Boolean);
@@ -167,24 +178,36 @@ export const renderInvoicePdf = (invoice) =>
       const addrTop = Math.max(y, metaY) + 10;
       doc.moveTo(PAGE_MARGIN, addrTop).lineTo(PAGE_WIDTH - PAGE_MARGIN, addrTop).strokeColor("#cccccc").stroke();
 
-      const colWidth = CONTENT_WIDTH / 2 - 10;
       const billTop = addrTop + 12;
-      doc.font("Helvetica-Bold").fontSize(10).text("BILLED TO", PAGE_MARGIN, billTop);
-      doc.font("Helvetica").fontSize(9).text(addressLines(invoice.billing_address).join("\n"), PAGE_MARGIN, billTop + 14, {
-        width: colWidth,
-      });
+      let afterAddr;
 
-      const shipX = PAGE_MARGIN + colWidth + 20;
-      doc.font("Helvetica-Bold").fontSize(10).text("SHIPPED TO", shipX, billTop, {
-        width: colWidth,
-      });
-      doc.font("Helvetica").fontSize(9).text(addressLines(invoice.shipping_address).join("\n"), shipX, billTop + 14, {
-        width: colWidth,
-      });
+      if (sameAddress(invoice.billing_address, invoice.shipping_address)) {
+        const addrText = addressLines(invoice.billing_address).join("\n");
+        doc.font("Helvetica-Bold").fontSize(10).text("ADDRESS", PAGE_MARGIN, billTop);
+        doc.font("Helvetica").fontSize(9).text(addrText, PAGE_MARGIN, billTop + 14, {
+          width: CONTENT_WIDTH,
+        });
+        afterAddr = billTop + 14 + doc.heightOfString(addrText, { width: CONTENT_WIDTH }) + 12;
+      } else {
+        const colWidth = CONTENT_WIDTH / 2 - 10;
+        doc.font("Helvetica-Bold").fontSize(10).text("BILLED TO", PAGE_MARGIN, billTop);
+        doc.font("Helvetica").fontSize(9).text(addressLines(invoice.billing_address).join("\n"), PAGE_MARGIN, billTop + 14, {
+          width: colWidth,
+        });
 
-      const billingHeight = doc.heightOfString(addressLines(invoice.billing_address).join("\n"), { width: colWidth });
-      const shippingHeight = doc.heightOfString(addressLines(invoice.shipping_address).join("\n"), { width: colWidth });
-      const afterAddr = billTop + 14 + Math.max(billingHeight, shippingHeight) + 12;
+        const shipX = PAGE_MARGIN + colWidth + 20;
+        doc.font("Helvetica-Bold").fontSize(10).text("SHIPPED TO", shipX, billTop, {
+          width: colWidth,
+        });
+        doc.font("Helvetica").fontSize(9).text(addressLines(invoice.shipping_address).join("\n"), shipX, billTop + 14, {
+          width: colWidth,
+        });
+
+        const billingHeight = doc.heightOfString(addressLines(invoice.billing_address).join("\n"), { width: colWidth });
+        const shippingHeight = doc.heightOfString(addressLines(invoice.shipping_address).join("\n"), { width: colWidth });
+        afterAddr = billTop + 14 + Math.max(billingHeight, shippingHeight) + 12;
+      }
+
       doc.moveTo(PAGE_MARGIN, afterAddr).lineTo(PAGE_WIDTH - PAGE_MARGIN, afterAddr).strokeColor("#cccccc").stroke();
 
       return afterAddr + 10;
