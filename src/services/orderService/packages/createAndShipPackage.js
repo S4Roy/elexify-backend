@@ -104,7 +104,10 @@ export const createAndShipPackage = async ({
       qLength: length,
       qWidth: width,
       qHeight: height,
-      packageOrderItems: orderItems.filter((oi) => requestedItems.some((r) => String(r.order_item_id) === String(oi._id))),
+      packageOrderItems: requestedItems.map(line => ({
+        ...order_data.order_items.find(item => String(item._id) === String(line.order_item_id)),
+        quantity: line.quantity,
+      })),
     });
 
     const [created] = await Package.create(

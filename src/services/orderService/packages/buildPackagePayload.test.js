@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildPackagePayload, resolveBillingAddress } from "./buildPackagePayload.js";
+import { buildPackagePayload, resolveBillingAddress, resolvePackageDims, calculatePackageWeight } from "./buildPackagePayload.js";
 
 const baseOrder = {
   id: "ORD-123",
@@ -84,5 +84,22 @@ describe("Shiprocket package address", () => {
     expect(payload.billing_address).toBe("4 Station Road");
     expect(payload.billing_city).toBe("Delhi");
     expect(resolveBillingAddress(baseOrder)).toBeNull();
+  });
+});
+
+describe('physical package weight', () => {
+  it('sums product weight times the selected package quantity', () => {
+    expect(resolvePackageDims({ qWeight: 99, qLength: 100, qWidth: 100, qHeight: 100,
+      packageOrderItems: [{ product: { weight: 2 }, quantity: 3 }, { product: { weight: 0.5 }, quantity: 4 }],
+    }).weight).toBe(8);
+  });
+  it('uses variation weights and recalculates reduced quantities', () => {
+    const item = { product: { weight: 2 }, variation: { weight: 0.5 }, quantity: 4 };
+    expect(calculatePackageWeight([item])).toBe(2);
+    expect(calculatePackageWeight([{ ...item, quantity: 1 }])).toBe(0.5);
+    expect(calculatePackageWeight([])).toBe(0);
+  });
+  it.each([undefined, 0, -1, NaN])('rejects missing or invalid product weight %s', weight => {
+    expect(() => calculatePackageWeight([{ product: { weight }, quantity: 1 }])).toThrow('positive product weight');
   });
 });

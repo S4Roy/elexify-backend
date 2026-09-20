@@ -67,6 +67,7 @@ class OrderResource extends Resource {
           product_id: item.product?._id || null,
           variation_id: item.variation?._id || null,
           sku: item.product?.sku || item.variation?.sku,
+          weight: item.variation?.weight ?? item.product?.weight ?? null,
           display_name: item.display_name || null,
           name: item.product?.name || null,
           slug: item.product?.slug || null,

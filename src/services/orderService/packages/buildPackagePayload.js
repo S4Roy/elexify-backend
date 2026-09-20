@@ -1,5 +1,5 @@
 import moment from "moment-timezone";
-import { envs } from "../../../config/index.js";
+import { StatusError, envs } from "../../../config/index.js";
 import { packageReference } from "./packageReference.js";
 
 // Builds the Shiprocket adhoc-order payload for one package. Mirrors
@@ -151,9 +151,19 @@ export const buildPackagePayload = ({ order_data, shiprocketConfig, pkg, pickupL
   return payload;
 };
 
-// Resolves the final weight/dims for a package the same way shipping.js
-// does today: prefer explicit input -> volumetric from input dims ->
-// volumetric from product dimensions -> env/default fallback.
+// Physical weight is calculated from only the units in this package.
+export const calculatePackageWeight = items => {
+  return Number(items.reduce((total, item) => {
+    const weight = Number(item.variation?.weight ?? item.product?.weight ?? item.weight);
+    const quantity = Number(item.quantity);
+    if (!Number.isFinite(weight) || weight <= 0) {
+      throw StatusError.badRequest(`Set a positive product weight for ${item.sku || item.product_name || item._id} before packing.`);
+    }
+    if (!Number.isInteger(quantity) || quantity <= 0) throw StatusError.badRequest('Package quantity must be a positive whole number');
+    return total + weight * quantity;
+  }, 0).toFixed(6));
+};
+
 export const resolvePackageDims = ({ qWeight, qLength, qWidth, qHeight, packageOrderItems }) => {
   const lengthNum = qLength ? Number(qLength) : null;
   const widthNum = qWidth ? Number(qWidth) : null;
@@ -177,7 +187,7 @@ export const resolvePackageDims = ({ qWeight, qLength, qWidth, qHeight, packageO
   const DEFAULT_WEIGHT = Number(process.env.DEFAULT_WEIGHT_KG || 0.5);
   const DEFAULT_DIM = Number(process.env.DEFAULT_DIM_CM || 10);
   return {
-    weight: weightNum || volumetricFromQuery || totalVolWeightFromProducts || DEFAULT_WEIGHT,
+    weight: packageOrderItems?.length ? calculatePackageWeight(packageOrderItems) : weightNum || volumetricFromQuery || totalVolWeightFromProducts || DEFAULT_WEIGHT,
     length: lengthNum || DEFAULT_DIM,
     width: widthNum || DEFAULT_DIM,
     height: heightNum || DEFAULT_DIM,
