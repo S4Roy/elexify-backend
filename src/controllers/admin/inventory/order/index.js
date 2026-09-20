@@ -13,6 +13,9 @@ import { updateStatus } from "./updateStatus.js";
 import { bulkUpdateStatus } from "./bulkUpdateStatus.js";
 import { customerOptions } from "./customerOptions.js";
 import { registerExternalPackage } from "./registerExternalPackage.js";
+import { audit as reconciliationAudit } from "./reconciliation/audit.js";
+import { apply as reconciliationApply } from "./reconciliation/apply.js";
+import { list as reconciliationList } from "./reconciliation/list.js";
 import { retryRefund } from "./retryRefund.js";
 import { invoice } from "./invoice.js";
 import { zohoInvoiceStatus, syncZohoInvoice } from "./zohoInvoice.js";
@@ -37,6 +40,9 @@ export {
   bulkUpdateStatus,
   customerOptions,
   registerExternalPackage,
+  reconciliationAudit,
+  reconciliationApply,
+  reconciliationList,
   retryRefund,
   invoice,
   zohoInvoiceStatus,

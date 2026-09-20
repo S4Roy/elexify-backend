@@ -153,6 +153,27 @@ orderRouter.post(
   inventoryController.orderController.registerExternalPackage,
 );
 orderRouter.post(
+  "/reconciliation/audit",
+  requirePermission(PERMISSIONS.ORDER_STATUS_MANAGE),
+  inventoryController.orderController.reconciliationAudit,
+);
+orderRouter.post(
+  "/reconciliation/apply",
+  requirePermission(PERMISSIONS.ORDER_STATUS_MANAGE),
+  celebrate({ body: Joi.object({
+    audit_id: Joi.string().hex().length(24).required(),
+    confirmation: Joi.string().valid("APPLY RECONCILIATION").required().messages({
+      "any.only": 'Type "APPLY RECONCILIATION" exactly to confirm this writes to potentially many orders.',
+    }),
+  }) }),
+  inventoryController.orderController.reconciliationApply,
+);
+orderRouter.get(
+  "/reconciliation/list",
+  requirePermission(PERMISSIONS.ORDER_STATUS_MANAGE),
+  inventoryController.orderController.reconciliationList,
+);
+orderRouter.post(
   "/refund/retry",
   inventoryValidation.orderValidation.retryRefund,
   inventoryController.orderController.retryRefund
