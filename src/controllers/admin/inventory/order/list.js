@@ -47,7 +47,10 @@ export const list = async (req, res, next) => {
 
     if (slug) matchFilter.slug = slug;
     if (_id) matchFilter._id = new mongoose.Types.ObjectId(_id);
-    if (order_status) matchFilter.order_status = order_status;
+    // Comma-separated for the admin Orders list's multiselect Status
+    // filter; a single value (e.g. from the /inventory/orders/:order_status
+    // route/status tiles) still works the same way via $in with one entry.
+    if (order_status) matchFilter.order_status = { $in: order_status.split(",") };
     if (payment_status) {
       matchFilter.payment_status = { $in: payment_status.split(",") };
     }
