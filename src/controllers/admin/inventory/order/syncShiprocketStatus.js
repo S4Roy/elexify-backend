@@ -1,12 +1,15 @@
 import { orderService } from "../../../../services/index.js";
 
-// "Fetch current status" button on Order Details — resyncs an already
-// Shiprocket-linked order from a live lookup, for when the webhook missed
-// or was delayed. See services/orderService/packages/syncShiprocketStatus.js.
+// "Fetch current status" button on Order Details — always available,
+// regardless of whether the order already has a Shiprocket link. If it
+// does, resyncs from a live lookup (for when the webhook missed or was
+// delayed); if it doesn't, searches Shiprocket live by the order's own
+// reference and links it on an unambiguous match. See
+// services/orderService/fetchShiprocketDetails.js.
 export const syncShiprocketStatus = async (req, res, next) => {
   try {
     const { order_id } = req.body;
-    const { order, changed, results } = await orderService.syncShiprocketStatus({
+    const { order, changed, results } = await orderService.fetchShiprocketDetailsForOrder({
       orderId: order_id,
       adminId: req.auth.user_id,
     });
