@@ -45,20 +45,21 @@ describe("reconcileShiprocketOrderStatus", () => {
     expect(Package.findOne).not.toHaveBeenCalled();
   });
 
-  it("advances a matched package forward and recomputes the order, only when --apply is passed", async () => {
+  it("matches a package by reference_id (\"<Order.id>-P<n>\", what the export's Order ID column actually contains) and advances it forward, only when --apply is passed", async () => {
     const pkg = { _id: "pkg1", order_id: "order1", status: "shipped" };
     Package.findOne.mockResolvedValue(pkg);
 
     const dryRun = await reconcileShiprocketOrderStatus({
-      rows: [{ "Order ID": "999", Status: "DELIVERED" }],
+      rows: [{ "Order ID": "ORD-000999-P1", Status: "DELIVERED" }],
       apply: false,
       logger: silentLogger,
     });
+    expect(Package.findOne).toHaveBeenCalledWith({ reference_id: "ORD-000999-P1" });
     expect(dryRun.counters.package_matched_updated).toBe(1);
     expect(Package.updateOne).not.toHaveBeenCalled();
 
     const applied = await reconcileShiprocketOrderStatus({
-      rows: [{ "Order ID": "999", Status: "DELIVERED" }],
+      rows: [{ "Order ID": "ORD-000999-P1", Status: "DELIVERED" }],
       apply: true,
       logger: silentLogger,
     });
@@ -68,6 +69,21 @@ describe("reconcileShiprocketOrderStatus", () => {
       expect.objectContaining({ $set: expect.objectContaining({ status: "delivered" }) }),
     );
     expect(recomputeOrderStatus).toHaveBeenCalledWith({ orderId: "order1", source: "reconciliation" });
+  });
+
+  it("falls back to Package.shiprocket_order_id only when reference_id doesn't match", async () => {
+    const pkg = { _id: "pkg1", order_id: "order1", status: "shipped" };
+    Package.findOne.mockResolvedValueOnce(null).mockResolvedValueOnce(pkg);
+
+    const report = await reconcileShiprocketOrderStatus({
+      rows: [{ "Order ID": "998877", Status: "DELIVERED" }],
+      apply: false,
+      logger: silentLogger,
+    });
+
+    expect(Package.findOne).toHaveBeenNthCalledWith(1, { reference_id: "998877" });
+    expect(Package.findOne).toHaveBeenNthCalledWith(2, { shiprocket_order_id: "998877" });
+    expect(report.counters.package_matched_updated).toBe(1);
   });
 
   it("treats a package already at or past the reported status as a no-op", async () => {
@@ -81,9 +97,27 @@ describe("reconcileShiprocketOrderStatus", () => {
     expect(Package.updateOne).not.toHaveBeenCalled();
   });
 
-  it("falls back to a legacy Order match and calls the shared manual-status service", async () => {
+  it("matches a legacy (pre-Package-model) order by its own Order.id — no \"-P<n>\" suffix in the export for those — and calls the shared manual-status service", async () => {
     const order = { id: "ORD-000065", order_status: "processing", _id: "order65" };
     Order.findOne.mockResolvedValue(order);
+    applyManualOrderStatusChange.mockResolvedValue({ ...order, order_status: "delivered" });
+
+    const report = await reconcileShiprocketOrderStatus({
+      rows: [{ "Order ID": "ORD-000065", Status: "DELIVERED", Channel: "Elexify Web" }],
+      apply: true,
+      logger: silentLogger,
+    });
+
+    expect(Order.findOne).toHaveBeenCalledWith({ id: "ORD-000065", deleted_at: null });
+    expect(applyManualOrderStatusChange).toHaveBeenCalledWith(
+      expect.objectContaining({ order, status: "delivered", changedBy: null }),
+    );
+    expect(report.counters.order_matched_updated).toBe(1);
+  });
+
+  it("falls back to the legacy Order.shiprocket_order_id field only when Order.id doesn't match", async () => {
+    const order = { id: "ORD-000066", order_status: "processing", _id: "order66" };
+    Order.findOne.mockResolvedValueOnce(null).mockResolvedValueOnce(order);
     applyManualOrderStatusChange.mockResolvedValue({ ...order, order_status: "delivered" });
 
     const report = await reconcileShiprocketOrderStatus({
@@ -92,9 +126,8 @@ describe("reconcileShiprocketOrderStatus", () => {
       logger: silentLogger,
     });
 
-    expect(applyManualOrderStatusChange).toHaveBeenCalledWith(
-      expect.objectContaining({ order, status: "delivered", changedBy: null }),
-    );
+    expect(Order.findOne).toHaveBeenNthCalledWith(1, { id: "4271", deleted_at: null });
+    expect(Order.findOne).toHaveBeenNthCalledWith(2, { shiprocket_order_id: "4271", deleted_at: null });
     expect(report.counters.order_matched_updated).toBe(1);
   });
 

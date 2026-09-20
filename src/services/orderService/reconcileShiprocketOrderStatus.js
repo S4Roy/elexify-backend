@@ -1,15 +1,34 @@
 // Reconciles Order/Package status from a Shiprocket order export (CSV,
-// columns: "Order ID" [Shiprocket's own numeric order id — the same value
-// stored in Package.shiprocket_order_id / the legacy Order.shiprocket_order_id
-// field, and the same value the live webhook correlates on], "Status"
-// [Shiprocket's current status text], optionally "Channel").
+// columns: "Order ID", "Status" [Shiprocket's current status text],
+// optionally "Channel").
 //
-// This is an exact-id join against a field WE already populated when the
-// order/package was created or last linked — never a fuzzy match. Rows
-// whose Order ID doesn't match any local Package or Order are reported as
-// unmatched, not guessed at; those need the "link Shiprocket order" admin
-// action (registerExternalPackage) run one at a time, since only a live
-// verified lookup can safely establish a *new* link.
+// Shiprocket's own export report echoes back the *channel order id* we
+// sent it when the order/package was created, not Shiprocket's internal
+// numeric order id — verified directly against a real export, "Order ID"
+// values come in three exact shapes:
+//   - "<Order.id>-P<n>"  — a Package created under the current
+//     multi-package flow; sent as reference_id (packageReference.js) and
+//     stored right back on that Package doc's own reference_id field.
+//   - "<Order.id>"  (no "-P" suffix) — a pre-Package-model order shipped
+//     under the old single-shipment flow, where the channel order id we
+//     sent Shiprocket was simply the order's own human id.
+//   - a bare number — an order Shiprocket has no channel reference for at
+//     all (booked directly in the Shiprocket dashboard, outside our
+//     system entirely); these have nothing local to match and correctly
+//     end up unmatched.
+// Package.shiprocket_order_id / Order.shiprocket_order_id (Shiprocket's
+// own internal numeric id, extractShiprocketIds.js) are tried only as a
+// last-resort fallback — this is what the live webhook correlates on when
+// a request carries that id instead, but it's essentially never what this
+// export's "Order ID" column actually contains.
+//
+// Every lookup here is an exact-id join against a field WE already
+// populated when the order/package was created or last linked — never a
+// fuzzy match. Rows whose Order ID doesn't match any local Package or
+// Order are reported as unmatched, not guessed at; those need the "link
+// Shiprocket order" admin action (registerExternalPackage) run one at a
+// time, since only a live verified lookup can safely establish a *new*
+// link.
 //
 // Two callers share this pure DB-matching logic (no file I/O here — see
 // callers for that):
@@ -99,7 +118,11 @@ export const reconcileShiprocketOrderStatus = async ({ rows, apply = false, logg
     }
 
     // ── Package-level match (current, post-multi-package-fulfillment orders) ──
-    const pkg = await Package.findOne({ shiprocket_order_id: shiprocketOrderId });
+    // reference_id (our own "<Order.id>-P<n>") first — see the header
+    // comment for why that's what this column actually contains; the
+    // Shiprocket-internal shiprocket_order_id is only a fallback.
+    const pkg = (await Package.findOne({ reference_id: shiprocketOrderId }))
+      || (await Package.findOne({ shiprocket_order_id: shiprocketOrderId }));
     if (pkg) {
       const packageStatus = PACKAGE_STATUS_MAP[mappedStatus];
       if (!packageStatus || !isForwardPackageTransition(pkg.status, packageStatus)) {
@@ -129,7 +152,11 @@ export const reconcileShiprocketOrderStatus = async ({ rows, apply = false, logg
     }
 
     // ── Legacy order-level match (pre-Package-model orders) ──
-    const order = await Order.findOne({ shiprocket_order_id: shiprocketOrderId, deleted_at: null });
+    // Order.id (our own human id) first — a pre-Package-model order's
+    // channel order id was simply its own id, no "-P<n>" suffix; the
+    // legacy Order.shiprocket_order_id field is only a fallback.
+    const order = (await Order.findOne({ id: shiprocketOrderId, deleted_at: null }))
+      || (await Order.findOne({ shiprocket_order_id: shiprocketOrderId, deleted_at: null }));
     if (order) {
       const currentRank = STATUS_RANK[order.order_status] ?? -1;
       const targetRank = STATUS_RANK[mappedStatus] ?? -1;
