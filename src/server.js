@@ -172,8 +172,12 @@ cron.schedule("*/10 * * * *", async () => {
   }
 });
 
-// Run every 6 hours
-cron.schedule("0 */6 * * *", async () => {
+// Safety-net regeneration for drift the debounced admin-mutation trigger
+// (scheduleGoogleFeedRegeneration, fired from product add/edit/remove/
+// status-update) doesn't cover — mainly stock moving via customer orders.
+// Hourly, not real-time per order: rebuilding the full feed file on every
+// checkout would be wasteful and isn't necessary for Merchant Center.
+cron.schedule("0 * * * *", async () => {
   try {
     await CronJobs.generateGoogleFeed(); // ✅ invoke the function
   } catch (e) {

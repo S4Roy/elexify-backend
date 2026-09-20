@@ -300,7 +300,16 @@ export const list = async (req, res, next) => {
             as: "banner",
           },
         },
-        { $unwind: { path: "$banner", preserveNullAndEmptyArrays: true } }
+        { $unwind: { path: "$banner", preserveNullAndEmptyArrays: true } },
+        {
+          $lookup: {
+            from: "seos",
+            localField: "seo",
+            foreignField: "_id",
+            as: "seo",
+          },
+        },
+        { $unwind: { path: "$seo", preserveNullAndEmptyArrays: true } }
       );
 
       const aggData = await Category.aggregate(pipeline);

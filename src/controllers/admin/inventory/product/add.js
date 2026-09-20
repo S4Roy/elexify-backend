@@ -7,6 +7,7 @@ import SEO from "../../../../models/SEO.js";
 import { StatusError } from "../../../../config/index.js";
 import ProductResource from "../../../../resources/ProductResource.js";
 import { generalHelper } from "../../../../helpers/index.js";
+import { scheduleGoogleFeedRegeneration } from "../../../../services/inventory/product/googleFeedService.js";
 
 /**
  * Add Product with SEO, Media, Variations & Meta
@@ -258,6 +259,8 @@ export const add = async (req, res, next) => {
       }));
       await ProductSpecification.insertMany(specsToInsert);
     }
+    scheduleGoogleFeedRegeneration();
+
     // ✅ Final response
     res.status(201).json({
       status: "success",

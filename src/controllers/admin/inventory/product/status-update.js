@@ -2,6 +2,7 @@ import { StatusError } from "../../../../config/index.js";
 import Product from "../../../../models/Product.js";
 import ProductVariation from "../../../../models/ProductVariation.js";
 import ProductResource from "../../../../resources/ProductResource.js";
+import { scheduleGoogleFeedRegeneration } from "../../../../services/inventory/product/googleFeedService.js";
 
 export const updateStatus = async (req, res, next) => {
   try {
@@ -46,6 +47,8 @@ export const updateStatus = async (req, res, next) => {
         }
       );
     }
+
+    scheduleGoogleFeedRegeneration();
 
     return res.status(200).json({
       status: "success",

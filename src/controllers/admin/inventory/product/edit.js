@@ -6,6 +6,7 @@ import Media from "../../../../models/Media.js";
 import SEO from "../../../../models/SEO.js";
 import ProductResource from "../../../../resources/ProductResource.js";
 import { generalHelper } from "../../../../helpers/index.js";
+import { scheduleGoogleFeedRegeneration } from "../../../../services/inventory/product/googleFeedService.js";
 
 /**
  * Update Product with SEO, Media, Variations & Meta
@@ -295,6 +296,8 @@ export const edit = async (req, res, next) => {
         await ProductSpecification.insertMany(specsToInsert);
       }
     }
+
+    scheduleGoogleFeedRegeneration();
 
     // ✅ Final response
     res.status(200).json({

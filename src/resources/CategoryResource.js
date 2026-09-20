@@ -2,6 +2,7 @@ import Resource from "resources.js";
 import { envs } from "../config/index.js";
 import MediaResource from "./MediaResource.js";
 import UserResource from "./UserResource.js";
+import SEOResource from "./SEOResource.js";
 
 class CategoryResource extends Resource {
   toArray() {
@@ -25,6 +26,7 @@ class CategoryResource extends Resource {
       banner: this.banner
         ? new MediaResource(this.banner).exec()
         : { url: envs.NO_IMAGE },
+      seo: this.seo ? new SEOResource(this.seo).exec() : null,
 
       updated_at: this.updated_at || null,
       created_at: this.created_at || null,

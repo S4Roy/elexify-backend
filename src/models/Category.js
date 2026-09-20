@@ -40,6 +40,11 @@ const CategorySchema = new Schema(
       default: null,
     },
     sort_order: { type: Number, default: 0 },
+    seo: {
+      type: Types.ObjectId,
+      ref: "seo", // 🔹 Reference to SEO Model
+      default: null,
+    },
     // Drives the storefront's "Top Categories" strip — an admin-curated
     // subset rather than showing all categories inline.
     is_featured: { type: Boolean, default: false },

@@ -23,7 +23,7 @@ import {
   shippingRateController,
   shippingSettingsController,
 } from "./shipping/index.js";
-import { seoProductController, seoSettingsController } from "./seo/index.js";
+import { seoProductController, seoCategoryController, seoSettingsController } from "./seo/index.js";
 import * as homeController from "./home/index.js";
 import * as topBarController from "./topbar/index.js";
 import * as headerConfigController from "./header-config/index.js";
@@ -66,6 +66,7 @@ export {
   shippingRateController,
   shippingSettingsController,
   seoProductController,
+  seoCategoryController,
   seoSettingsController,
   homeController,
   topBarController,

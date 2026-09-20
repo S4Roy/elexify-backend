@@ -243,6 +243,16 @@ ProductSchema.plugin(mongooseAggregatePaginate);
 
 // Create model
 ProductSchema.add({ zoho_item_id: String, zoho_organization_id: String, hsn_sac: String, accounting_unit: String, zoho_tax_id: String });
+
+// Google Merchant Center feed fields — all optional, no admin UI yet
+// (settable via API/direct edit). Without a real gtin/mpn, the feed honestly
+// reports identifier_exists=no instead of fabricating one from the SKU.
+ProductSchema.add({
+  gtin: { type: String, trim: true, default: null },
+  mpn: { type: String, trim: true, default: null },
+  google_product_category: { type: String, trim: true, default: null },
+  exclude_from_feed: { type: Boolean, default: false },
+});
 const Product = model("products", ProductSchema);
 
 export default Product;

@@ -23,7 +23,7 @@ import {
   shippingRateValidation,
   shippingSettingsValidation,
 } from "./shipping/index.js";
-import { seoProductValidation, seoSettingsValidation } from "./seo/index.js";
+import { seoProductValidation, seoCategoryValidation, seoSettingsValidation } from "./seo/index.js";
 import * as homeValidation from "./home/index.js";
 import * as topBarValidation from "./topbar/index.js";
 import * as headerConfigValidation from "./header-config/index.js";
@@ -61,6 +61,7 @@ export {
   shippingRateValidation,
   shippingSettingsValidation,
   seoProductValidation,
+  seoCategoryValidation,
   seoSettingsValidation,
   homeValidation,
   topBarValidation,

@@ -4,6 +4,7 @@ import { s3Handler } from "../../../../services/s3Handler/s3Handler.js";
 import path from "path";
 import ProductResource from "../../../../resources/ProductResource.js";
 import { generalHelper } from "../../../../helpers/index.js";
+import { scheduleGoogleFeedRegeneration } from "../../../../services/inventory/product/googleFeedService.js";
 
 /**
  * Edit Product
@@ -37,6 +38,8 @@ export const remove = async (req, res, next) => {
       { $set: updateData },
       { new: true }
     );
+
+    scheduleGoogleFeedRegeneration();
 
     // Success Response
     res.status(200).json({
