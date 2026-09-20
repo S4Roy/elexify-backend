@@ -8,6 +8,7 @@ const integrationCredentialsRouter = Router();
 const guard = requirePermission(PERMISSIONS.INTEGRATION_CREDENTIAL_MANAGE);
 integrationCredentialsRouter.get("/", guard, controller.list);
 integrationCredentialsRouter.get("/shiprocket/pickup-locations", guard, controller.pickupLocations);
+integrationCredentialsRouter.get("/shiprocket/channels", guard, controller.channels);
 integrationCredentialsRouter.put("/:provider", guard, celebrate({
   [Segments.PARAMS]: Joi.object({ provider: Joi.string().trim().lowercase().required() }),
   [Segments.BODY]: Joi.object({ enabled: Joi.boolean(), credentials: Joi.object().pattern(Joi.string(), Joi.string().allow("").max(4096)) }).min(1),

@@ -160,6 +160,7 @@ orderRouter.post(
   requirePermission(PERMISSIONS.ORDER_STATUS_MANAGE),
   celebrate({ body: Joi.object({
     order_id: Joi.string().hex().length(24).required(),
+    channel_id: Joi.string().trim().max(64),
   }) }),
   inventoryController.orderController.syncShiprocketStatus,
 );

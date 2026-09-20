@@ -49,7 +49,7 @@ const fetchRemoteOrder = async (shiprocketOrderId) => {
  *   registerExternalPackage's ordinary verification, and this button
  *   should never require the admin to first know that.
  */
-export const fetchShiprocketDetailsForOrder = async ({ orderId, adminId }) => {
+export const fetchShiprocketDetailsForOrder = async ({ orderId, adminId, channelId }) => {
   const order = await Order.findOne({ _id: orderId, deleted_at: null });
   if (!order) throw StatusError.notFound("Order not found");
 
@@ -72,7 +72,12 @@ export const fetchShiprocketDetailsForOrder = async ({ orderId, adminId }) => {
     };
   }
 
-  const matches = await findRemoteReference(order.id);
+  // Scope the live search to a single sales channel when one is given (the
+  // admin picks it from a dropdown backed by Shiprocket's registered
+  // channels, defaulting to the account's configured channel_id) — an
+  // account with several channels can otherwise return an order booked
+  // under a different storefront that merely reused the same reference.
+  const matches = await findRemoteReference(order.id, channelId ? { channel_id: channelId } : {});
   if (!matches.length) {
     return { found: false, message: `No Shiprocket order was found with reference "${order.id}".` };
   }

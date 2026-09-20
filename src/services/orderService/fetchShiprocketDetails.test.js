@@ -69,13 +69,24 @@ describe("fetchShiprocketDetailsForOrder", () => {
 
     const result = await fetchShiprocketDetailsForOrder({ orderId: "o1", adminId: "admin1" });
 
-    expect(findRemoteReference).toHaveBeenCalledWith("ORD-1");
+    expect(findRemoteReference).toHaveBeenCalledWith("ORD-1", {});
     expect(registerExternalPackage).toHaveBeenCalledWith(
       expect.objectContaining({ orderId: "o1", shiprocketOrderId: 777, adminId: "admin1", legacyDeliveredImport: true }),
     );
     expect(result.found).toBe(true);
     expect(result.linked_now).toBe(true);
     expect(result.details.shiprocket_order_id).toBe("777");
+  });
+
+  it("scopes the live search to the given channel", async () => {
+    Order.findOne.mockResolvedValue({ _id: "o1", id: "ORD-1", order_status: "processing", shiprocket_order_id: null });
+    Package.find.mockResolvedValue([]);
+    findRemoteReference.mockResolvedValue([{ id: 777, channel_order_id: "ORD-1" }]);
+    returnApi.mockResolvedValue({ data: { id: 777, channel_order_id: "ORD-1", shipments: [{ current_status: "Packed" }] } });
+
+    await fetchShiprocketDetailsForOrder({ orderId: "o1", adminId: "admin1", channelId: "12345" });
+
+    expect(findRemoteReference).toHaveBeenCalledWith("ORD-1", { channel_id: "12345" });
   });
 
   it("not linked anywhere: a match that isn't delivered yet is only shown, never written — the legacy bare-id reference can't pass ordinary verification", async () => {

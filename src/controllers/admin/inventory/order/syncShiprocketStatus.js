@@ -8,10 +8,11 @@ import { orderService } from "../../../../services/index.js";
 // manual-link path uses. See services/orderService/fetchShiprocketDetails.js.
 export const syncShiprocketStatus = async (req, res, next) => {
   try {
-    const { order_id } = req.body;
+    const { order_id, channel_id } = req.body;
     const result = await orderService.fetchShiprocketDetailsForOrder({
       orderId: order_id,
       adminId: req.auth.user_id,
+      channelId: channel_id || undefined,
     });
     return res.status(200).json({ status: "success", data: result });
   } catch (error) {

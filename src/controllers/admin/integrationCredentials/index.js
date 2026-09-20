@@ -6,12 +6,13 @@ import { auditService } from "../../../services/index.js";
 import { decryptCredential, encryptCredential, maskCredential } from "../../../utils/integrationCredentialsCrypto.js";
 import { getTokens as getShiprocketToken } from "../../../services/shiprocket/getTokens.js";
 import { getPickupLocations as getShiprocketPickupLocations } from "../../../services/shiprocket/getPickupLocations.js";
+import { getChannels as getShiprocketChannels } from "../../../services/shiprocket/getChannels.js";
 import { getTokens as getZohoToken } from "../../../services/zoho/getTokens.js";
 import { getRazorpayClient } from "../../../services/integrationCredentials/razorpay.js";
 import { getIntegrationConfig } from "../../../services/integrationCredentials/index.js";
 
 const PROVIDERS = {
-  shiprocket: { label: "Shiprocket", fields: ["email", "password", "channel_id", "pickup_location"], secret: ["password"], plain: ["pickup_location"] },
+  shiprocket: { label: "Shiprocket", fields: ["email", "password", "channel_id", "pickup_location"], secret: ["password"], plain: ["channel_id", "pickup_location"] },
   zoho: { label: "Zoho Books", fields: ["org_id", "client_id", "client_secret", "refresh_token", "base_url"], secret: ["client_secret", "refresh_token"] },
   google: { label: "Google Sign-In", fields: ["client_id"], secret: [] },
   razorpay: { label: "Razorpay", fields: ["key_id", "key_secret", "account_id", "webhook_secret"], secret: ["key_secret", "webhook_secret"] },
@@ -191,5 +192,16 @@ export const pickupLocations = async (req, res, next) => {
     if (!doc.enabled) throw StatusError.badRequest("Enable the Shiprocket integration before listing pickup locations.");
     const data = await getShiprocketPickupLocations();
     res.status(200).json({ status: "success", data });
+  } catch (error) { next(error); }
+};
+
+export const channels = async (req, res, next) => {
+  try {
+    const doc = await IntegrationCredential.findOne({ provider: "shiprocket" });
+    if (!doc) throw StatusError.badRequest("Save managed Shiprocket credentials before listing channels.");
+    if (!doc.enabled) throw StatusError.badRequest("Enable the Shiprocket integration before listing channels.");
+    const data = await getShiprocketChannels();
+    const config = await getIntegrationConfig("shiprocket", { channel_id: envs.shiprocket?.channel_id });
+    res.status(200).json({ status: "success", data, default_channel_id: config?.channel_id ? String(config.channel_id) : null });
   } catch (error) { next(error); }
 };
