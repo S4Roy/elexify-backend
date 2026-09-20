@@ -1,8 +1,14 @@
+import { celebrate, Joi } from 'celebrate';
+import { categoryListQuery } from '../../../validations/admin/inventory/category/list.js';
+import { exportCategories } from '../../../controllers/admin/inventory/category/exportCategories.js';
 import { Router } from "express";
 import { inventoryController } from "../../../controllers/admin/index.js";
 import { inventoryValidation } from "../../../validations/admin/index.js";
 
 const categoryRouter = Router();
+categoryRouter.get('/export', celebrate({ query: categoryListQuery.keys({
+  category_ids: Joi.string().pattern(/^[0-9a-fA-F]{24}(,[0-9a-fA-F]{24})*$/).max(25000),
+}) }), exportCategories);
 
 categoryRouter.get(
   "/list",

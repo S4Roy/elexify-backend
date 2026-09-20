@@ -1,6 +1,7 @@
+import { sendWorkbook } from "../../../../services/exportService/sendWorkbook.js";
 import { buildOrderMatchFilter } from "../../../../services/orderService/buildOrderMatchFilter.js";
 import { buildOrdersExportWorkbook } from "../../../../services/orderService/exportOrders.js";
-import { auditService } from "../../../../services/index.js";
+
 
 // Exports the Orders list to .xlsx, matching the table's current
 // filter/search (default) or a hand-picked selection of rows (order_ids) —
@@ -18,19 +19,7 @@ export const exportOrders = async (req, res, next) => {
       sortOrder: parseInt(sort_order),
     });
 
-    await auditService.recordAudit({
-      userId: req.auth.user_id,
-      actorId: req.auth.user_id,
-      req,
-      event: "ORDER_EXPORTED",
-      metadata: { count, selection: orderIds.length ? "selected" : "filtered", order_ids: orderIds.length ? orderIds : undefined },
-    });
-
-    const filename = `orders-export-${new Date().toISOString().slice(0, 10)}.xlsx`;
-    res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
-    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
-    await workbook.xlsx.write(res);
-    res.end();
+    await sendWorkbook({ req, res, workbook, entity: 'orders', event: 'ORDER_EXPORTED', metadata: { count, selection: orderIds.length ? 'selected' : 'filtered', order_ids: orderIds } });
   } catch (error) {
     next(error);
   }
