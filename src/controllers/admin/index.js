@@ -6,7 +6,6 @@ import * as pageController from "./page/index.js";
 import * as currencyController from "./currency/index.js";
 import * as testimonialController from "./testimonial/index.js";
 import * as faqController from "./faq/index.js";
-import * as consultationController from "./consultation/index.js";
 import * as bannerController from "./banner/index.js";
 import * as blogController from "./blog/index.js";
 import * as ratingController from "./rating/index.js";
@@ -47,7 +46,6 @@ export {
   masterController,
   mediaController,
   customerController,
-  consultationController,
   pageController,
   currencyController,
   testimonialController,

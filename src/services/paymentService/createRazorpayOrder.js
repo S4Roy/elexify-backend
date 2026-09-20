@@ -1,29 +1,49 @@
-import { getRazorpayClient, getRazorpayContext } from "../integrationCredentials/razorpay.js";
+import {
+  getRazorpayClient,
+  getRazorpayContext,
+} from "../integrationCredentials/razorpay.js";
 
-export const findRazorpayOrderByReceipt = async ({ receipt, amount, currency }) => {
+export const findRazorpayOrderByReceipt = async ({
+  receipt,
+  amount,
+  currency,
+}) => {
   const razorpay = await getRazorpayClient();
   const response = await razorpay.orders.all({ receipt, count: 100 });
-  const candidates = (response?.items || []).filter((order) =>
-    order.receipt === receipt &&
-    order.amount === Math.round(Number(amount) * 100) &&
-    order.currency === String(currency).toUpperCase(),
+  const candidates = (response?.items || []).filter(
+    (order) =>
+      order.receipt === receipt &&
+      order.amount === Math.round(Number(amount) * 100) &&
+      order.currency === String(currency).toUpperCase(),
   );
   if (candidates.length > 1) {
-    const error = new Error("Multiple Razorpay orders match the checkout receipt; manual reconciliation required");
+    const error = new Error(
+      "Multiple Razorpay orders match the checkout receipt; manual reconciliation required",
+    );
     error.code = "AMBIGUOUS_PROVIDER_ORDERS";
     throw error;
   }
   return candidates[0] || null;
 };
 
-export const createRazorpayOrder = async (totalAmount, currency, receipt, notes = {}) => {
+export const createRazorpayOrder = async (
+  totalAmount,
+  currency,
+  receipt,
+  notes = {},
+) => {
   try {
     const { client: razorpay, credentials } = await getRazorpayContext();
+    const mergedNotes = {
+      order_id: String(receipt),
+      description: `${receipt}`,
+      ...notes,
+    };
     const options = {
       amount: Math.round(totalAmount * 100), // 🔧 FIXED: ensure integer
       currency,
       receipt: receipt,
-      ...(Object.keys(notes).length ? { notes } : {}),
+      notes: mergedNotes,
     };
 
     const order = await razorpay.orders.create(options);

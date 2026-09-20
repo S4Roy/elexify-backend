@@ -6,7 +6,6 @@ import * as pageValidation from "./page/index.js";
 import * as currencyValidation from "./currency/index.js";
 import * as testimonialValidation from "./testimonial/index.js";
 import * as faqValidation from "./faq/index.js";
-import * as consultationValidation from "./consultation/index.js";
 import * as bannerValidation from "./banner/index.js";
 import * as blogValidation from "./blog/index.js";
 import * as ratingValidation from "./rating/index.js";
@@ -46,7 +45,6 @@ export {
   currencyValidation,
   testimonialValidation,
   faqValidation,
-  consultationValidation,
   bannerValidation,
   blogValidation,
   ratingValidation,
