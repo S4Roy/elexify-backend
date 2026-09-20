@@ -1,4 +1,5 @@
-import { sourceCondition, sourceExpression } from '../../../../services/legacyImport/filter.js';
+import { sourceExpression } from '../../../../services/legacyImport/filter.js';
+import { buildOrderMatchFilter } from '../../../../services/orderService/buildOrderMatchFilter.js';
 import Order from "../../../../models/Order.js";
 import { StatusError, envs } from "../../../../config/index.js";
 import mongoose from "mongoose";
@@ -7,72 +8,27 @@ import User from "../../../../models/User.js";
 
 export const list = async (req, res, next) => {
   try {
-    const user_id = req.auth?.user_id || null;
-
     const {
       page = 1,
       limit = envs.pagination.limit,
-      order_status = "",
-      search_key = "",
       sort_by = "id",
       sort_order = -1,
       _id = null,
       customer_id = null,
-      payment_status = null,
-      payment_method = null,
-      from_date = null,
-      to_date = null,
     } = req.query;
 
     const { slug = null } = req.params;
 
-    const importSource = req.query.import_source;
-    if (importSource && !['backup', 'other'].includes(importSource)) throw StatusError.badRequest('Invalid import source filter');
-    let importedReviewIds = [];
+    const importedReviewIds = [];
     const options = {
       page: parseInt(page),
       limit: parseInt(limit),
       sort: { [sort_by]: parseInt(sort_order) },
     };
 
-    const matchFilter = {
-      deleted_at: null,
-    };
-    if (importSource) matchFilter.$and = [sourceCondition(importSource, importedReviewIds)];
-    if (req.auth.role == "customer") {
-      matchFilter.user = new mongoose.Types.ObjectId(user_id);
-    } else if (customer_id) {
-      matchFilter.user = new mongoose.Types.ObjectId(customer_id);
-    }
-
+    const matchFilter = buildOrderMatchFilter(req.query, req.auth);
     if (slug) matchFilter.slug = slug;
     if (_id) matchFilter._id = new mongoose.Types.ObjectId(_id);
-    // Comma-separated for the admin Orders list's multiselect Status
-    // filter; a single value (e.g. from the /inventory/orders/:order_status
-    // route/status tiles) still works the same way via $in with one entry.
-    if (order_status) matchFilter.order_status = { $in: order_status.split(",") };
-    if (payment_status) {
-      matchFilter.payment_status = { $in: payment_status.split(",") };
-    }
-    if (payment_method) {
-      matchFilter.payment_method = { $in: payment_method.split(",") };
-    }
-    if (from_date || to_date) {
-      matchFilter.created_at = {};
-      if (from_date) matchFilter.created_at.$gte = new Date(from_date);
-      if (to_date) {
-        const end = new Date(to_date);
-        end.setHours(23, 59, 59, 999);
-        matchFilter.created_at.$lte = end;
-      }
-    }
-    if (search_key) {
-      matchFilter.$or = [
-        { id: { $regex: search_key, $options: "i" } },
-        { transaction_id: { $regex: search_key, $options: "i" } },
-        { order_status: { $regex: search_key, $options: "i" } },
-      ];
-    }
 
     const pipeline = [
       { $match: matchFilter },

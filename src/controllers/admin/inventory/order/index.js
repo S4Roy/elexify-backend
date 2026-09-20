@@ -1,5 +1,6 @@
 import { add } from "./add.js";
 import { list } from "./list.js";
+import { exportOrders } from "./exportOrders.js";
 import { order_details } from "./order_details.js";
 import { verifyPayment } from "./verifyPayment.js";
 import { stats } from "./stats.js";
@@ -26,6 +27,7 @@ import { list as listPackages, retry as retryPackage, cancel as cancelPackage } 
 export {
   add,
   list,
+  exportOrders,
   order_details,
   verifyPayment,
   stats,
