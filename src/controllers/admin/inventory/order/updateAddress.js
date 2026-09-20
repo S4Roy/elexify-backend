@@ -1,7 +1,6 @@
 import mongoose from 'mongoose';
 import Order from '../../../../models/Order.js';
 import Address from '../../../../models/Address.js';
-import Package from '../../../../models/Package.js';
 import Invoice from '../../../../models/Invoice.js';
 import AuditLog from '../../../../models/AuditLog.js';
 import { StatusError } from '../../../../config/index.js';
@@ -9,13 +8,13 @@ import { resolveAddressFields } from '../../customerAccount/address.js';
 import { snapshotAddress } from '../../../../services/invoiceService/snapshotAddress.js';
 
 export const assertOrderAddressEditable = order => {
-  if (!['pending', 'confirmed', 'processing'].includes(order.order_status) ||
+  if (!['pending', 'confirmed', 'processing', 'partially_shipped', 'partially_delivered'].includes(order.order_status) ||
       order.inventory_reverted || (order.refund?.status && order.refund.status !== 'not_required')) {
-    throw StatusError.conflict('Addresses can only be corrected on pending, confirmed or processing orders without refund or cancellation effects');
+    throw StatusError.conflict('Addresses can only be corrected before full packing on active orders without refund or cancellation effects');
   }
   if (order.invoice?.generated) throw StatusError.conflict('An invoice has been generated or is being generated. Order addresses are locked.');
-  if (order.package_count > 0 || order.awb || order.shiprocket_order_id || order.shipped_at) {
-    throw StatusError.conflict('Shipment preparation has started. Order addresses are locked.');
+  if (order.fully_packed || order.awb || order.shiprocket_order_id) {
+    throw StatusError.conflict('This order is fully packed or has a legacy shipment. Order addresses are locked.');
   }
 };
 
@@ -34,9 +33,8 @@ export const updateAddress = async (req, res, next) => {
           (order.updated_at?.getTime() || null) !== (expected_updated_at ? new Date(expected_updated_at).getTime() : null)) {
         throw StatusError.conflict('Order changed. Close the editor, refresh and review the latest details.');
       }
-      if (await Package.exists({ order_id: order._id }).session(session) ||
-          await Invoice.exists({ order_id: order._id }).session(session)) {
-        throw StatusError.conflict('This order already has shipment or invoice records. Its addresses are locked.');
+      if (await Invoice.exists({ order_id: order._id }).session(session)) {
+        throw StatusError.conflict('This order already has invoice records. Its addresses are locked.');
       }
       const original = await Address.findById(order[ref]).session(session).lean();
       if (!original) throw StatusError.notFound('Original order address not found');
@@ -54,7 +52,7 @@ export const updateAddress = async (req, res, next) => {
       const after = snapshotAddress(updated);
       const changed = await Order.updateOne({ _id: order._id, [ref]: order[ref],
         updated_at: order.updated_at || null, order_status: order.order_status,
-        'invoice.generated': { $ne: true }, package_count: { $in: [0, null] },
+        'invoice.generated': { $ne: true }, fully_packed: { $ne: true },
       }, { $set: { [ref]: updated._id, [`${ref}_snapshot`]: after, updated_at: now } }, { session });
       if (changed.modifiedCount !== 1) throw StatusError.conflict('Order changed. Refresh and try again.');
       await AuditLog.create([{

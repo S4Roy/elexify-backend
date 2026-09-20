@@ -1,3 +1,4 @@
+import { assertCityName } from "../../../services/shipping/validateAddressCity.js";
 import mongoose from 'mongoose';
 import Address from '../../../models/Address.js';
 import User from '../../../models/User.js';
@@ -77,6 +78,7 @@ export const editAddress = async (req, res, next) => {
 };
 
 export const resolveAddressFields = async (fields) => {
+    const cityName = assertCityName(fields.city_name);
     const country = await Country.findOne({ id: fields.country, status: 'active' }).lean();
     const state = await State.findOne({ id: fields.state, country_id: fields.country, status: 'active' }).lean();
     if (!country || !state) throw StatusError.badRequest('Select an active country and a state belonging to it');
@@ -85,8 +87,8 @@ export const resolveAddressFields = async (fields) => {
       throw StatusError.badRequest('Select a calling code from an active country');
     }
     if (fields.purpose !== 'billing') await assertPincodeServiceable(fields.postcode, fields.country);
-    const city = await City.findOne({ name: fields.city_name, state_id: fields.state, country_id: fields.country, status: 'active' }).lean();
-  return { country_name: country.name, state_name: state.name, city: city?.id || null };
+    const city = await City.findOne({ name: cityName, state_id: fields.state, country_id: fields.country, status: 'active' }).lean();
+  return { country_name: country.name, state_name: state.name, city: city?.id || null, city_name: cityName };
 };
 
 export const createAddress = async (req, res, next) => {

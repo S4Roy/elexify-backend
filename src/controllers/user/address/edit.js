@@ -1,3 +1,4 @@
+import { validateAddressCity } from "../../../services/shipping/validateAddressCity.js";
 import Address from "../../../models/Address.js";
 import { StatusError } from "../../../config/index.js";
 import { assertPincodeServiceable } from "../../../services/shipping/assertPincodeServiceable.js";
@@ -44,6 +45,10 @@ export const edit = async (req, res, next) => {
 
     if (postcode !== undefined) {
       await assertPincodeServiceable(postcode, country ?? address.country);
+    }
+
+    if (city !== undefined || state !== undefined || country !== undefined) {
+      await validateAddressCity(city ?? address.city, state ?? address.state, country ?? address.country);
     }
 
     // Unset other default addresses

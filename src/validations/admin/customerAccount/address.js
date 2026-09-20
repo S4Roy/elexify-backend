@@ -1,3 +1,4 @@
+import { CITY_MAX_LENGTH, CITY_LENGTH_MESSAGE } from "../../../services/shipping/validateAddressCity.js";
 import { englishAddressLine } from "../../englishAddressLine.js";
 import { celebrate, Joi } from 'celebrate';
 
@@ -17,7 +18,7 @@ export const addressEditSchema = Joi.object({
   land_mark: Joi.string().trim().max(100).allow('').required(),
   country: Joi.number().integer().positive().required(),
   state: Joi.number().integer().positive().required(),
-  city_name: Joi.string().trim().min(1).max(100).required(),
+  city_name: Joi.string().trim().min(1).max(CITY_MAX_LENGTH).required().messages({ "string.max": CITY_LENGTH_MESSAGE }),
   postcode: Joi.string().trim().min(2).max(20).required(),
   address_type: Joi.string().valid('home', 'office', 'billing', 'shipping', 'other').required(),
   purpose: Joi.string().valid('shipping', 'billing', 'both').required(),

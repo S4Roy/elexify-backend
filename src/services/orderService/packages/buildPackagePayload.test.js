@@ -17,6 +17,37 @@ const build = (order_data) => buildPackagePayload({
 });
 
 describe("Shiprocket package address", () => {
+  it("limits long shipping cities while retaining the full locality and existing address", () => {
+    const city = "Greater Kailash Part Two Near Central Market New Delhi";
+    const shipping_address = { address_line_1: "24 Main Road", address_line_2: "Floor 2", city_name: city, postcode: "110048" };
+    const payload = build({
+      billing_address: { address_line_1: "Billing Road", city_name: "Delhi", postcode: "110001" },
+      shipping_address,
+    });
+    expect(payload.shipping_city).toBe(city.slice(0, 40).trimEnd());
+    expect(payload.shipping_address_2).toBe(`Floor 2, ${city}`);
+    expect(payload.shipping_address).toBe("24 Main Road");
+    expect(shipping_address.city_name).toBe(city);
+  });
+
+  it("also limits billing snapshot cities when shipping uses billing", () => {
+    const city = "A".repeat(41);
+    const payload = build({ shipping_is_billing: true,
+      billing_address_snapshot: { address_line_1: "Billing Road", city, postcode: "110001" },
+    });
+    expect(payload.billing_city).toBe("A".repeat(40));
+    expect(payload.billing_address_2).toBe(city);
+    expect(payload.shipping_is_billing).toBe(true);
+    expect(payload.shipping_city).toBe("");
+  });
+
+  it("normalizes whitespace and leaves a city at the limit intact", () => {
+    const city = "A".repeat(40);
+    const payload = build({ billing_address: { address_line_1: "Road", city: { name: `  ${city}  ` }, postcode: "110001" } });
+    expect(payload.billing_city).toBe(city);
+    expect(payload.billing_address_2).toBe("");
+  });
+
   it("uses an edited shipping address with a free-text city instead of the billing address", () => {
     const payload = build({
       billing_address: { address_line_1: "Original Billing Street", city_name: "Delhi", postcode: "110001" },

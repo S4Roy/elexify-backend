@@ -137,6 +137,17 @@ export const buildPackagePayload = ({ order_data, shiprocketConfig, pkg, pickupL
     payload.shipping_phone = String(shippingAddr.phone || payload.billing_phone);
   }
 
+  // Shiprocket rejects city values longer than 40 characters. Keep the
+  // complete locality on the shipping label without changing the saved address.
+  for (const prefix of ["billing", "shipping"]) {
+    const city = payload[`${prefix}_city`].trim().replace(/\s+/g, " ");
+    const characters = Array.from(city);
+    payload[`${prefix}_city`] = characters.slice(0, 40).join("").trimEnd();
+    if (characters.length > 40) {
+      payload[`${prefix}_address_2`] = [payload[`${prefix}_address_2`], city].filter(Boolean).join(", ");
+    }
+  }
+
   return payload;
 };
 

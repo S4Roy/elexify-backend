@@ -1,7 +1,6 @@
 import { celebrate, Joi } from "celebrate";
 
-export const list = celebrate({
-  query: Joi.object({
+export const productListQuery = Joi.object({
     page: Joi.number().optional(),
     limit: Joi.number().optional(),
     _id: Joi.string().optional().allow("", null),
@@ -30,5 +29,6 @@ export const list = celebrate({
       .messages({
         "any.only": "All must be either 'true' or 'false'",
       }),
-  }),
 });
+
+export const list = celebrate({ query: productListQuery });

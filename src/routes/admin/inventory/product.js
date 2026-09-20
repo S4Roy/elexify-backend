@@ -1,8 +1,15 @@
+import { celebrate, Joi } from "celebrate";
+import { productListQuery } from "../../../validations/admin/inventory/product/list.js";
+import { exportProducts } from "../../../controllers/admin/inventory/product/exportProducts.js";
 import { Router } from "express";
 import { inventoryController } from "../../../controllers/admin/index.js";
 import { inventoryValidation } from "../../../validations/admin/index.js";
 
 const productRouter = Router();
+
+productRouter.get("/export", celebrate({ query: productListQuery.keys({
+  product_ids: Joi.string().pattern(/^[0-9a-fA-F]{24}(,[0-9a-fA-F]{24})*$/).max(25000),
+}) }), exportProducts);
 
 productRouter.get(
   "/list",

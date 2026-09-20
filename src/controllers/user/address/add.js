@@ -1,3 +1,4 @@
+import { validateAddressCity } from "../../../services/shipping/validateAddressCity.js";
 import Address from "../../../models/Address.js";
 import { StatusError } from "../../../config/index.js";
 import { assertPincodeServiceable } from "../../../services/shipping/assertPincodeServiceable.js";
@@ -33,6 +34,7 @@ export const add = async (req, res, next) => {
     const user_id = req.auth?.user_id;
     if (!user_id) throw StatusError.unauthorized("Invalid access token.");
 
+    await validateAddressCity(city, state, country || 101);
     await assertPincodeServiceable(postcode, country || 101);
 
     const addressFilter = {
