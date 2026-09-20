@@ -117,7 +117,12 @@ orderRouter.post(
         const ids = value.split(",").map((id) => id.trim()).filter(Boolean);
         if (!ids.length) return helpers.error("array.min");
         if (ids.length > BULK_ORDER_STATUS_LIMIT) return helpers.error("array.max");
-        if (!ids.every((id) => /^[0-9a-fA-F]{24}$/.test(id))) return helpers.error("any.invalid");
+        // Order.id (models/Order.js) is a human-readable string, not a Mongo
+        // ObjectId — current orders are "ORD-######" (see
+        // generateOrderNumber.js) but older/imported orders may differ, so
+        // this only rules out obviously-wrong input rather than pinning the
+        // exact format.
+        if (!ids.every((id) => /^[A-Za-z0-9_-]{1,64}$/.test(id))) return helpers.error("any.invalid");
         return ids;
       }, "comma-separated order IDs")
       .messages({
