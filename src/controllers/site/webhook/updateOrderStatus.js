@@ -8,6 +8,7 @@ import OrderScans from "../../../models/OrderScans.js";
 import WebhookLog from "../../../models/WebhookLog.js";
 import moment from "moment-timezone";
 import { normalizeOrderStatus } from "../../../helpers/order/normalizeOrderStatus.js";
+import { PACKAGE_STATUS_MAP, isForwardPackageTransition } from "../../../helpers/order/packageStatus.js";
 import { orderService, notificationService } from "../../../services/index.js";
 import { ORDER_STATUS, PAYMENT_STATUS } from "../../../constants/orderStatus.js";
 
@@ -19,36 +20,6 @@ const SHIPMENT_STATUS_EVENTS = {
   [ORDER_STATUS.SHIPPED]: "ORDER_SHIPPED",
   [ORDER_STATUS.OUT_FOR_DELIVERY]: "ORDER_OUT_FOR_DELIVERY",
   [ORDER_STATUS.DELIVERED]: "ORDER_DELIVERED",
-};
-
-// A Package only ever carries a shipment-stage status — never the order-
-// level "confirmed"/"processing"/"partially_*" values normalizeOrderStatus
-// can also return.
-const PACKAGE_STATUS_MAP = {
-  packed: "packed",
-  shipped: "shipped",
-  out_for_delivery: "out_for_delivery",
-  delivered: "delivered",
-  cancelled: "cancelled",
-  returned: "returned",
-};
-
-// Shiprocket's webhook deliveries aren't guaranteed in order — a stale or
-// duplicate event for a status the package has already moved past must be
-// a no-op, never a regression (and never an error that makes Shiprocket
-// retry forever).
-const PACKAGE_STATUS_ORDER = ["packed", "shipped", "out_for_delivery", "delivered"];
-const isForwardPackageTransition = (from, to) => {
-  if (to === "returned") return from === "delivered";
-  // Shiprocket only ever cancels pre-pickup (same window our own
-  // cancelPackage enforces) — a "Cancelled" event against a package that's
-  // already shipped/delivered is stale/out-of-order, never a real
-  // transition to apply.
-  if (to === "cancelled") return ["packed", "failed"].includes(from);
-  const fromIdx = PACKAGE_STATUS_ORDER.indexOf(from);
-  const toIdx = PACKAGE_STATUS_ORDER.indexOf(to);
-  if (fromIdx === -1 || toIdx === -1) return true;
-  return toIdx > fromIdx;
 };
 
 const processReverseWebhook = async ({ orderIds, awbStr, incoming, courierName, eventTimestamp, shipmentId, token }) => {

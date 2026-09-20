@@ -6,6 +6,8 @@ import { StatusError } from "../../../config/index.js";
 import { returnApi } from "../../shiprocket/returnShipment.js";
 import { packageReference } from "./packageReference.js";
 import { recomputeOrderStatus } from "./recomputeOrderStatus.js";
+import { normalizeOrderStatus } from "../../../helpers/order/normalizeOrderStatus.js";
+import { PACKAGE_STATUS_MAP } from "../../../helpers/order/packageStatus.js";
 
 // Orders in these statuses have nothing left to ship or can never be
 // shipped — mirrors createAndShipPackage.js's own guard.
@@ -14,9 +16,10 @@ const BLOCKED_ORDER_STATUSES = ["cancelled", "returned", "return_requested", "de
 /**
  * Lets an admin link an order to a Shiprocket order that was created
  * out-of-band (booked directly in the Shiprocket dashboard because our own
- * automated packing/shipping call never ran, or the order predates this
- * integration) — instead of the old shortcut of typing a bare "packed"
- * label with no shipment behind it at all.
+ * automated packing/shipping call never ran, the order predates this
+ * integration, or it's a legacy/imported order that never got a proper
+ * link) — instead of the old shortcut of typing a bare status label with
+ * no shipment behind it at all.
  *
  * Mirrors the exact verification pattern services/returnService/pickup.js's
  * bookReversePickup already uses for the same real-world situation on the
@@ -29,7 +32,8 @@ const BLOCKED_ORDER_STATUSES = ["cancelled", "returned", "return_requested", "de
  *      expected to enter that reference as the "Channel Order ID" when
  *      booking manually in Shiprocket, same convention as the return flow.
  *   3. Only then create the Package doc, populated from the *verified*
- *      response — never from whatever sub-fields the admin might type.
+ *      response (courier, AWB, ETD, and current shipment status) — never
+ *      from whatever sub-fields the admin might type.
  *
  * Scoped to registering exactly one package covering the order's full
  * quantity (package_number 1) — an order that already has packages doesn't
@@ -80,6 +84,17 @@ export const registerExternalPackage = async ({ orderId, shiprocketOrderId, reas
   const items = orderItems.map((oi) => ({ order_item_id: oi._id, quantity: oi.quantity }));
   const previousStatus = order.order_status;
 
+  // Derive the package's actual status from what Shiprocket reports for
+  // this shipment right now — never assume "packed" just because that's
+  // usually the first stage. A courier booked days ago out-of-band may
+  // already be shipped, out for delivery, or delivered by the time an
+  // admin gets around to linking it, and recording "packed" for that would
+  // be its own false record, exactly what this whole flow exists to avoid.
+  // Falls back to "packed" only when Shiprocket's status text is missing or
+  // one we don't recognize.
+  const derivedStatus = PACKAGE_STATUS_MAP[normalizeOrderStatus(shipment.current_status)] || "packed";
+  const now = new Date();
+
   let pkg;
   try {
     [pkg] = await Package.create([{
@@ -87,12 +102,16 @@ export const registerExternalPackage = async ({ orderId, shiprocketOrderId, reas
       package_number: packageNumber,
       reference_id: referenceId,
       items,
-      status: "packed",
+      status: derivedStatus,
       integration_status: "created",
       shiprocket_order_id: String(remote.id),
       shiprocket_shipment_id: String(shipment.id),
       awb: shipment.awb || null,
       courier_name: shipment.courier_name || null,
+      etd: shipment.etd || null,
+      shipped_at: ["shipped", "out_for_delivery", "delivered"].includes(derivedStatus) ? now : null,
+      delivered_at: derivedStatus === "delivered" ? now : null,
+      timeline: [{ status: derivedStatus, occurred_at: now, raw: { source: "manual_admin_link", shiprocket_status: shipment.current_status || null } }],
       booking_snapshot: remote,
       created_by: adminId,
     }]);

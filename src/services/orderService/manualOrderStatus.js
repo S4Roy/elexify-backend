@@ -25,7 +25,11 @@ export const PACKAGE_CASCADE_STATUSES = ["packed", "shipped", "out_for_delivery"
 // services/returnService and packages/cancelPackage.js), not this one.
 const PACKAGE_CASCADE_EXCLUDED_STATUSES = ["cancelled", "return_requested", "returned"];
 
-const STATUS_RANK = {
+// Exported for callers that need to pre-check "is this actually forward
+// progress" before invoking a manual correction — e.g. the Shiprocket
+// export reconciliation script, which must never let a stale/out-of-order
+// snapshot row regress an order that's already progressed further locally.
+export const STATUS_RANK = {
   pending: 0, confirmed: 1, processing: 2, packed: 3, shipped: 4,
   out_for_delivery: 5, delivered: 6,
 };
@@ -69,14 +73,15 @@ export const applyManualOrderStatusChange = async ({ order, expectedStatus = nul
       `This order has packages or tracking. Choose one of ${PACKAGE_CASCADE_STATUSES.join(", ")} to update its packages too, or use the package workflow directly.`,
     );
   }
-  // "packed" specifically always needs a real shipment behind it — a bare
-  // label flip here would mean an order marked packed with nothing to
-  // actually ship. An order with no packages yet must go through
+  // Any shipment-stage status always needs a real shipment behind it — a
+  // bare label flip straight to "shipped"/"delivered"/etc. on an order with
+  // no package would leave the order saying it was delivered with nothing
+  // ever actually shipped. An order with no packages yet must go through
   // registerExternalPackage (verified against a live Shiprocket order)
   // instead; one that already has packages hits the cascade path above.
-  if (status === "packed" && !hasPackagesOrTracking) {
+  if (PACKAGE_CASCADE_STATUSES.includes(status) && !hasPackagesOrTracking) {
     throw StatusError.badRequest(
-      "Provide a Shiprocket reference to mark this order as packed — use the package registration action, not a plain status correction.",
+      "Provide a Shiprocket reference to advance this order's fulfillment status — use the package registration action, not a plain status correction.",
     );
   }
   if ((order.payment_method === "razorpay" || order.is_partial_cod) && !["paid", "advance_paid"].includes(order.payment_status) &&
