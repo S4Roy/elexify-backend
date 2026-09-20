@@ -3,6 +3,7 @@ import Package from "../../models/Package.js";
 import { StatusError } from "../../config/index.js";
 import { returnApi } from "../shiprocket/returnShipment.js";
 import { findRemoteReference } from "./liveShiprocketImport.js";
+import { registerExternalPackage } from "./packages/registerExternalPackage.js";
 
 const extractDetails = (remote) => {
   const shipment = Array.isArray(remote?.shipments) ? remote.shipments[0] : remote?.shipments;
@@ -30,14 +31,22 @@ const fetchRemoteOrder = async (shiprocketOrderId) => {
 };
 
 /**
- * Read-only "Fetch Shiprocket details" button on Order Details. Works for
- * an order in *any* status and never writes to the database — it only
- * looks up and returns what Shiprocket currently reports, for an admin to
- * read. Applying any resulting status/courier change is a separate,
- * explicit action (Change Status -> Link Shiprocket order, or the CSV
- * reconciliation flow) — this never does that itself.
+ * "Fetch Shiprocket details" button on Order Details, for an order in
+ * *any* status.
+ *
+ * - Already linked locally (a Package or the legacy Order.shiprocket_order_id
+ *   field) — just looks up and returns what Shiprocket currently reports.
+ *   Never writes anything here: the data already exists in our DB, so
+ *   there's nothing to save, only to display.
+ * - Not linked locally yet — searches Shiprocket live by the order's own
+ *   reference (its human id, the exact channel_order_id we'd have sent
+ *   when creating it), and on a single unambiguous match, *does* write:
+ *   establishes the link via registerExternalPackage, which independently
+ *   re-verifies the match live before creating anything — the same
+ *   verified-linking convention every other manual-link path in this
+ *   codebase already follows, never a blind write from admin-typed input.
  */
-export const fetchShiprocketDetailsForOrder = async ({ orderId }) => {
+export const fetchShiprocketDetailsForOrder = async ({ orderId, adminId }) => {
   const order = await Order.findOne({ _id: orderId, deleted_at: null });
   if (!order) throw StatusError.notFound("Order not found");
 
@@ -47,13 +56,19 @@ export const fetchShiprocketDetailsForOrder = async ({ orderId }) => {
 
   if (linkedId) {
     const remote = await fetchRemoteOrder(linkedId);
-    return { found: true, details: extractDetails(remote) };
+    return { found: true, linked_now: false, details: extractDetails(remote) };
   }
 
-  // Nothing linked locally yet — search Shiprocket live by this order's
-  // own reference (its human id, the exact channel_order_id we'd have
-  // sent when creating it). Read-only: a match is only ever displayed,
-  // never linked, from this action.
+  if (packages.length) {
+    // Has packages, but none carry a Shiprocket link yet — don't guess
+    // which one a fresh search should attach to; that needs the
+    // dedicated package retry/manage workflow, not this button.
+    return {
+      found: false,
+      message: "This order has packages that aren't linked to Shiprocket yet — retry or manage them from Manage Packages instead.",
+    };
+  }
+
   const matches = await findRemoteReference(order.id);
   if (!matches.length) {
     return { found: false, message: `No Shiprocket order was found with reference "${order.id}".` };
@@ -65,6 +80,12 @@ export const fetchShiprocketDetailsForOrder = async ({ orderId }) => {
     };
   }
 
-  const remote = await fetchRemoteOrder(matches[0].id).catch(() => matches[0]);
-  return { found: true, details: extractDetails(remote) };
+  await registerExternalPackage({
+    orderId,
+    shiprocketOrderId: matches[0].id,
+    adminId,
+    reason: 'Linked via "Fetch Shiprocket details" on Order Details (found live by order reference)',
+  });
+  const remote = await fetchRemoteOrder(matches[0].id);
+  return { found: true, linked_now: true, details: extractDetails(remote) };
 };
