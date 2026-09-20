@@ -107,11 +107,13 @@ export const applyManualOrderStatusChange = async ({ order, expectedStatus = nul
     {
       $set: {
         order_status: status,
+        ...(status === "packed" ? { "zoho.packed_at": order.zoho?.packed_at || changedAt } : {}),
         updated_at: changedAt,
         processing_at: targetRank >= 2 ? (order.processing_at || changedAt) : null,
         shipped_at: targetRank >= 4 ? (order.shipped_at || changedAt) : null,
         delivered_at: targetRank >= 6 ? (order.delivered_at || changedAt) : null,
       },
+      ...(status === "packed" || order.zoho?.packed_at ? { $inc: { "zoho.version": 1 } } : {}),
       $push: { manual_status_history: {
         from: fromStatus, to: status, reason: reason.trim(),
         changed_by: changedBy, changed_at: changedAt,

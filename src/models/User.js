@@ -197,6 +197,7 @@ UserSchema.index(
 
 UserSchema.plugin(mongooseAggregatePaginate);
 
+UserSchema.add({ zoho_contact_id: String, zoho_organization_id: String, gstin: String, gst_treatment: String });
 const User = model("users", UserSchema);
 
 export default User;

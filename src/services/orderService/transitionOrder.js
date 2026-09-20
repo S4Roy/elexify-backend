@@ -51,9 +51,10 @@ export const transitionOrder = async ({
   const update = { ...set };
   if (orderStatus) update.order_status = orderStatus;
   if (paymentStatus) update.payment_status = paymentStatus;
+  if (orderStatus === "packed") update["zoho.packed_at"] = current.zoho?.packed_at || new Date();
   const updated = await Order.findOneAndUpdate(
     { _id: current._id, order_status: current.order_status, payment_status: current.payment_status },
-    { $set: update },
+    { $set: update, ...(orderStatus === "packed" || current.zoho?.packed_at ? { $inc: { "zoho.version": 1 } } : {}) },
     { new: true, session },
   );
   if (updated?.replacement_return_id && !session) {

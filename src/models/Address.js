@@ -88,6 +88,7 @@ AddressSchema.index({ state: 1 });
 AddressSchema.plugin(mongooseAggregatePaginate);
 
 // Create model
+AddressSchema.add({ gstin: String, gst_treatment: String });
 const Address = model("address", AddressSchema);
 
 export default Address;

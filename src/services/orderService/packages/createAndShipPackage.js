@@ -140,7 +140,8 @@ export const createAndShipPackage = async ({
     const fullyPacked = orderItems.every((oi) => (updatedAllocated.get(String(oi._id)) || 0) >= oi.quantity);
     const packageClaim = await Order.updateOne(
       { _id: order._id, shipping_address: order.shipping_address, billing_address: order.billing_address },
-      { $set: { package_count: nonCancelledPackages.length + 1, fully_packed: fullyPacked } },
+      { $set: { package_count: nonCancelledPackages.length + 1, fully_packed: fullyPacked,
+        "zoho.packed_at": order.zoho?.packed_at || new Date() }, $inc: { "zoho.version": 1 } },
       { session: dbSession },
     );
 

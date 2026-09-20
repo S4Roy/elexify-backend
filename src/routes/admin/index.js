@@ -32,6 +32,7 @@ import { emailTemplatesRouter } from "./emailTemplates.js";
 import { smsTemplatesRouter } from "./smsTemplates.js";
 import { dataOperationsRouter } from "./dataOperations.js";
 import { integrationCredentialsRouter } from "./integrationCredentials.js";
+import { zohoBooksRouter } from "./zohoBooks.js";
 
 const v1AdminRouter = Router();
 // All routes go here
@@ -69,5 +70,6 @@ v1AdminRouter.use("/email-templates", emailTemplatesRouter);
 v1AdminRouter.use("/sms-templates", smsTemplatesRouter);
 v1AdminRouter.use("/data-operations", dataOperationsRouter);
 v1AdminRouter.use("/integration-credentials", integrationCredentialsRouter);
+v1AdminRouter.use("/integrations/zoho-books", zohoBooksRouter);
 
 export { v1AdminRouter };

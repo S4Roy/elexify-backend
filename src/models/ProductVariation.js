@@ -170,6 +170,7 @@ ProductVariationSchema.index(
 );
 
 // Create model
+ProductVariationSchema.add({ zoho_item_id: String, zoho_organization_id: String, hsn_sac: String, accounting_unit: String, zoho_tax_id: String });
 const ProductVariation = model("product_variations", ProductVariationSchema);
 
 export default ProductVariation;

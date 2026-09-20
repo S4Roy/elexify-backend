@@ -242,6 +242,7 @@ ProductSchema.index({ serial_numbers: 1 });
 ProductSchema.plugin(mongooseAggregatePaginate);
 
 // Create model
+ProductSchema.add({ zoho_item_id: String, zoho_organization_id: String, hsn_sac: String, accounting_unit: String, zoho_tax_id: String });
 const Product = model("products", ProductSchema);
 
 export default Product;

@@ -4,10 +4,17 @@ import qs from "qs";
 import moment from "moment-timezone";
 import Token from "../../models/Token.js";
 import { getIntegrationConfig } from "../integrationCredentials/index.js";
+import ZohoConnection from "../../models/ZohoConnection.js";
+import { getAccessToken } from "./ZohoAuthService.js";
 
 const ZOHO_TOKEN_URL = "https://accounts.zoho.in/oauth/v2/token";
 
 export const getTokens = async ({ forceRefresh = false } = {}) => {
+  const connection = await ZohoConnection.findOne({ key: "books" });
+  if (connection) {
+    if (!connection.connected) throw new Error("Zoho integration is disconnected");
+    return getAccessToken(connection, forceRefresh);
+  }
   const credentials = await getIntegrationConfig("zoho", {
     org_id: envs.zoho.ORG_ID,
     client_id: envs.zoho.CLIENT_ID,

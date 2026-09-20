@@ -4,6 +4,7 @@ import { createCustomer } from './createCustomer.js';
 import { customerPayload } from './customerPayload.js';
 
 vi.mock('./booksRequest.js', async importOriginal => ({ ...await importOriginal(), booksRequest: vi.fn() }));
+vi.mock('../../models/ZohoConnection.js', () => ({ default: { findOne: vi.fn().mockResolvedValue(null) } }));
 beforeEach(() => vi.resetAllMocks());
 
 describe('Zoho customer synchronization', () => {

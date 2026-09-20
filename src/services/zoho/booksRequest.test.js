@@ -6,6 +6,7 @@ import { getIntegrationConfig } from '../integrationCredentials/index.js';
 
 vi.mock('axios', () => ({ default: { request: vi.fn() } }));
 vi.mock('./getTokens.js', () => ({ getTokens: vi.fn() }));
+vi.mock('../../models/ZohoConnection.js', () => ({ default: { findOne: vi.fn().mockResolvedValue(null) } }));
 vi.mock('../integrationCredentials/index.js', () => ({ getIntegrationConfig: vi.fn() }));
 
 beforeEach(() => {

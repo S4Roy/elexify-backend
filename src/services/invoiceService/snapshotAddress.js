@@ -16,5 +16,7 @@ export const snapshotAddress = (address) => {
     state: address.state_name || null,
     country: address.country_name || null,
     postcode: address.postcode || null,
+    ...(address.gstin ? { gstin: address.gstin } : {}),
+    ...(address.gst_treatment ? { gst_treatment: address.gst_treatment } : {}),
   };
 };

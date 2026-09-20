@@ -215,6 +215,19 @@ OrderSchema.index(
 );
 
 // Apply pagination plugin
+OrderSchema.add({
+  zoho: {
+    packed_at: Date,
+    version: { type: Number, default: 0 },
+    completed_version: { type: Number, default: 0 },
+    organization_id: String,
+    salesorder_id: String,
+    salesorder_number: String,
+    sync_status: String,
+    synced_at: Date,
+  },
+});
+OrderSchema.index({ "zoho.packed_at": 1 });
 OrderSchema.plugin(mongooseAggregatePaginate);
 
 // Create and export model

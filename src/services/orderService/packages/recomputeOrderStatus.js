@@ -33,6 +33,9 @@ export const recomputeOrderStatus = async ({ orderId, source = "application", se
   if (session) orderQuery.session(session);
   const order = await orderQuery;
   const set = { package_count: nonCancelledPackages.length, fully_packed: fullyPacked };
+  if (!order.zoho?.packed_at && packages.some(pkg => pkg.status === "packed")) {
+    set["zoho.packed_at"] = new Date();
+  }
 
   const derived = derivePackageOrderStatus(items);
   if (derived && derived !== order.order_status) {
@@ -42,7 +45,7 @@ export const recomputeOrderStatus = async ({ orderId, source = "application", se
     return { order: updated, statusChanged: true, previousStatus: order.order_status };
   }
 
-  const updateQuery = Order.updateOne({ _id: orderId }, { $set: set });
+  const updateQuery = Order.updateOne({ _id: orderId }, { $set: set, ...(order.zoho?.packed_at || set["zoho.packed_at"] ? { $inc: { "zoho.version": 1 } } : {}) });
   if (session) updateQuery.session(session);
   await updateQuery;
   const refreshedQuery = Order.findById(orderId);

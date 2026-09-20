@@ -1,6 +1,7 @@
 import nodemailer from "nodemailer";
 import IntegrationCredential from "../../../models/IntegrationCredential.js";
 import Token from "../../../models/Token.js";
+import ZohoConnection from "../../../models/ZohoConnection.js";
 import { StatusError, envs } from "../../../config/index.js";
 import { auditService } from "../../../services/index.js";
 import { decryptCredential, encryptCredential, maskCredential } from "../../../utils/integrationCredentialsCrypto.js";
@@ -70,6 +71,9 @@ export const update = async (req, res, next) => {
     const definition = PROVIDERS[provider];
     if (!definition) throw StatusError.badRequest("Unsupported integration provider.");
     const supplied = req.body?.credentials || {};
+    if (provider === "zoho" && await ZohoConnection.exists({ key: "books", connected: true })) {
+      throw StatusError.conflict("Disconnect Zoho Books before changing its OAuth credentials.");
+    }
     const unknown = Object.keys(supplied).filter((key) => !definition.fields.includes(key));
     if (unknown.length) throw StatusError.badRequest(`Unsupported credential field: ${unknown[0]}`);
 
@@ -107,6 +111,9 @@ export const clear = async (req, res, next) => {
   try {
     const provider = String(req.params.provider || "").toLowerCase();
     if (!PROVIDERS[provider]) throw StatusError.badRequest("Unsupported integration provider.");
+    if (provider === "zoho" && await ZohoConnection.exists({ key: "books", connected: true })) {
+      throw StatusError.conflict("Disconnect Zoho Books before removing its OAuth credentials.");
+    }
     const reason = String(req.body?.reason || "").trim();
     if (reason.length < 10) throw StatusError.badRequest("A reason of at least 10 characters is required.");
     await IntegrationCredential.deleteOne({ provider });

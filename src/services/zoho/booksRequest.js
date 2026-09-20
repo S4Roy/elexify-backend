@@ -2,6 +2,8 @@ import axios from 'axios';
 import { envs } from '../../config/index.js';
 import { getIntegrationConfig } from '../integrationCredentials/index.js';
 import { getTokens } from './getTokens.js';
+import ZohoConnection from '../../models/ZohoConnection.js';
+import { booksClient } from './ZohoBooksClient.js';
 
 export const zohoErrorMessage = error => {
   const data = error?.response?.data || error;
@@ -11,6 +13,11 @@ export const zohoErrorMessage = error => {
 };
 
 export const booksRequest = async (method, path, { data, params = {} } = {}) => {
+  const connection = await ZohoConnection.findOne({ key: 'books' });
+  if (connection) {
+    if (!connection.connected) throw new Error('Zoho integration is disconnected');
+    return booksClient(connection, method, path, { data, params });
+  }
   const credentials = await getIntegrationConfig('zoho', { org_id: envs.zoho.ORG_ID, base_url: envs.zoho.BASE_URL });
   if (!credentials) throw new Error('Zoho integration is disabled');
   if (!/^\d+$/.test(String(credentials.org_id || ''))) throw new Error('Configure a valid Zoho Books organization ID');

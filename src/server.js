@@ -12,6 +12,11 @@ import mongoose from "./config/mongoose.js";
 import * as middleware from "./middleware/index.js";
 import i18n from "i18n";
 import cron from "node-cron";
+import { processZohoQueue } from "./services/zoho/ZohoSyncQueue.js";
+
+cron.schedule("* * * * *", () => {
+  processZohoQueue().catch(() => console.error("Zoho worker failed; durable jobs retained for retry"));
+});
 
 // import rules from "./config/rules.js";
 // import bcrypt from "./config/bcrypt.js";
