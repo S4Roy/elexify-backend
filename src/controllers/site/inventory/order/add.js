@@ -216,6 +216,17 @@ export const add = async (req, res, next, adminContext = null) => {
     const user = await User.findById(user_id);
     if (!user) throw StatusError.unauthorized("Invalid user session.");
 
+    // A verified mobile number is required to place an order (e.g. for
+    // delivery updates and COD/OTP-on-delivery) — Google/email sign-in never
+    // collects one. Admin-placed orders are exempt: staff take orders over
+    // channels (phone/offline) where the customer's own account state
+    // doesn't apply.
+    if (!adminContext && !user.mobile_verified_at) {
+      throw StatusError.forbidden(
+        "MOBILE_VERIFICATION_REQUIRED: Please verify your mobile number to place an order.",
+      );
+    }
+
     // ── Address — look up by address_id ──────────────────────────────────────
 const address = await Address.findOne({
   _id: new mongoose.Types.ObjectId(address_id),

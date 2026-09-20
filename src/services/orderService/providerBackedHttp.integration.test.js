@@ -102,7 +102,7 @@ suite("PROVIDER-BOUNDARY STUBBED: provider-backed real HTTP exactly-once", () =>
     provider.lookupCalls = 0;
     await mongoose.connection.db.dropDatabase();
     await Promise.all([Order.syncIndexes(), ProviderOrderAttempt.syncIndexes()]);
-    user = await User.create({ role: "customer", name: "Provider Customer", email: "provider-http@example.test", status: "active" });
+    user = await User.create({ role: "customer", name: "Provider Customer", email: "provider-http@example.test", status: "active", mobile: "9876543210", phone_code: "91", mobile_verified_at: new Date() });
     [address, alternateAddress] = await Address.create([
       { user: user._id, full_name: "Provider Customer", phone: "9876543210", address_line_1: "1 Provider Street", state: 19, country: 101, postcode: "700001" },
       { user: user._id, full_name: "Provider Customer", phone: "9876543210", address_line_1: "2 Provider Street", state: 19, country: 101, postcode: "700001" },

@@ -71,8 +71,8 @@ suite("stock reservation write-result shape (COD, variation)", () => {
       StockTransaction.syncIndexes(),
     ]);
     [user, secondUser] = await User.create([
-      { role: "customer", name: "Shape Customer", email: "shape-1@example.test", status: "active" },
-      { role: "customer", name: "Shape Customer Two", email: "shape-2@example.test", status: "active" },
+      { role: "customer", name: "Shape Customer", email: "shape-1@example.test", status: "active", mobile: "9876543210", phone_code: "91", mobile_verified_at: new Date() },
+      { role: "customer", name: "Shape Customer Two", email: "shape-2@example.test", status: "active", mobile: "9876543211", phone_code: "91", mobile_verified_at: new Date() },
     ]);
     [address, secondUserAddress] = await Address.create([
       {

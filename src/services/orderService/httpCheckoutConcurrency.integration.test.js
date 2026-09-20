@@ -125,12 +125,18 @@ suite("real HTTP checkout concurrency and recovery", () => {
         name: "HTTP Checkout Customer",
         email: "http-checkout@example.test",
         status: "active",
+        mobile: "9876543210",
+        phone_code: "91",
+        mobile_verified_at: new Date(),
       },
       {
         role: "customer",
         name: "HTTP Checkout Customer Two",
         email: "http-checkout-two@example.test",
         status: "active",
+        mobile: "9876543211",
+        phone_code: "91",
+        mobile_verified_at: new Date(),
       },
     ]);
     [address, secondAddress] = await Address.create([

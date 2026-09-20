@@ -26,7 +26,7 @@ export const invoice = async (req, res, next) => {
     const doc = await invoiceService.getOrGenerateInvoice({ orderId: order_id, actorType: "customer" });
     const pdfBuffer = await invoiceService.renderInvoicePdf(doc);
 
-    const filename = `Invoice-${doc.invoice_number.replace(/\//g, "-")}.pdf`;
+    const filename = `Receipt-${doc.invoice_number.replace(/\//g, "-")}.pdf`;
     res.set({
       "Content-Type": "application/pdf",
       "Content-Disposition": `attachment; filename="${filename}"`,

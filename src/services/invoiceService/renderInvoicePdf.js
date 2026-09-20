@@ -84,7 +84,7 @@ const ITEM_COLS_BASE = [
   { key: "discount", label: "Discount", width: 55, align: "right" },
 ];
 const ITEM_COLS_GST = [
-  { key: "tax", label: "GST (included)", width: 70, align: "right" },
+  { key: "tax", label: "Included Charges", width: 70, align: "right" },
 ];
 const ITEM_COLS_TOTAL = [{ key: "amount", label: "Amount", width: 0, align: "right" }]; // width filled dynamically
 
@@ -121,7 +121,7 @@ export const renderInvoicePdf = (invoice) =>
 
     const drawHeader = () => {
       const top = PAGE_MARGIN;
-      doc.font("Helvetica-Bold").fontSize(16).text("TAX INVOICE", PAGE_MARGIN, top, {
+      doc.font("Helvetica-Bold").fontSize(16).text("ORDER RECEIPT", PAGE_MARGIN, top, {
         width: CONTENT_WIDTH,
         align: "center",
       });
@@ -150,8 +150,8 @@ export const renderInvoicePdf = (invoice) =>
 
       const metaX = PAGE_MARGIN + 320;
       const metaRows = [
-        ["Invoice No", invoice.invoice_number],
-        ["Invoice Date", fmtDate(invoice.invoice_date)],
+        ["Receipt No", invoice.invoice_number],
+        ["Receipt Date", fmtDate(invoice.invoice_date)],
         ["Order No", invoice.order_number],
         ["Order Date", fmtDate(invoice.order_date)],
         ["Payment Method", paymentMethodLabel(invoice)],
@@ -259,7 +259,7 @@ export const renderInvoicePdf = (invoice) =>
       totals.coupon_discount ? ["Coupon Discount", -totals.coupon_discount] : null,
       ["Shipping", totals.shipping],
       totals.cod_fee ? ["COD Fee", totals.cod_fee] : null,
-      invoice.is_gst_applicable ? ["GST (included)", totals.tax_total] : null,
+      invoice.is_gst_applicable ? ["Included Charges", totals.tax_total] : null,
     ].filter(Boolean);
 
     if (cursorY + (totalsRows.length + 4) * 14 > CONTENT_BOTTOM) {
@@ -295,7 +295,7 @@ export const renderInvoicePdf = (invoice) =>
 
     if (invoice.is_gst_applicable) {
       doc.font("Helvetica").fontSize(8).text(
-        "Prices include GST. Line GST includes tax on allocated shipping; GST is not added again.",
+        "Prices are inclusive of all applicable charges. The included-charges amount per line also accounts for allocated shipping; it is not added again separately.",
         PAGE_MARGIN, cursorY, { width: CONTENT_WIDTH },
       );
       cursorY += 24;
@@ -318,14 +318,14 @@ export const renderInvoicePdf = (invoice) =>
 
     doc.font("Helvetica").fontSize(8).fillColor("#555555");
     doc.text(
-      "Terms / Notes: Goods once sold are subject to the store's return/cancellation policy. This is a computer-generated invoice.",
+      "Terms / Notes: Goods once sold are subject to the store's return/cancellation policy. This is a computer-generated receipt.",
       PAGE_MARGIN,
       cursorY,
       { width: CONTENT_WIDTH }
     );
     doc.fillColor("black");
     cursorY += doc.heightOfString(
-      "Terms / Notes: Goods once sold are subject to the store's return/cancellation policy. This is a computer-generated invoice.",
+      "Terms / Notes: Goods once sold are subject to the store's return/cancellation policy. This is a computer-generated receipt.",
       { width: CONTENT_WIDTH }
     );
     cursorY += 10;
