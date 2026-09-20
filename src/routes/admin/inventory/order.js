@@ -141,6 +141,18 @@ orderRouter.post(
   bulkUpdateStatus,
 );
 orderRouter.post(
+  "/package/register-external",
+  requirePermission(PERMISSIONS.ORDER_STATUS_MANAGE),
+  celebrate({ body: Joi.object({
+    order_id: Joi.string().hex().length(24).required(),
+    shiprocket_order_id: Joi.string().trim().pattern(/^\d+$/).required().messages({
+      "string.pattern.base": "Shiprocket order ID must be numeric",
+    }),
+    reason: Joi.string().trim().min(10).max(500).required(),
+  }) }),
+  inventoryController.orderController.registerExternalPackage,
+);
+orderRouter.post(
   "/refund/retry",
   inventoryValidation.orderValidation.retryRefund,
   inventoryController.orderController.retryRefund

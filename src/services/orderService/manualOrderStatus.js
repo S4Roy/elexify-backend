@@ -69,6 +69,16 @@ export const applyManualOrderStatusChange = async ({ order, expectedStatus = nul
       `This order has packages or tracking. Choose one of ${PACKAGE_CASCADE_STATUSES.join(", ")} to update its packages too, or use the package workflow directly.`,
     );
   }
+  // "packed" specifically always needs a real shipment behind it — a bare
+  // label flip here would mean an order marked packed with nothing to
+  // actually ship. An order with no packages yet must go through
+  // registerExternalPackage (verified against a live Shiprocket order)
+  // instead; one that already has packages hits the cascade path above.
+  if (status === "packed" && !hasPackagesOrTracking) {
+    throw StatusError.badRequest(
+      "Provide a Shiprocket reference to mark this order as packed — use the package registration action, not a plain status correction.",
+    );
+  }
   if ((order.payment_method === "razorpay" || order.is_partial_cod) && !["paid", "advance_paid"].includes(order.payment_status) &&
       !["pending", "failed"].includes(status)) {
     throw StatusError.conflict("Record the received payment from the Payment section before advancing fulfillment");

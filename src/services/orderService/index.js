@@ -8,6 +8,7 @@ import { createAndShipPackage } from "./packages/createAndShipPackage.js";
 import { retryPackageShipment } from "./packages/retryPackageShipment.js";
 import { cancelPackage } from "./packages/cancelPackage.js";
 import { recomputeOrderStatus } from "./packages/recomputeOrderStatus.js";
+import { registerExternalPackage } from "./packages/registerExternalPackage.js";
 import { applyManualOrderStatusChange, MANUAL_ORDER_STATUSES, PACKAGE_CASCADE_STATUSES } from "./manualOrderStatus.js";
 
 export {
@@ -18,5 +19,6 @@ export {
   completeManualReturnRefund,
   updateReturnPickup,
   createAndShipPackage, retryPackageShipment, cancelPackage, recomputeOrderStatus,
+  registerExternalPackage,
   applyManualOrderStatusChange, MANUAL_ORDER_STATUSES, PACKAGE_CASCADE_STATUSES,
 };
