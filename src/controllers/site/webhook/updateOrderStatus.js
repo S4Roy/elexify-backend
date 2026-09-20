@@ -66,18 +66,24 @@ const processReverseWebhook = async ({ orderIds, awbStr, incoming, courierName, 
 
 // Best-effort audit write — this must never affect the response the
 // webhook sender sees, so any failure here is swallowed by the caller.
-const recordWebhookLog = ({ body, statusCode, responseBody, processingMs, packageId }) => {
+const recordWebhookLog = ({ body, statusCode, responseBody, processingMs, packageId, resolvedOrderId }) => {
   const awbStr = body?.awb != null ? String(body.awb) : null;
   const incomingStatus = (body?.current_status || body?.shipment_status || "").toString().trim() || null;
   const mappedStatus = incomingStatus
     ? normalizeOrderStatus(incomingStatus.toLowerCase().replace(/\s+/g, "_"))
     : null;
-  // channel_order_id is the composite id we originally sent Shiprocket
-  // (e.g. "ORD-010708-P2" — see buildPackagePayload.js); order_id in their
-  // webhook body is Shiprocket's own internal numeric order id.
-  const orderId = typeof body?.channel_order_id === "string" && body.channel_order_id.trim()
-    ? body.channel_order_id.trim()
-    : null;
+  // Prefer the order we actually correlated this webhook to server-side
+  // (via the matched Package/Order/ReturnRequest — see the `resolvedOrderId`
+  // assignments below) over Shiprocket's own channel_order_id field: in
+  // practice that field is frequently missing or left at its dashboard
+  // placeholder ("enter your channel order id") on real webhook deliveries,
+  // even though it's reliably present in orders/show API responses. Only
+  // fall back to it when nothing was actually resolved (e.g. no local
+  // match was found at all), purely as a debugging breadcrumb.
+  const orderId = resolvedOrderId
+    || (typeof body?.channel_order_id === "string" && body.channel_order_id.trim() && body.channel_order_id.trim().toLowerCase() !== "enter your channel order id"
+      ? body.channel_order_id.trim()
+      : null);
   const shiprocketOrderId = body?.order_id != null ? String(body.order_id) : null;
 
   const outcome = statusCode >= 500 || responseBody?.status === "error"
@@ -113,6 +119,11 @@ export const updateOrderStatus = async (req, res, next) => {
   // (best-effort, never blocking or altering the actual response) and then
   // sends the same response every existing call site sent.
   let matchedPackageId = null;
+  // Set as soon as any branch below actually correlates this webhook to a
+  // real local Order — read by `respond` via closure (same pattern as
+  // matchedPackageId) so every response path logs it without threading an
+  // extra parameter through each call site.
+  let resolvedOrderId = null;
   const respond = (payload) => {
     recordWebhookLog({
       body,
@@ -120,6 +131,7 @@ export const updateOrderStatus = async (req, res, next) => {
       responseBody: payload,
       processingMs: Date.now() - startedAt,
       packageId: matchedPackageId,
+      resolvedOrderId,
     }).catch((err) => console.warn("WebhookLog write failed:", err?.message || err));
     return res.status(200).json(payload);
   };
@@ -172,6 +184,8 @@ export const updateOrderStatus = async (req, res, next) => {
     // and update the same customer-visible event log as manual admin actions.
     const reverse = await processReverseWebhook({ orderIds, awbStr, incoming, courierName: courier_name, eventTimestamp, shipmentId: body.shipment_id, token: req.headers["x-api-key"] });
     if (reverse) {
+      const parentOrder = await Order.findOne({ _id: reverse.request.order_id });
+      resolvedOrderId = parentOrder?.id || null;
       // A webhook retries on any non-2xx — an unsupported status will
       // never become supported on retry, so this acks with 200 rather
       // than triggering an endless resend loop from Shiprocket's side.
@@ -192,9 +206,11 @@ export const updateOrderStatus = async (req, res, next) => {
         ...(body.shipment_id ? [{ shiprocket_shipment_id: String(body.shipment_id) }] : []),
       ],
     });
-    if (pkg) matchedPackageId = pkg._id;
-
     if (pkg) {
+      matchedPackageId = pkg._id;
+      const parentOrder = await Order.findOne({ _id: pkg.order_id });
+      resolvedOrderId = parentOrder?.id || null;
+
       const packageStatus = PACKAGE_STATUS_MAP[normalizeOrderStatus(incoming.replace(/\s+/g, "_"))];
 
       // Courier is picked manually in the Shiprocket dashboard, so the AWB/
@@ -317,6 +333,7 @@ export const updateOrderStatus = async (req, res, next) => {
         awb: awbStr,
       });
     }
+    resolvedOrderId = order.id;
     const newStatus = normalizeOrderStatus(incoming.replace(/\s+/g, "_"));
     if (!newStatus) {
       // Same reasoning as the reverse-shipment branch above — ack with 200

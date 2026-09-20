@@ -389,6 +389,58 @@ describe("updateOrderStatus — webhook audit log", () => {
     expect(logged.payload).toEqual(body);
   });
 
+  // Regression test for a real production issue: the admin Webhook Logs
+  // page showed "—" for Order ID on nearly every row because Shiprocket's
+  // actual webhook deliveries often omit channel_order_id or send it as
+  // the dashboard's own literal placeholder text — even though the order
+  // was correctly correlated to a local Package/Order server-side. The log
+  // must use that server-resolved order, not the raw (unreliable) field.
+  it("logs the server-resolved order id, not the raw channel_order_id, when a package is matched", async () => {
+    const pkg = {
+      _id: "pkg10", order_id: "order10", status: "shipped", awb: "111", courier_name: "Delhivery",
+      etd: null, timeline: [{ status: "packed" }, { status: "shipped" }],
+      shipped_at: new Date("2021-06-24T00:00:00Z"), delivered_at: null,
+    };
+    Package.findOne.mockResolvedValue(pkg);
+    Package.findOneAndUpdate.mockResolvedValue({ ...pkg, status: "delivered" });
+    // The resolved Order's own human id differs from whatever Shiprocket's
+    // webhook happened to carry as channel_order_id — proving the log uses
+    // the server-side correlation, not the raw field.
+    Order.findOne.mockResolvedValue({ id: "ORD-000040" });
+    orderService.recomputeOrderStatus.mockResolvedValue({
+      order: { _id: "order10", id: "ORD-000040", order_status: "delivered" },
+      statusChanged: true,
+    });
+
+    const body = {
+      awb: 111,
+      current_status: "Delivered",
+      order_id: "13906000",
+      channel_order_id: "enter your channel order id",
+      scans: [],
+    };
+    await updateOrderStatus({ headers: {}, body }, mockRes(), vi.fn());
+
+    expect(Order.findOne).toHaveBeenCalledWith({ _id: "order10" });
+    const logged = WebhookLog.create.mock.calls[0][0];
+    expect(logged.order_id).toBe("ORD-000040");
+  });
+
+  it("does not log Shiprocket's dashboard placeholder text as an order id when nothing was resolved", async () => {
+    Package.findOne.mockResolvedValue(null);
+    Order.findOne.mockResolvedValue(null);
+
+    const body = {
+      current_status: "Delivered",
+      channel_order_id: "Enter your channel order ID",
+      scans: [],
+    };
+    await updateOrderStatus({ headers: {}, body }, mockRes(), vi.fn());
+
+    const logged = WebhookLog.create.mock.calls[0][0];
+    expect(logged.order_id).toBeNull();
+  });
+
   it("records an ignored call for an unsupported status with no package_id", async () => {
     Package.findOne.mockResolvedValue(null);
     Order.findOne.mockResolvedValue({ id: "ORD-000031", order_status: "processing", meta: {} });
