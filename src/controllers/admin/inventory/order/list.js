@@ -1,3 +1,4 @@
+import { sourceCondition, sourceExpression } from '../../../../services/legacyImport/filter.js';
 import Order from "../../../../models/Order.js";
 import { StatusError, envs } from "../../../../config/index.js";
 import mongoose from "mongoose";
@@ -25,6 +26,9 @@ export const list = async (req, res, next) => {
 
     const { slug = null } = req.params;
 
+    const importSource = req.query.import_source;
+    if (importSource && !['backup', 'other'].includes(importSource)) throw StatusError.badRequest('Invalid import source filter');
+    let importedReviewIds = [];
     const options = {
       page: parseInt(page),
       limit: parseInt(limit),
@@ -34,6 +38,7 @@ export const list = async (req, res, next) => {
     const matchFilter = {
       deleted_at: null,
     };
+    if (importSource) matchFilter.$and = [sourceCondition(importSource, importedReviewIds)];
     if (req.auth.role == "customer") {
       matchFilter.user = new mongoose.Types.ObjectId(user_id);
     } else if (customer_id) {
@@ -67,7 +72,9 @@ export const list = async (req, res, next) => {
     }
 
     const pipeline = [
-      { $match: matchFilter }, // Lookup user
+      { $match: matchFilter },
+      { $addFields: { customer_account_expected: { $ne: [{ $ifNull: ["$user", null] }, null] } } },
+      { $addFields: { imported_from_backup: sourceExpression(importedReviewIds) } }, // Lookup user
       {
         $lookup: {
           from: "users",

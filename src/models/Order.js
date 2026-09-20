@@ -108,6 +108,7 @@ const OrderSchema = new Schema(
     processing_at: { type: Date, default: null },
     shipped_at: { type: Date, default: null },
     delivered_at: { type: Date, default: null },
+    legacy_import: { type: Object, default: undefined },
     is_migrated: { type: Boolean, default: false },
 
     // Denormalized from the order's Package docs (src/models/Package.js) so

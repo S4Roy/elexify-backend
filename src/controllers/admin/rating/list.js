@@ -1,3 +1,4 @@
+import { sourceCondition, sourceExpression, legacyReviewIds } from '../../../services/legacyImport/filter.js';
 import Rating from "../../../models/Rating.js";
 import { StatusError } from "../../../config/index.js";
 import { envs } from "../../../config/index.js";
@@ -24,6 +25,13 @@ export const list = async (req, res, next) => {
     } = req.query;
     const { slug = null } = req.params;
 
+    const importSource = req.query.import_source;
+    if (importSource && !['backup', 'other'].includes(importSource)) throw StatusError.badRequest('Invalid import source filter');
+    let importedReviewIds = [];
+    try { importedReviewIds = await legacyReviewIds(); }
+    catch {
+      if (importSource) throw StatusError.badRequest('The original backup must be available to identify reviews from the earlier import.');
+    }
     const options = {
       page: page,
       limit: limit,
@@ -31,6 +39,7 @@ export const list = async (req, res, next) => {
     };
     let matchFilter = { deleted_at: null };
 
+    if (importSource) matchFilter.$and = [sourceCondition(importSource, importedReviewIds)];
     if (search_key) {
       matchFilter.$or = [
         { name: { $regex: ".*" + search_key + ".*", $options: "i" } },
@@ -48,6 +57,7 @@ export const list = async (req, res, next) => {
     }
     const pipeline = [
       { $match: matchFilter },
+      { $addFields: { imported_from_backup: sourceExpression(importedReviewIds) } },
 
       // 🔹 Join with users
       {
@@ -104,6 +114,7 @@ export const list = async (req, res, next) => {
       // Optional: project only necessary fields
       {
         $project: {
+          imported_from_backup: 1,
           rating: 1,
           description: 1,
           status: 1,

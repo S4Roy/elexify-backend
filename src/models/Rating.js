@@ -4,6 +4,7 @@ import mongooseAggregatePaginate from "mongoose-aggregate-paginate-v2";
 
 const RatingSchema = new Schema(
   {
+    legacy_import: { type: Object, default: undefined },
     // Linked user (required, who wrote the review)
     user: {
       type: Types.ObjectId,

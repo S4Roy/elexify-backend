@@ -4,6 +4,7 @@ import MediaResource from "./MediaResource.js";
 class RatingResource extends Resource {
   toArray() {
     let doc = {
+      imported_from_backup: this.imported_from_backup === true || this.legacy_import?.source === 'eqstoxco_wp434',
       _id: this._id || null,
       user: this.user || null,
       product_id: this.product_id || null,

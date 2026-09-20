@@ -223,5 +223,6 @@
 	"OTP sent to your new mobile number": "OTP sent to your new mobile number",
 	"Mobile number updated and verified successfully": "Mobile number updated and verified successfully",
 	"SMS templates fetched successfully": "SMS templates fetched successfully",
-	"SMS template fetched successfully": "SMS template fetched successfully"
+	"SMS template fetched successfully": "SMS template fetched successfully",
+	"Webhook logs fetched successfully": "Webhook logs fetched successfully"
 }

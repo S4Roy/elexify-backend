@@ -1,3 +1,4 @@
+import { customerContact } from "../helpers/order/customerContact.js";
 import Resource from "resources.js";
 import UserResource from "./UserResource.js";
 import AddressResource from "./AddressResource.js";
@@ -7,6 +8,7 @@ import CategoryResourceMinimal from "./CategoryResourceMinimal.js"; // make sure
 class OrderResource extends Resource {
   toArray() {
     return {
+      imported_from_backup: this.imported_from_backup === true || this.legacy_import?.source === 'eqstoxco_wp434',
       _id: this._id || null,
       id: this.id || null,
       shiprocket_order_id: this.shiprocket_order_id || null,
@@ -51,6 +53,7 @@ class OrderResource extends Resource {
         cancelled_at: pkg.cancelled_at || null,
       })),
       payment_method: this.payment_method || null,
+      customer_contact: customerContact(this),
       user: this.user ? new UserResource(this.user).exec() : null,
       billing_address: this.billing_address
         ? new AddressResource(this.billing_address).exec()

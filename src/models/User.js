@@ -5,6 +5,7 @@ const { Schema, model, Types } = mongoose;
 
 const UserSchema = new Schema(
   {
+    legacy_import: { type: Object, default: undefined },
     role: {
       type: String,
       required: true,

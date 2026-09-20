@@ -1,3 +1,6 @@
+import Order from "../../../models/Order.js";
+import { customerActivityPipeline } from "../../../helpers/order/customerActivity.js";
+import { sourceCondition, sourceExpression } from '../../../services/legacyImport/filter.js';
 import User from "../../../models/User.js";
 import { StatusError } from "../../../config/index.js";
 import { envs } from "../../../config/index.js";
@@ -30,6 +33,9 @@ export const list = async (req, res, next) => {
 
     const slug = paramSlug;
 
+    const importSource = req.query.import_source;
+    if (importSource && !['backup', 'other'].includes(importSource)) throw StatusError.badRequest('Invalid import source filter');
+    let importedReviewIds = [];
     const options = {
       page: page,
       limit: limit,
@@ -37,11 +43,13 @@ export const list = async (req, res, next) => {
     };
     let matchFilter = { deleted_at: null, role: "customer" };
 
+    if (importSource) matchFilter.$and = [sourceCondition(importSource, importedReviewIds)];
     if (search_key) {
+      const escapedSearch = search_key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       matchFilter.$or = [
-        { name: { $regex: ".*" + search_key + ".*", $options: "i" } },
-        { email: { $regex: ".*" + search_key + ".*", $options: "i" } },
-        { mobile: { $regex: ".*" + search_key + ".*", $options: "i" } },
+        { name: { $regex: escapedSearch, $options: "i" } },
+        { email: { $regex: escapedSearch, $options: "i" } },
+        { mobile: { $regex: escapedSearch, $options: "i" } },
       ];
     }
     if (status) {
@@ -64,12 +72,20 @@ export const list = async (req, res, next) => {
       matchFilter.mobile_verified_at =
         mobile_verified === "yes" ? { $ne: null } : null;
     }
-    const pipeline = [{ $match: matchFilter }];
+    const pipeline = [{ $match: matchFilter }, { $addFields: { imported_from_backup: sourceExpression() } }];
     let data;
 
     data = await User.aggregatePaginate(User.aggregate(pipeline), options);
 
-    data.docs = await UserResource.collection(data.docs);
+    const activity = data.docs.length
+      ? await Order.aggregate(customerActivityPipeline(data.docs.map(doc => doc._id)))
+      : [];
+    const activityByUser = new Map(activity.map(row => [String(row._id), row]));
+    data.docs = (await UserResource.collection(data.docs)).map(doc => ({
+      ...doc,
+      order_count: activityByUser.get(String(doc._id))?.order_count ?? 0,
+      last_order_at: activityByUser.get(String(doc._id))?.last_order_at ?? null,
+    }));
 
     res.status(201).json({
       status: "success",

@@ -37,3 +37,4 @@ public/temp/
 public/**/Invoice-*.pdf
 uploads/
 tmp/
+db-backups/

@@ -2,8 +2,9 @@ import { celebrate, Joi } from "celebrate";
 
 export const list = celebrate({
   query: Joi.object({
-    page: Joi.number().optional(),
-    limit: Joi.number().optional(),
+    import_source: Joi.string().valid("backup", "other").optional().allow("", null),
+    page: Joi.number().integer().min(1).optional(),
+    limit: Joi.number().integer().min(1).max(100).optional(),
     search_key: Joi.string().optional().allow("", null),
     sort_by: Joi.string()
       .optional()
