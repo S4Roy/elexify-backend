@@ -1,57 +1,70 @@
 import Order from "../../models/Order.js";
 import Package from "../../models/Package.js";
 import { StatusError } from "../../config/index.js";
+import { returnApi } from "../shiprocket/returnShipment.js";
 import { findRemoteReference } from "./liveShiprocketImport.js";
-import { registerExternalPackage } from "./packages/registerExternalPackage.js";
-import { syncShiprocketStatus } from "./packages/syncShiprocketStatus.js";
 
-const ACTIVE_PACKAGE_EXCLUDED_STATUSES = ["cancelled", "return_requested", "returned"];
+const extractDetails = (remote) => {
+  const shipment = Array.isArray(remote?.shipments) ? remote.shipments[0] : remote?.shipments;
+  return {
+    shiprocket_order_id: remote?.id != null ? String(remote.id) : null,
+    channel_order_id: remote?.channel_order_id || null,
+    channel_name: remote?.channel_name || null,
+    status: shipment?.current_status || remote?.status || null,
+    shipment_id: shipment?.id != null ? String(shipment.id) : null,
+    awb: shipment?.awb || null,
+    courier_name: shipment?.courier_name || null,
+    etd: shipment?.etd || null,
+  };
+};
+
+const fetchRemoteOrder = async (shiprocketOrderId) => {
+  let remote;
+  try {
+    remote = (await returnApi("GET", `orders/show/${encodeURIComponent(shiprocketOrderId)}`)).data;
+  } catch (error) {
+    throw StatusError.badRequest("Could not reach Shiprocket. Try again shortly.");
+  }
+  if (!remote?.id) throw StatusError.notFound("Shiprocket no longer has this order.");
+  return remote;
+};
 
 /**
- * Backs the always-visible "Fetch current status" button on Order Details.
- * Unlike syncShiprocketStatus (which only resyncs an *existing* link),
- * this also covers an order with nothing linked yet: it searches
- * Shiprocket live by the order's own reference — the exact channel_order_id
- * we'd have sent when creating it (packageReference.js / Order.id) — and,
- * on a single unambiguous match, establishes the link via
- * registerExternalPackage (which does its own independent live
- * verification before writing anything).
- *
- * Always returns the same {order, changed, results} shape regardless of
- * which path was taken, so the controller/frontend don't need to care.
+ * Read-only "Fetch Shiprocket details" button on Order Details. Works for
+ * an order in *any* status and never writes to the database — it only
+ * looks up and returns what Shiprocket currently reports, for an admin to
+ * read. Applying any resulting status/courier change is a separate,
+ * explicit action (Change Status -> Link Shiprocket order, or the CSV
+ * reconciliation flow) — this never does that itself.
  */
-export const fetchShiprocketDetailsForOrder = async ({ orderId, adminId }) => {
+export const fetchShiprocketDetailsForOrder = async ({ orderId }) => {
   const order = await Order.findOne({ _id: orderId, deleted_at: null });
   if (!order) throw StatusError.notFound("Order not found");
 
-  const activePackages = await Package.find({
-    order_id: order._id,
-    status: { $nin: ACTIVE_PACKAGE_EXCLUDED_STATUSES },
-  });
-  const alreadyLinked = !!order.shiprocket_order_id || activePackages.some((pkg) => pkg.shiprocket_order_id);
-  if (alreadyLinked) return syncShiprocketStatus({ orderId, adminId });
+  const packages = await Package.find({ order_id: order._id });
+  const linkedId = order.shiprocket_order_id
+    || packages.find((pkg) => pkg.shiprocket_order_id)?.shiprocket_order_id;
 
-  if (activePackages.length) {
-    throw StatusError.conflict(
-      "This order has packages that aren't linked to Shiprocket yet — retry or manage them from Manage Packages instead.",
-    );
+  if (linkedId) {
+    const remote = await fetchRemoteOrder(linkedId);
+    return { found: true, details: extractDetails(remote) };
   }
 
+  // Nothing linked locally yet — search Shiprocket live by this order's
+  // own reference (its human id, the exact channel_order_id we'd have
+  // sent when creating it). Read-only: a match is only ever displayed,
+  // never linked, from this action.
   const matches = await findRemoteReference(order.id);
   if (!matches.length) {
-    throw StatusError.notFound(`No Shiprocket order was found with reference "${order.id}". It may not have been booked yet.`);
+    return { found: false, message: `No Shiprocket order was found with reference "${order.id}".` };
   }
   if (matches.length > 1) {
-    throw StatusError.conflict(
-      `Multiple Shiprocket orders match reference "${order.id}" — link the correct one manually with its Shiprocket order ID.`,
-    );
+    return {
+      found: false,
+      message: `${matches.length} Shiprocket orders match reference "${order.id}" — review them directly in Shiprocket.`,
+    };
   }
 
-  const { order: linkedOrder } = await registerExternalPackage({
-    orderId,
-    shiprocketOrderId: matches[0].id,
-    adminId,
-    reason: 'Linked via "Fetch current status" on Order Details (found live by order reference)',
-  });
-  return { order: linkedOrder, changed: true, results: [] };
+  const remote = await fetchRemoteOrder(matches[0].id).catch(() => matches[0]);
+  return { found: true, details: extractDetails(remote) };
 };
