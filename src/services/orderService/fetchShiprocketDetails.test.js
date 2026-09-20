@@ -60,22 +60,37 @@ describe("fetchShiprocketDetailsForOrder", () => {
     expect(findRemoteReference).not.toHaveBeenCalled();
   });
 
-  it("not linked anywhere: searches Shiprocket live by the order's own id and WRITES the link on a single match", async () => {
-    Order.findOne.mockResolvedValue({ _id: "o1", id: "ORD-1", shiprocket_order_id: null });
+  it("not linked anywhere: a confirmed-delivered match gets written via the historical-delivery path", async () => {
+    Order.findOne.mockResolvedValue({ _id: "o1", id: "ORD-1", order_status: "processing", shiprocket_order_id: null });
     Package.find.mockResolvedValue([]);
     findRemoteReference.mockResolvedValue([{ id: 777, channel_order_id: "ORD-1" }]);
-    registerExternalPackage.mockResolvedValue({ pkg: {}, order: { order_status: "packed" } });
-    returnApi.mockResolvedValue({ data: { id: 777, channel_order_id: "ORD-1", shipments: [{ current_status: "Packed" }] } });
+    registerExternalPackage.mockResolvedValue({ pkg: {}, order: { order_status: "delivered" } });
+    returnApi.mockResolvedValue({ data: { id: 777, channel_order_id: "ORD-1", shipments: [{ current_status: "Delivered" }] } });
 
     const result = await fetchShiprocketDetailsForOrder({ orderId: "o1", adminId: "admin1" });
 
     expect(findRemoteReference).toHaveBeenCalledWith("ORD-1");
     expect(registerExternalPackage).toHaveBeenCalledWith(
-      expect.objectContaining({ orderId: "o1", shiprocketOrderId: 777, adminId: "admin1" }),
+      expect.objectContaining({ orderId: "o1", shiprocketOrderId: 777, adminId: "admin1", legacyDeliveredImport: true }),
     );
     expect(result.found).toBe(true);
     expect(result.linked_now).toBe(true);
     expect(result.details.shiprocket_order_id).toBe("777");
+  });
+
+  it("not linked anywhere: a match that isn't delivered yet is only shown, never written — the legacy bare-id reference can't pass ordinary verification", async () => {
+    Order.findOne.mockResolvedValue({ _id: "o1", id: "ORD-1", order_status: "processing", shiprocket_order_id: null });
+    Package.find.mockResolvedValue([]);
+    findRemoteReference.mockResolvedValue([{ id: 777, channel_order_id: "ORD-1" }]);
+    returnApi.mockResolvedValue({ data: { id: 777, channel_order_id: "ORD-1", shipments: [{ current_status: "Packed" }] } });
+
+    const result = await fetchShiprocketDetailsForOrder({ orderId: "o1", adminId: "admin1" });
+
+    expect(registerExternalPackage).not.toHaveBeenCalled();
+    expect(result).toEqual({
+      found: true, linked_now: false,
+      details: { shiprocket_order_id: "777", channel_order_id: "ORD-1", channel_name: null, status: "Packed", shipment_id: null, awb: null, courier_name: null, etd: null },
+    });
   });
 
   it("reports not-found rather than guessing when nothing matches, and writes nothing", async () => {

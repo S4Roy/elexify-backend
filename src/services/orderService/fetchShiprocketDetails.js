@@ -4,6 +4,7 @@ import { StatusError } from "../../config/index.js";
 import { returnApi } from "../shiprocket/returnShipment.js";
 import { findRemoteReference } from "./liveShiprocketImport.js";
 import { registerExternalPackage } from "./packages/registerExternalPackage.js";
+import { normalizeOrderStatus } from "../../helpers/order/normalizeOrderStatus.js";
 
 const extractDetails = (remote) => {
   const shipment = Array.isArray(remote?.shipments) ? remote.shipments[0] : remote?.shipments;
@@ -40,11 +41,13 @@ const fetchRemoteOrder = async (shiprocketOrderId) => {
  *   there's nothing to save, only to display.
  * - Not linked locally yet — searches Shiprocket live by the order's own
  *   reference (its human id, the exact channel_order_id we'd have sent
- *   when creating it), and on a single unambiguous match, *does* write:
- *   establishes the link via registerExternalPackage, which independently
- *   re-verifies the match live before creating anything — the same
- *   verified-linking convention every other manual-link path in this
- *   codebase already follows, never a blind write from admin-typed input.
+ *   when creating it). On a single unambiguous match that Shiprocket
+ *   confirms as *delivered*, writes the link via registerExternalPackage's
+ *   historical-delivery path (independently re-verified live, never a
+ *   blind write). A match that isn't delivered yet is only displayed —
+ *   the legacy bare-id reference format that search uses can't pass
+ *   registerExternalPackage's ordinary verification, and this button
+ *   should never require the admin to first know that.
  */
 export const fetchShiprocketDetailsForOrder = async ({ orderId, adminId }) => {
   const order = await Order.findOne({ _id: orderId, deleted_at: null });
@@ -80,12 +83,31 @@ export const fetchShiprocketDetailsForOrder = async ({ orderId, adminId }) => {
     };
   }
 
+  // A match found only by the order's bare id (no "-P<n>" suffix) is the
+  // legacy single-shipment channel-order-id convention — registerExternalPackage's
+  // ordinary verification expects the current multi-package reference
+  // format instead, so writing this link requires its dedicated
+  // historical-delivery bypass (legacyDeliveredImport), which is reserved
+  // for a *confirmed delivery* specifically. So: check Shiprocket's live
+  // status first, and only write when it's actually "delivered" — for
+  // anything still in progress, show what was found without writing;
+  // linking a still-moving legacy shipment stays a deliberate action via
+  // Change Status -> Link Shiprocket order instead of an automatic one
+  // from a details lookup.
+  const remote = await fetchRemoteOrder(matches[0].id);
+  const shipment = Array.isArray(remote?.shipments) ? remote.shipments[0] : remote?.shipments;
+  const isDelivered = normalizeOrderStatus(shipment?.current_status || remote?.status) === "delivered";
+  if (!isDelivered) {
+    return { found: true, linked_now: false, details: extractDetails(remote) };
+  }
+
   await registerExternalPackage({
     orderId,
     shiprocketOrderId: matches[0].id,
     adminId,
-    reason: 'Linked via "Fetch Shiprocket details" on Order Details (found live by order reference)',
+    legacyDeliveredImport: true,
+    reason: 'Linked via "Fetch Shiprocket details" on Order Details (found live by order reference, confirmed delivered)',
   });
-  const remote = await fetchRemoteOrder(matches[0].id);
-  return { found: true, linked_now: true, details: extractDetails(remote) };
+  const linkedRemote = await fetchRemoteOrder(matches[0].id);
+  return { found: true, linked_now: true, details: extractDetails(linkedRemote) };
 };
