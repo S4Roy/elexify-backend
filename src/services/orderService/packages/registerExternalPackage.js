@@ -1,3 +1,5 @@
+import { canCorrectHistoricalDelivery } from "../historicalDelivery.js";
+import { applyManualOrderStatusChange } from "../manualOrderStatus.js";
 import mongoose from "mongoose";
 import Order from "../../../models/Order.js";
 import OrderItem from "../../../models/OrderItem.js";
@@ -40,11 +42,11 @@ const BLOCKED_ORDER_STATUSES = ["cancelled", "returned", "return_requested", "de
  * need this; it already has real Package docs, and the ordinary cascade
  * path in manualOrderStatus.js covers correcting their status.
  */
-export const registerExternalPackage = async ({ orderId, shiprocketOrderId, reason, adminId }) => {
+export const registerExternalPackage = async ({ orderId, shiprocketOrderId, reason, adminId, legacyDeliveredImport = false }) => {
   if (!mongoose.Types.ObjectId.isValid(orderId)) throw StatusError.notFound("Order not found");
   const order = await Order.findOne({ _id: orderId, deleted_at: null });
   if (!order) throw StatusError.notFound("Order not found");
-  if (BLOCKED_ORDER_STATUSES.includes(order.order_status)) {
+  if (BLOCKED_ORDER_STATUSES.includes(order.order_status) && !(legacyDeliveredImport && order.order_status === "delivered")) {
     throw StatusError.conflict(`Cannot register a package: order is "${order.order_status}".`);
   }
   if (order.inventory_reverted || (order.refund?.status && order.refund.status !== "not_required")) {
@@ -73,13 +75,20 @@ export const registerExternalPackage = async ({ orderId, shiprocketOrderId, reas
     throw StatusError.badRequest("Could not verify this Shiprocket order. Check the order ID and try again.");
   }
   if (!remote?.id) throw StatusError.badRequest("Shiprocket order was not found.");
-  if (String(remote.channel_order_id) !== referenceId) {
+  if (String(remote.channel_order_id) !== referenceId && !(legacyDeliveredImport && String(remote.channel_order_id) === String(order.id))) {
     throw StatusError.badRequest(
       `This Shiprocket order is not linked to this order (expected channel order ID "${referenceId}", got "${remote.channel_order_id}").`,
     );
   }
   const shipment = Array.isArray(remote.shipments) ? remote.shipments[0] : remote.shipments;
   if (!shipment?.id) throw StatusError.badRequest("This Shiprocket order has no shipment yet.");
+
+  if (legacyDeliveredImport && normalizeOrderStatus(shipment.current_status || remote.status) !== "delivered") {
+    throw StatusError.conflict("Shiprocket no longer reports this shipment as delivered.");
+  }
+  if ((order.payment_method === "razorpay" || order.is_partial_cod) && !["paid", "advance_paid"].includes(order.payment_status) && !canCorrectHistoricalDelivery(order, legacyDeliveredImport, normalizeOrderStatus(shipment.current_status || remote.status)) && !(legacyDeliveredImport && order.order_status === "delivered")) {
+    throw StatusError.conflict("Record the received payment before advancing fulfillment.");
+  }
 
   const items = orderItems.map((oi) => ({ order_item_id: oi._id, quantity: oi.quantity }));
   const previousStatus = order.order_status;
@@ -92,7 +101,7 @@ export const registerExternalPackage = async ({ orderId, shiprocketOrderId, reas
   // be its own false record, exactly what this whole flow exists to avoid.
   // Falls back to "packed" only when Shiprocket's status text is missing or
   // one we don't recognize.
-  const derivedStatus = PACKAGE_STATUS_MAP[normalizeOrderStatus(shipment.current_status)] || "packed";
+  const derivedStatus = PACKAGE_STATUS_MAP[normalizeOrderStatus(shipment.current_status || remote.status)] || "packed";
   const now = new Date();
 
   let pkg;
@@ -100,7 +109,7 @@ export const registerExternalPackage = async ({ orderId, shiprocketOrderId, reas
     [pkg] = await Package.create([{
       order_id: order._id,
       package_number: packageNumber,
-      reference_id: referenceId,
+      reference_id: String(remote.channel_order_id),
       items,
       status: derivedStatus,
       integration_status: "created",
@@ -111,7 +120,7 @@ export const registerExternalPackage = async ({ orderId, shiprocketOrderId, reas
       etd: shipment.etd || null,
       shipped_at: ["shipped", "out_for_delivery", "delivered"].includes(derivedStatus) ? now : null,
       delivered_at: derivedStatus === "delivered" ? now : null,
-      timeline: [{ status: derivedStatus, occurred_at: now, raw: { source: "manual_admin_link", shiprocket_status: shipment.current_status || null } }],
+      timeline: [{ status: derivedStatus, occurred_at: now, raw: { source: "manual_admin_link", changed_by: String(adminId), reason: reason.trim(), shiprocket_status: shipment.current_status || null } }],
       booking_snapshot: remote,
       created_by: adminId,
     }]);
@@ -122,8 +131,13 @@ export const registerExternalPackage = async ({ orderId, shiprocketOrderId, reas
     throw error;
   }
 
-  const { order: recomputed } = await recomputeOrderStatus({ orderId: order._id, source: "application" });
-  if (recomputed.order_status !== previousStatus) {
+  // Historical imports can still be pending/confirmed locally. Once the
+  // verified package exists, use the audited correction path for that jump.
+  if (legacyDeliveredImport && previousStatus !== "delivered") {
+    await applyManualOrderStatusChange({ order, status: "delivered", reason, changedBy: adminId, historicalDeliveryVerified: legacyDeliveredImport });
+  }
+  const { order: recomputed } = await recomputeOrderStatus({ orderId: order._id, source: legacyDeliveredImport ? "reconciliation" : "application" });
+  if (!legacyDeliveredImport && recomputed.order_status !== previousStatus) {
     await Order.updateOne({ _id: order._id }, { $push: { manual_status_history: {
       from: previousStatus, to: recomputed.order_status, reason: reason.trim(),
       changed_by: adminId, changed_at: new Date(),

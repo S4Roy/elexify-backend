@@ -1,3 +1,4 @@
+import { fetchDetails } from "../../../controllers/admin/inventory/order/reconciliation/fetchDetails.js";
 import { createOptions } from "../../../controllers/admin/inventory/order/add.js";
 import { quote } from "../../../validations/admin/inventory/order/place.js";
 import { updateAddress } from "../../../controllers/admin/inventory/order/updateAddress.js";
@@ -14,6 +15,8 @@ import { requirePermission } from "../../../middleware/requirePermission.js";
 import { PERMISSIONS } from "../../../constants/adminPermissions.js";
 
 const orderRouter = Router();
+orderRouter.post('/reconciliation/fetch-details', requirePermission(PERMISSIONS.ORDER_STATUS_MANAGE),
+  celebrate({ body: Joi.object({ audit_id: Joi.string().hex().length(24).required() }) }), fetchDetails);
 
 orderRouter.get('/address/options', requirePermission(PERMISSIONS.ORDER_ADDRESS_MANAGE),
   celebrate({ query: Joi.object({ country: Joi.number().integer().positive() }) }), addressOptions);

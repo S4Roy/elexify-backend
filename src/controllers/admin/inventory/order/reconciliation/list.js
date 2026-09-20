@@ -7,7 +7,7 @@ import ShiprocketReconciliationAudit from "../../../../../models/ShiprocketRecon
 export const list = async (req, res, next) => {
   try {
     const audits = await ShiprocketReconciliationAudit.find({})
-      .select("-rows")
+      .select("-rows -candidates")
       .sort({ created_at: -1 })
       .limit(20)
       .populate("uploaded_by", "name email")

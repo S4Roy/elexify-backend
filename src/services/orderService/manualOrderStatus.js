@@ -1,3 +1,4 @@
+import { canCorrectHistoricalDelivery } from "./historicalDelivery.js";
 import Order from "../../models/Order.js";
 import Package from "../../models/Package.js";
 import { StatusError } from "../../config/index.js";
@@ -49,7 +50,7 @@ export const STATUS_RANK = {
  * @param {string} params.reason
  * @param {string} params.changedBy - admin user id, for the audit trail
  */
-export const applyManualOrderStatusChange = async ({ order, expectedStatus = null, status, reason, changedBy }) => {
+export const applyManualOrderStatusChange = async ({ order, expectedStatus = null, status, reason, changedBy, historicalDeliveryVerified = false }) => {
   if (!order) throw StatusError.notFound("Order not found");
   if (!MANUAL_ORDER_STATUSES.includes(status)) {
     throw StatusError.badRequest("Use the dedicated cancellation or return workflow for this status");
@@ -85,7 +86,7 @@ export const applyManualOrderStatusChange = async ({ order, expectedStatus = nul
     );
   }
   if ((order.payment_method === "razorpay" || order.is_partial_cod) && !["paid", "advance_paid"].includes(order.payment_status) &&
-      !["pending", "failed"].includes(status)) {
+      !["pending", "failed"].includes(status) && !canCorrectHistoricalDelivery(order, historicalDeliveryVerified, status)) {
     throw StatusError.conflict("Record the received payment from the Payment section before advancing fulfillment");
   }
 

@@ -69,7 +69,7 @@ export const parseCsvBuffer = (buffer) =>
   new Promise((resolve, reject) => {
     const rows = [];
     Readable.from(buffer)
-      .pipe(csv())
+      .pipe(csv({ mapHeaders: ({ header }) => header.replace(/^\uFEFF/, "").trim(), strict: true }))
       .on("data", (row) => rows.push(row))
       .on("end", () => resolve(rows))
       .on("error", reject);

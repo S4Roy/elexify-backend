@@ -16,6 +16,14 @@ const { Schema, model, Types } = mongoose;
 // time with a reason noting this reconciliation.
 const ShiprocketReconciliationAuditSchema = new Schema(
   {
+    mode: { type: String, default: "snapshot" },
+    candidates: { type: [Schema.Types.Mixed], default: [] },
+    details_cursor: { type: Number, default: 0 },
+    details_processing: { type: Boolean, default: false },
+    details_outcomes: { type: [Schema.Types.Mixed], default: [] },
+    cursor: { type: Number, default: 0 },
+    processing: { type: Boolean, default: false },
+    outcomes: { type: [Schema.Types.Mixed], default: [] },
     filename: { type: String, default: null },
     rows: { type: [Schema.Types.Mixed], required: true },
     dry_run_report: { type: Schema.Types.Mixed, required: true },

@@ -97,6 +97,7 @@ const OrderSchema = new Schema(
 
     coupon_code: { type: String },
     shiprocket_order_id: { type: String },
+    shiprocket_shipment_id: { type: String },
     note: { type: String },
     paid_at: { type: Date, default: null },
     deleted_at: { type: Date, default: null },

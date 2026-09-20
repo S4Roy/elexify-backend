@@ -1,3 +1,4 @@
+import { packageReferenceQuery, orderReferenceQuery } from "../../../helpers/order/shipmentReferences.js";
 import { validReturnWebhookToken } from "../../../services/returnService/webhookAuth.js";
 import { StatusError } from "../../../config/index.js";
 import { applyReverseEvent } from "../../../services/returnService/pickup.js";
@@ -170,13 +171,7 @@ export const updateOrderStatus = async (req, res, next) => {
     // under the old single-shipment flow has zero Package docs, so this
     // simply finds nothing and falls through to the untouched legacy path
     // below — that's what keeps historical orders fully backward compatible.
-    const pkg = await Package.findOne({
-      $or: [
-        ...orderIds.flatMap(id => [{ shiprocket_order_id: id }, { reference_id: id }]),
-        ...(awbStr ? [{ awb: awbStr }] : []),
-        ...(body.shipment_id ? [{ shiprocket_shipment_id: String(body.shipment_id) }] : []),
-      ],
-    });
+    const pkg = await Package.findOne(packageReferenceQuery({ orderIds, awb: awbStr, shipmentId: body.shipment_id }));
     if (pkg) {
       matchedPackageId = pkg._id;
       const parentOrder = await Order.findOne({ _id: pkg.order_id });
@@ -285,11 +280,8 @@ export const updateOrderStatus = async (req, res, next) => {
     // ── Legacy fallback: no Package doc correlates to this webhook (a
     // pre-feature order shipped under the old single-shipment flow) ──────
     // Try find forward order
-    const orderRefs = [
-      ...orderIds.flatMap(id => [{ id }, { shiprocket_order_id: id }]),
-      ...(awbStr ? [{ awb: awbStr }] : []),
-    ];
-    let order = orderRefs.length ? await Order.findOne({ $or: orderRefs }) : null;
+    const orderQuery = orderReferenceQuery({ orderIds, awb: awbStr });
+    let order = orderQuery.$or.length ? await Order.findOne(orderQuery) : null;
 
     if (!order) {
       // Not found: log and return success (to avoid retries). You can persist webhook for later if you want.
