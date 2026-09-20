@@ -10,6 +10,7 @@ import { geoStats } from "./geoStats.js";
 import { shipping } from "./shipping.js";
 import { cancel, forceCancel, reopen } from "./cancel.js";
 import { updateStatus } from "./updateStatus.js";
+import { bulkUpdateStatus } from "./bulkUpdateStatus.js";
 import { retryRefund } from "./retryRefund.js";
 import { invoice } from "./invoice.js";
 import { zohoInvoiceStatus, syncZohoInvoice } from "./zohoInvoice.js";
@@ -31,6 +32,7 @@ export {
   forceCancel,
   reopen,
   updateStatus,
+  bulkUpdateStatus,
   retryRefund,
   invoice,
   zohoInvoiceStatus,

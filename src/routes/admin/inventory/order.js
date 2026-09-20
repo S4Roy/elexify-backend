@@ -6,6 +6,7 @@ import { addressEditSchema } from "../../../validations/admin/customerAccount/ad
 import { recordManualPayment } from "../../../controllers/admin/inventory/order/recordManualPayment.js";
 import { celebrate, Joi } from "celebrate";
 import { returnOperation } from "../../../controllers/admin/inventory/order/returnOperations.js";
+import { bulkUpdateStatus, BULK_ORDER_STATUS_LIMIT } from "../../../controllers/admin/inventory/order/bulkUpdateStatus.js";
 import { Router } from "express";
 import { inventoryController } from "../../../controllers/admin/index.js";
 import { inventoryValidation } from "../../../validations/admin/index.js";
@@ -104,6 +105,30 @@ orderRouter.post(
     reason: Joi.string().trim().min(10).max(500).required(),
   }) }),
   inventoryController.orderController.updateStatus,
+);
+orderRouter.post(
+  "/status/bulk",
+  requirePermission(PERMISSIONS.ORDER_STATUS_MANAGE),
+  celebrate({ body: Joi.object({
+    order_ids: Joi.string()
+      .trim()
+      .required()
+      .custom((value, helpers) => {
+        const ids = value.split(",").map((id) => id.trim()).filter(Boolean);
+        if (!ids.length) return helpers.error("array.min");
+        if (ids.length > BULK_ORDER_STATUS_LIMIT) return helpers.error("array.max");
+        if (!ids.every((id) => /^[0-9a-fA-F]{24}$/.test(id))) return helpers.error("any.invalid");
+        return ids;
+      }, "comma-separated order IDs")
+      .messages({
+        "array.min": "Provide at least one order ID",
+        "array.max": `Provide at most ${BULK_ORDER_STATUS_LIMIT} order IDs per request`,
+        "any.invalid": "One or more order IDs are invalid",
+      }),
+    status: Joi.string().valid("pending", "confirmed", "processing", "packed", "shipped", "out_for_delivery", "delivered", "failed").required(),
+    reason: Joi.string().trim().min(10).max(500).required(),
+  }) }),
+  bulkUpdateStatus,
 );
 orderRouter.post(
   "/refund/retry",
