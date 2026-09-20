@@ -12,13 +12,13 @@ vi.mock('../../customerAccount/address.js', () => ({ resolveAddressFields: vi.fn
 const oid = () => new mongoose.Types.ObjectId();
 
 describe('order address eligibility', () => {
-  it.each(['pending', 'confirmed', 'processing', 'partially_shipped', 'partially_delivered'])('allows %s before invoice and shipment', order_status => {
+  it.each(['pending', 'confirmed', 'processing'])('allows %s before invoice and shipment', order_status => {
     expect(() => assertOrderAddressEditable({ order_status })).not.toThrow();
   });
   it.each([
     { order_status: 'shipped' }, { order_status: 'cancelled' }, { order_status: 'delivered' },
     { order_status: 'packed' }, { order_status: 'returned' }, { inventory_reverted: true },
-    { invoice: { generated: true } }, { fully_packed: true }, { awb: 'AWB' },
+    { invoice: { generated: true } }, { order_status: 'partially_shipped' }, { order_status: 'partially_delivered' }, { awb: 'AWB' },
     { shiprocket_order_id: 'shipment' }, { refund: { status: 'processing' } },
   ])('blocks unsafe corrections %j', change => {
     expect(() => assertOrderAddressEditable({ order_status: 'processing', ...change })).toThrow();
@@ -88,18 +88,27 @@ describe('order address updates', () => {
     expect(next.mock.calls[0][0].statusCode).toBe(409);
     expect(Address.create).not.toHaveBeenCalled();
   });
-  it.each(['processing', 'partially_shipped', 'partially_delivered'])('allows address edits for %s with partially packed items', async status => {
+  it.each(['pending', 'confirmed', 'processing'])('allows address edits for %s with partially packed items', async status => {
     order.order_status = status;
     order.package_count = 1;
     order.fully_packed = false;
     await updateAddress(req, res, next);
     expect(next).not.toHaveBeenCalled();
     expect(res.json).toHaveBeenCalled();
-    expect(Order.updateOne.mock.calls[0][0]).toMatchObject({ fully_packed: { $ne: true } });
+    expect(Order.updateOne.mock.calls[0][0]).toMatchObject({ order_status: status });
     expect(Order.updateOne.mock.calls[0][0]).not.toHaveProperty('package_count');
   });
-  it('rejects a fully packed order before creating an address', async () => {
+  it('allows correction after allocation when shipment creation has not reached packed status', async () => {
     order.fully_packed = true;
+    order.package_count = 1;
+    await updateAddress(req, res, next);
+    expect(next).not.toHaveBeenCalled();
+    expect(res.json).toHaveBeenCalled();
+    expect(Order.updateOne.mock.calls[0][0]).not.toHaveProperty('fully_packed');
+  });
+  it('rejects packed status even when fully_packed is false', async () => {
+    order.order_status = 'packed';
+    order.fully_packed = false;
     await updateAddress(req, res, next);
     expect(next.mock.calls[0][0].statusCode).toBe(409);
     expect(Address.create).not.toHaveBeenCalled();

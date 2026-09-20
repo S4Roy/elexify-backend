@@ -8,13 +8,13 @@ import { resolveAddressFields } from '../../customerAccount/address.js';
 import { snapshotAddress } from '../../../../services/invoiceService/snapshotAddress.js';
 
 export const assertOrderAddressEditable = order => {
-  if (!['pending', 'confirmed', 'processing', 'partially_shipped', 'partially_delivered'].includes(order.order_status) ||
+  if (!['pending', 'confirmed', 'processing'].includes(order.order_status) ||
       order.inventory_reverted || (order.refund?.status && order.refund.status !== 'not_required')) {
-    throw StatusError.conflict('Addresses can only be corrected before full packing on active orders without refund or cancellation effects');
+    throw StatusError.conflict('Addresses can only be corrected before the order is packed without refund or cancellation effects');
   }
   if (order.invoice?.generated) throw StatusError.conflict('An invoice has been generated or is being generated. Order addresses are locked.');
-  if (order.fully_packed || order.awb || order.shiprocket_order_id) {
-    throw StatusError.conflict('This order is fully packed or has a legacy shipment. Order addresses are locked.');
+  if (order.awb || order.shiprocket_order_id) {
+    throw StatusError.conflict('This order has a legacy shipment. Order addresses are locked.');
   }
 };
 
@@ -52,7 +52,7 @@ export const updateAddress = async (req, res, next) => {
       const after = snapshotAddress(updated);
       const changed = await Order.updateOne({ _id: order._id, [ref]: order[ref],
         updated_at: order.updated_at || null, order_status: order.order_status,
-        'invoice.generated': { $ne: true }, fully_packed: { $ne: true },
+        'invoice.generated': { $ne: true },
       }, { $set: { [ref]: updated._id, [`${ref}_snapshot`]: after, updated_at: now } }, { session });
       if (changed.modifiedCount !== 1) throw StatusError.conflict('Order changed. Refresh and try again.');
       await AuditLog.create([{
