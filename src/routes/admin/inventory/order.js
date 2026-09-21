@@ -180,6 +180,7 @@ orderRouter.post(
   celebrate({ body: Joi.object({
     order_id: Joi.string().hex().length(24).required(),
     channel_id: Joi.string().trim().max(64),
+    package_ids: Joi.array().items(Joi.string().hex().length(24)).min(1).max(100).unique(),
   }) }),
   inventoryController.orderController.syncShiprocketStatus,
 );

@@ -6,6 +6,8 @@ vi.mock("./liveShiprocketImport.js", () => ({ findRemoteReference: vi.fn() }));
 vi.mock("./packages/registerExternalPackage.js", () => ({ registerExternalPackage: vi.fn() }));
 vi.mock("../shiprocket/returnShipment.js", () => ({ returnApi: vi.fn() }));
 
+vi.mock("./packages/syncShiprocketStatus.js", () => ({ syncShiprocketStatus: vi.fn() }));
+const { syncShiprocketStatus } = await import("./packages/syncShiprocketStatus.js");
 const { fetchShiprocketDetailsForOrder } = await import("./fetchShiprocketDetails.js");
 const { default: Order } = await import("../../models/Order.js");
 const { default: Package } = await import("../../models/Package.js");
@@ -23,40 +25,24 @@ describe("fetchShiprocketDetailsForOrder", () => {
     await expect(fetchShiprocketDetailsForOrder({ orderId: "missing", adminId: "admin1" })).rejects.toThrow("Order not found");
   });
 
-  it("already linked (legacy field): looks it up and writes nothing, for any order status", async () => {
-    Order.findOne.mockResolvedValue({ _id: "o1", id: "ORD-1", order_status: "cancelled", shiprocket_order_id: "999" });
-    Package.find.mockResolvedValue([]);
-    returnApi.mockResolvedValue({ data: { id: 999, channel_order_id: "ORD-1", shipments: [{ current_status: "Delivered", awb: "AWB1", courier_name: "BlueDart" }] } });
-
+  it("syncs all packages even when the parent has a legacy link", async () => {
+    Order.findOne.mockResolvedValue({ _id: "o1", shiprocket_order_id: "legacy" });
+    Package.find.mockResolvedValue([{ _id: "p1", shiprocket_order_id: "555" }, { _id: "p2", shiprocket_order_id: "556" }]);
+    syncShiprocketStatus.mockResolvedValue({ order: { order_status: "partially_delivered" }, changed: true,
+      results: [{ package_id: "p1", details: { awb: "AWB1" } }, { package_id: "p2", outcome: "error" }] });
     const result = await fetchShiprocketDetailsForOrder({ orderId: "o1", adminId: "admin1" });
-
-    expect(result).toEqual({
-      found: true, linked_now: false,
-      details: { shiprocket_order_id: "999", channel_order_id: "ORD-1", channel_name: null, status: "Delivered", shipment_id: null, awb: "AWB1", courier_name: "BlueDart", etd: null },
-    });
-    expect(Order.updateOne).not.toHaveBeenCalled();
-    expect(Package.updateOne).not.toHaveBeenCalled();
-    expect(registerExternalPackage).not.toHaveBeenCalled();
+    expect(syncShiprocketStatus).toHaveBeenCalledWith({ orderId: "o1", adminId: "admin1", packageIds: null });
+    expect(result.packages).toHaveLength(2);
+    expect(result.changed).toBe(true);
+    expect(findRemoteReference).not.toHaveBeenCalled();
   });
-
-  it("already linked via a package: looks it up without writing", async () => {
-    Order.findOne.mockResolvedValue({ _id: "o1", id: "ORD-1", shiprocket_order_id: null });
-    Package.find.mockResolvedValue([{ shiprocket_order_id: "555" }]);
-    returnApi.mockResolvedValue({ data: { id: 555, channel_order_id: "ORD-1-P1", shipments: { current_status: "Shipped", awb: "AWB2" } } });
-
+  it("returns unlinked packages without guessing or searching the parent reference", async () => {
+    Order.findOne.mockResolvedValue({ _id: "o1" });
+    Package.find.mockResolvedValue([{ _id: "p1" }]);
+    syncShiprocketStatus.mockResolvedValue({ order: {}, changed: false, results: [{ package_id: "p1", outcome: "unlinked" }] });
     const result = await fetchShiprocketDetailsForOrder({ orderId: "o1", adminId: "admin1" });
-
-    expect(returnApi).toHaveBeenCalledWith("GET", "orders/show/555");
-    expect(result.linked_now).toBe(false);
-    expect(registerExternalPackage).not.toHaveBeenCalled();
-  });
-
-  it("rejects when the order has packages but none of them are linked, without guessing", async () => {
-    Order.findOne.mockResolvedValue({ _id: "o1", id: "ORD-1", shiprocket_order_id: null });
-    Package.find.mockResolvedValue([{ shiprocket_order_id: null }]);
-
-    const result = await fetchShiprocketDetailsForOrder({ orderId: "o1", adminId: "admin1" });
-    expect(result).toEqual({ found: false, message: expect.stringContaining("aren't linked") });
+    expect(result.found).toBe(false);
+    expect(result.packages[0].outcome).toBe("unlinked");
     expect(findRemoteReference).not.toHaveBeenCalled();
   });
 

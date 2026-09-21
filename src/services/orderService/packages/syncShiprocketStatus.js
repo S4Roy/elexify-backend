@@ -1,17 +1,11 @@
-import { shiprocketStatusFields } from "../../../helpers/order/shiprocketStatus.js";
 import Order from "../../../models/Order.js";
 import Package from "../../../models/Package.js";
 import { StatusError } from "../../../config/index.js";
 import { returnApi } from "../../shiprocket/returnShipment.js";
 import { normalizeOrderStatus } from "../../../helpers/order/normalizeOrderStatus.js";
-import { PACKAGE_STATUS_MAP, isForwardPackageTransition } from "../../../helpers/order/packageStatus.js";
+import { applyPackageShipment, applyLegacyShipment, selectRemoteShipment, shipmentDetails, fulfillmentBlocked } from "./applyShiprocketShipment.js";
 import { recomputeOrderStatus } from "./recomputeOrderStatus.js";
-import { applyManualOrderStatusChange, STATUS_RANK } from "../manualOrderStatus.js";
-
-// Same exclusion list manualOrderStatus.js uses for its own package
-// cascade — an active return or a cancelled package isn't this action's
-// concern, it belongs to its own dedicated workflow.
-const ACTIVE_PACKAGE_EXCLUDED_STATUSES = ["cancelled", "return_requested", "returned"];
+import { applyManualOrderStatusChange } from "../manualOrderStatus.js";
 
 const SHIPMENT_STATUS_EVENTS = {
   shipped: "ORDER_SHIPPED",
@@ -32,18 +26,19 @@ const SHIPMENT_STATUS_EVENTS = {
  * since only that live-verified flow may establish a *new* Shiprocket
  * link. This is a resync of an existing one, nothing more.
  */
-export const syncShiprocketStatus = async ({ orderId, adminId, shiprocketOrderId = null, notify = true, verifiedRemote = null }) => {
+export const syncShiprocketStatus = async ({ orderId, adminId, shiprocketOrderId = null, notify = true, verifiedRemote = null, packageIds = null }) => {
   const order = await Order.findOne({ _id: orderId, deleted_at: null });
   if (!order) throw StatusError.notFound("Order not found");
 
-  if (["cancelled", "returned", "return_requested", "failed"].includes(order.order_status) || order.inventory_reverted || (order.refund?.status && order.refund.status !== "not_required")) {
-    throw StatusError.conflict("Order has cancellation, return, failure or refund effects.");
+  const packages = await Package.find({ order_id: order._id });
+  if (packageIds?.some(id => !packages.some(pkg => String(pkg._id) === String(id)))) {
+    throw StatusError.badRequest("A selected package does not belong to this order");
   }
-  const activePackages = await Package.find({
-    order_id: order._id,
-    status: { $nin: ACTIVE_PACKAGE_EXCLUDED_STATUSES },
-    shiprocket_order_id: shiprocketOrderId || { $type: "string" },
-  });
+  const activePackages = packages.filter(pkg =>
+    (!packageIds?.length || packageIds.map(String).includes(String(pkg._id))) &&
+    (!shiprocketOrderId || String(pkg.shiprocket_order_id) === String(shiprocketOrderId))
+  );
+  const blocked = fulfillmentBlocked(order);
 
   const { notificationService } = await import("../../index.js");
   if (!notify) {
@@ -54,102 +49,77 @@ export const syncShiprocketStatus = async ({ orderId, adminId, shiprocketOrderId
     } } });
   }
 
-  if (activePackages.length) {
+  if (packages.length) {
     const results = [];
     for (const pkg of activePackages) {
-      let remote;
+      const identity = { package_id: pkg._id, package_number: pkg.package_number, reference_id: pkg.reference_id };
+      if (!pkg.shiprocket_order_id) {
+        results.push({ ...identity, status: pkg.status, changed: false, outcome: "unlinked", message: "Not linked to Shiprocket; use Manage Packages" });
+        continue;
+      }
       try {
-        remote = verifiedRemote || (await returnApi("GET", `orders/show/${encodeURIComponent(pkg.shiprocket_order_id)}`)).data;
-      } catch (error) {
-        results.push({ package_id: pkg._id, changed: false, error: "Could not reach Shiprocket for this package" });
-        continue;
-      }
-      const shipment = Array.isArray(remote?.shipments) ? remote.shipments[0] : remote?.shipments;
-      if (!shipment) {
-        results.push({ package_id: pkg._id, changed: false, error: "Shiprocket has no shipment on this order" });
-        continue;
-      }
-
-      const metaSet = shiprocketStatusFields(shipment.current_status || remote.status, new Date(), pkg);
-      if (shipment.id && String(shipment.id) !== pkg.shiprocket_shipment_id) metaSet.shiprocket_shipment_id = String(shipment.id);
-      if (shipment.awb && shipment.awb !== pkg.awb) metaSet.awb = shipment.awb;
-      if (shipment.courier_name && shipment.courier_name !== pkg.courier_name) metaSet.courier_name = shipment.courier_name;
-      if (shipment.etd && shipment.etd !== pkg.etd) metaSet.etd = shipment.etd;
-
-      const packageStatus = PACKAGE_STATUS_MAP[normalizeOrderStatus(shipment.current_status || remote.status)];
-      const isForward = packageStatus && isForwardPackageTransition(pkg.status, packageStatus);
-
-      if (!isForward) {
-        if (Object.keys(metaSet).length) await Package.updateOne({ _id: pkg._id }, { $set: metaSet });
-        results.push({ package_id: pkg._id, status: pkg.status, changed: Object.keys(metaSet).length > 0 });
-        continue;
-      }
-
-      const now = new Date();
-      const set = { status: packageStatus, ...metaSet };
-      if (packageStatus === "shipped" && !pkg.shipped_at) set.shipped_at = now;
-      if (packageStatus === "delivered" && !pkg.delivered_at) set.delivered_at = now;
-      await Package.updateOne(
-        { _id: pkg._id },
-        { $set: set, $push: { timeline: {
-          status: packageStatus, occurred_at: now,
+        // Use request start time so a webhook received during the fetch wins.
+        const at = new Date();
+        if (verifiedRemote && String(verifiedRemote.id) !== String(pkg.shiprocket_order_id)) {
+          throw new Error("Verified Shiprocket snapshot does not belong to this package");
+        }
+        const remote = verifiedRemote || (await returnApi("GET", `orders/show/${encodeURIComponent(pkg.shiprocket_order_id)}`)).data;
+        const shipment = selectRemoteShipment(remote, pkg);
+        const latestOrder = await Order.findOne({ _id: order._id, deleted_at: null });
+        if (!latestOrder) throw new Error("Order no longer exists");
+        const result = await applyPackageShipment({
+          pkg, shipment: { ...shipment, current_status: shipment.current_status || remote.status }, at,
+          allowTransition: !fulfillmentBlocked(latestOrder),
           raw: { source: "manual_admin_sync", changed_by: String(adminId), shiprocket_status: shipment.current_status },
-        } } },
-      );
-      results.push({ package_id: pkg._id, status: packageStatus, changed: true });
+        });
+        results.push({ ...identity, status: result.pkg.status, changed: result.changed,
+          outcome: result.outcome, details: shipmentDetails(remote, shipment) });
+      } catch (error) {
+        results.push({ ...identity, status: pkg.status, changed: false, outcome: "error", error: error.message || "Could not sync this package" });
+      }
     }
-
-    const { order: recomputed, statusChanged } = await recomputeOrderStatus({ orderId: order._id, source: "application" });
+    let recomputed = order;
+    let statusChanged = false;
+    let reconciliationError;
+    if (!blocked) {
+      try {
+        ({ order: recomputed, statusChanged } = await recomputeOrderStatus({ orderId: order._id, source: "carrier" }));
+      } catch (error) {
+        reconciliationError = "Package results saved, but order status could not be reconciled. Retry sync.";
+      }
+    }
     const shipmentEvent = SHIPMENT_STATUS_EVENTS[recomputed.order_status];
     if (notify && statusChanged && shipmentEvent) {
-      notificationService.sendOrderNotification({
-        order: recomputed, event: shipmentEvent, dedupeKey: `${recomputed.id}:${shipmentEvent}`,
-      });
+      notificationService.sendOrderNotification({ order: recomputed, event: shipmentEvent, dedupeKey: `${recomputed.id}:${shipmentEvent}` });
     }
-    return { order: recomputed, changed: statusChanged || results.some((r) => r.changed), results };
+    return { order: recomputed, changed: statusChanged || results.some(r => r.changed), results, reconciliation_error: reconciliationError };
   }
 
   // ── Legacy pre-Package-model order ──
   if (!order.shiprocket_order_id) {
     throw StatusError.badRequest('This order has no Shiprocket link yet — use "Link Shiprocket order" instead.');
   }
+  const fetchedAt = new Date();
   let remote;
   try {
     remote = verifiedRemote || (await returnApi("GET", `orders/show/${encodeURIComponent(order.shiprocket_order_id)}`)).data;
   } catch (error) {
     throw StatusError.badRequest("Could not reach Shiprocket for this order. Try again shortly.");
   }
-  const shipment = Array.isArray(remote?.shipments) ? remote.shipments[0] : remote?.shipments;
+  const shipment = selectRemoteShipment(remote, order);
+  const details = shipmentDetails(remote, shipment);
 
-  const metaUpdates = shiprocketStatusFields(shipment?.current_status || remote?.status, new Date(), order);
-  if (shipment?.awb && shipment.awb !== order.awb) metaUpdates.awb = shipment.awb;
-  if (shipment?.courier_name && shipment.courier_name !== order.courier_name) metaUpdates.courier_name = shipment.courier_name;
-  if (shipment?.etd && shipment.etd !== order.etd) metaUpdates.etd = shipment.etd;
-
-  const mappedStatus = normalizeOrderStatus(shipment?.current_status || remote?.status);
-  const currentRank = STATUS_RANK[order.order_status] ?? -1;
-  const targetRank = STATUS_RANK[mappedStatus] ?? -1;
-  const isForward = mappedStatus && targetRank > currentRank;
-
-  if (!isForward) {
-    if (Object.keys(metaUpdates).length) await Order.updateOne({ _id: order._id }, { $set: metaUpdates });
-    Object.assign(order, metaUpdates);
-    return { order, changed: Object.keys(metaUpdates).length > 0, results: [] };
+  // Retain the explicit historical import correction path, which separately
+  // verifies delivery and permits imported payment records.
+  if (!notify && verifiedRemote && normalizeOrderStatus(shipment.current_status || remote.status) === "delivered" && order.order_status !== "delivered" && !blocked) {
+    await applyManualOrderStatusChange({ order, status: "delivered", changedBy: adminId,
+      historicalDeliveryVerified: true, reason: "Verified historical Shiprocket delivery" });
+    Object.assign(order, { order_status: "delivered" });
   }
-
-  const updated = await applyManualOrderStatusChange({
-    order, status: mappedStatus, changedBy: adminId,
-    historicalDeliveryVerified: !notify && !!verifiedRemote && mappedStatus === "delivered",
-    reason: `Synced from Shiprocket (live status: "${shipment?.current_status || "unknown"}")`,
-  });
-  if (Object.keys(metaUpdates).length) await Order.updateOne({ _id: order._id }, { $set: metaUpdates });
-
-  const shipmentEvent = SHIPMENT_STATUS_EVENTS[updated.order_status];
-  if (notify && shipmentEvent) {
-    notificationService.sendOrderNotification({
-      order: updated, event: shipmentEvent, dedupeKey: `${updated.id}:${shipmentEvent}`,
-    });
+  const result = await applyLegacyShipment({ order, shipment: { ...shipment, current_status: shipment.current_status || remote.status }, at: fetchedAt });
+  const shipmentEvent = SHIPMENT_STATUS_EVENTS[result.order.order_status];
+  if (notify && result.statusChanged && shipmentEvent) {
+    notificationService.sendOrderNotification({ order: result.order, event: shipmentEvent, dedupeKey: `${result.order.id}:${shipmentEvent}` });
   }
-  Object.assign(updated, metaUpdates);
-  return { order: updated, changed: true, results: [] };
+  return { ...result, results: [], details };
 };

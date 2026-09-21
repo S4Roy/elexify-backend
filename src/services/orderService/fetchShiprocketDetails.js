@@ -1,3 +1,5 @@
+import { syncShiprocketStatus } from "./packages/syncShiprocketStatus.js";
+import { selectRemoteShipment, shipmentDetails } from "./packages/applyShiprocketShipment.js";
 import Order from "../../models/Order.js";
 import Package from "../../models/Package.js";
 import { StatusError } from "../../config/index.js";
@@ -6,19 +8,7 @@ import { findRemoteReference } from "./liveShiprocketImport.js";
 import { registerExternalPackage } from "./packages/registerExternalPackage.js";
 import { normalizeOrderStatus } from "../../helpers/order/normalizeOrderStatus.js";
 
-const extractDetails = (remote) => {
-  const shipment = Array.isArray(remote?.shipments) ? remote.shipments[0] : remote?.shipments;
-  return {
-    shiprocket_order_id: remote?.id != null ? String(remote.id) : null,
-    channel_order_id: remote?.channel_order_id || null,
-    channel_name: remote?.channel_name || null,
-    status: shipment?.current_status || remote?.status || null,
-    shipment_id: shipment?.id != null ? String(shipment.id) : null,
-    awb: shipment?.awb || null,
-    courier_name: shipment?.courier_name || null,
-    etd: shipment?.etd || null,
-  };
-};
+const extractDetails = remote => shipmentDetails(remote, selectRemoteShipment(remote));
 
 const fetchRemoteOrder = async (shiprocketOrderId) => {
   let remote;
@@ -31,46 +21,21 @@ const fetchRemoteOrder = async (shiprocketOrderId) => {
   return remote;
 };
 
-/**
- * "Fetch Shiprocket details" button on Order Details, for an order in
- * *any* status.
- *
- * - Already linked locally (a Package or the legacy Order.shiprocket_order_id
- *   field) — just looks up and returns what Shiprocket currently reports.
- *   Never writes anything here: the data already exists in our DB, so
- *   there's nothing to save, only to display.
- * - Not linked locally yet — searches Shiprocket live by the order's own
- *   reference (its human id, the exact channel_order_id we'd have sent
- *   when creating it). On a single unambiguous match that Shiprocket
- *   confirms as *delivered*, writes the link via registerExternalPackage's
- *   historical-delivery path (independently re-verified live, never a
- *   blind write). A match that isn't delivered yet is only displayed —
- *   the legacy bare-id reference format that search uses can't pass
- *   registerExternalPackage's ordinary verification, and this button
- *   should never require the admin to first know that.
- */
-export const fetchShiprocketDetailsForOrder = async ({ orderId, adminId, channelId }) => {
+// Existing links are synced package-by-package. Unlinked legacy discovery
+// retains its verified delivered-only linking policy.
+export const fetchShiprocketDetailsForOrder = async ({ orderId, adminId, channelId, packageIds = null }) => {
   const order = await Order.findOne({ _id: orderId, deleted_at: null });
   if (!order) throw StatusError.notFound("Order not found");
 
   const packages = await Package.find({ order_id: order._id });
-  const linkedId = order.shiprocket_order_id
-    || packages.find((pkg) => pkg.shiprocket_order_id)?.shiprocket_order_id;
-
-  if (linkedId) {
-    const remote = await fetchRemoteOrder(linkedId);
-    return { found: true, linked_now: false, details: extractDetails(remote) };
+  if (packages.length || order.shiprocket_order_id) {
+    const synced = await syncShiprocketStatus({ orderId, adminId, packageIds });
+    return { found: !!synced.details || synced.results.some(result => !!result.details), linked_now: false,
+      changed: synced.changed, order_status: synced.order.order_status,
+      details: synced.details, packages: synced.results, outcome: synced.outcome,
+      reconciliation_error: synced.reconciliation_error };
   }
-
-  if (packages.length) {
-    // Has packages, but none carry a Shiprocket link yet — don't guess
-    // which one a fresh search should attach to; that needs the
-    // dedicated package retry/manage workflow, not this button.
-    return {
-      found: false,
-      message: "This order has packages that aren't linked to Shiprocket yet — retry or manage them from Manage Packages instead.",
-    };
-  }
+  if (packageIds?.length) throw StatusError.badRequest("This order has no packages to retry");
 
   // Scope the live search to a single sales channel when one is given (the
   // admin picks it from a dropdown backed by Shiprocket's registered
@@ -100,7 +65,7 @@ export const fetchShiprocketDetailsForOrder = async ({ orderId, adminId, channel
   // Change Status -> Link Shiprocket order instead of an automatic one
   // from a details lookup.
   const remote = await fetchRemoteOrder(matches[0].id);
-  const shipment = Array.isArray(remote?.shipments) ? remote.shipments[0] : remote?.shipments;
+  const shipment = selectRemoteShipment(remote);
   const isDelivered = normalizeOrderStatus(shipment?.current_status || remote?.status) === "delivered";
   if (!isDelivered) {
     return { found: true, linked_now: false, details: extractDetails(remote) };

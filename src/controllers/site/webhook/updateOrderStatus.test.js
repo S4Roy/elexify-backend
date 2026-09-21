@@ -1,9 +1,9 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 
 vi.mock("../../../models/Package.js", () => ({
-  default: { findOne: vi.fn(), findOneAndUpdate: vi.fn(), updateOne: vi.fn() },
+  default: { findOne: vi.fn(), find: vi.fn(), exists: vi.fn(), findById: vi.fn(), findOneAndUpdate: vi.fn(), updateOne: vi.fn() },
 }));
-vi.mock("../../../models/Order.js", () => ({ default: { findOne: vi.fn() } }));
+vi.mock("../../../models/Order.js", () => ({ default: { findOne: vi.fn(), find: vi.fn() } }));
 vi.mock("../../../models/ReturnRequest.js", () => ({ default: { findOne: vi.fn() } }));
 vi.mock("../../../models/OrderScans.js", () => ({
   default: { findOne: vi.fn(), insertMany: vi.fn() },
@@ -13,6 +13,14 @@ vi.mock("../../../services/index.js", () => ({
   orderService: { recomputeOrderStatus: vi.fn() },
   notificationService: { sendOrderNotification: vi.fn() },
 }));
+
+vi.mock("../../../services/orderService/packages/applyShiprocketShipment.js", async () => {
+  const actual = await vi.importActual("../../../services/orderService/packages/applyShiprocketShipment.js");
+  return { ...actual, applyLegacyShipment: vi.fn(async ({ order }) => {
+    await order.save();
+    return { order, changed: true, statusChanged: false };
+  }) };
+});
 
 const { updateOrderStatus } = await import("./updateOrderStatus.js");
 const { default: Package } = await import("../../../models/Package.js");
@@ -35,7 +43,19 @@ beforeEach(() => {
     order: { _id: "order1", id: "ORD-1", order_status: "packed" }, statusChanged: false,
   });
   Package.findOne.mockResolvedValue(null);
+  Package.find.mockImplementation(async () => {
+    const pkg = await Package.findOne();
+    return pkg ? [pkg] : [];
+  });
+  Package.exists.mockResolvedValue(null);
+  Package.findOneAndUpdate.mockImplementation(async (filter, update) => ({
+    ...(await Package.findOne()), ...update.$set,
+  }));
   Order.findOne.mockResolvedValue(null);
+  Order.find.mockImplementation(async () => {
+    const order = await Order.findOne();
+    return order ? [order] : [];
+  });
   ReturnRequest.findOne.mockResolvedValue(null);
   // OrderScans.findOne(...).lean() — mirror Mongoose's chainable query API.
   OrderScans.findOne.mockReturnValue({ lean: () => Promise.resolve(null) });
@@ -84,20 +104,21 @@ describe("updateOrderStatus — Shiprocket forward-shipment webhook", () => {
 
     await updateOrderStatus(req, res, vi.fn());
 
-    expect(Package.findOne).toHaveBeenCalledWith({
+    expect(Package.find).toHaveBeenCalledWith({
       $or: [
         { shiprocket_order_id: "13905312" }, { reference_id: "13905312" },
         { shiprocket_order_id: "ORD-000019-P1" }, { reference_id: "ORD-000019-P1" },
         { awb: "59629792084" },
       ],
     });
-    expect(Package.updateOne).toHaveBeenCalledWith(
-      { _id: "pkg1" },
+    expect(Package.findOneAndUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({ _id: "pkg1", status: "packed" }),
       { $set: expect.objectContaining({ awb: "59629792084", courier_name: "Delhivery Surface", etd: "2021-07-03", shiprocket_status: "Pickup Scheduled" }) },
+      { new: true },
     );
     // "Pickup Scheduled" normalizes to "packed" — same as the package's
     // current status — so this must not be treated as a status transition.
-    expect(Package.findOneAndUpdate).not.toHaveBeenCalled();
+    expect(Package.findOneAndUpdate.mock.calls.every(([, update]) => !update.$push)).toBe(true);
     expect(orderService.recomputeOrderStatus).toHaveBeenCalled();
     expect(res.status).toHaveBeenCalledWith(200);
   });
@@ -161,7 +182,7 @@ describe("updateOrderStatus — Shiprocket forward-shipment webhook", () => {
 
     expect(Package.findOneAndUpdate).toHaveBeenCalledTimes(1);
     const [filter, update] = Package.findOneAndUpdate.mock.calls[0];
-    expect(filter).toEqual({ _id: "pkg2" });
+    expect(filter).toMatchObject({ _id: "pkg2", status: "shipped", shiprocket_status_updated_at: null });
     expect(update.$set).toMatchObject({
       status: "delivered",
       awb: "59629792084",
@@ -219,7 +240,7 @@ describe("updateOrderStatus — Shiprocket forward-shipment webhook", () => {
 
     expect(Package.findOneAndUpdate).toHaveBeenCalledTimes(1);
     const [filter, update] = Package.findOneAndUpdate.mock.calls[0];
-    expect(filter).toEqual({ _id: "pkg3" });
+    expect(filter).toMatchObject({ _id: "pkg3", status: "packed", shiprocket_status_updated_at: null });
     expect(update.$set.status).toBe("cancelled");
     expect(update.$set.cancelled_at).toBeInstanceOf(Date);
     expect(res.status).toHaveBeenCalledWith(200);
@@ -253,7 +274,7 @@ describe("updateOrderStatus — Shiprocket forward-shipment webhook", () => {
 
     await updateOrderStatus(req, res, vi.fn());
 
-    expect(Package.findOneAndUpdate).not.toHaveBeenCalled();
+    expect(Package.findOneAndUpdate.mock.calls.every(([, update]) => !update.$push)).toBe(true);
     expect(orderService.recomputeOrderStatus).toHaveBeenCalled();
     expect(res.status).toHaveBeenCalledWith(200);
   });
@@ -493,7 +514,7 @@ describe('Shiprocket legacy identifier correlation', () => {
     await updateOrderStatus({ headers: {}, body: {
       order_id: '15781', channel_order_id: 'ORD-000019', awb: 'FH010390455IN', current_status: 'shipped',
     } }, res, vi.fn());
-    expect(Order.findOne).toHaveBeenCalledWith({ $or: [
+    expect(Order.find).toHaveBeenCalledWith({ $or: [
       { id: '15781' }, { shiprocket_order_id: '15781' },
       { id: 'ORD-000019' }, { shiprocket_order_id: 'ORD-000019' },
       { awb: 'FH010390455IN' },
@@ -501,7 +522,7 @@ describe('Shiprocket legacy identifier correlation', () => {
   });
   it('can correlate historical orders using only AWB', async () => {
     await updateOrderStatus({ headers: {}, body: { awb: 'FH010390455IN', current_status: 'shipped' } }, mockRes(), vi.fn());
-    expect(Order.findOne).toHaveBeenCalledWith({ $or: [{ awb: 'FH010390455IN' }] });
+    expect(Order.find).toHaveBeenCalledWith({ $or: [{ awb: 'FH010390455IN' }] });
   });
   it('does not query legacy orders with an empty selector for shipment-only events', async () => {
     await updateOrderStatus({ headers: {}, body: { shipment_id: 'shipment-1', current_status: 'shipped' } }, mockRes(), vi.fn());
@@ -521,7 +542,7 @@ describe("package webhook replay recovery", () => {
     });
     const res = mockRes();
     await updateOrderStatus({ headers: {}, body: { order_id: "123", current_status: "OUT FOR DELIVERY" } }, res, vi.fn());
-    expect(Package.findOneAndUpdate).not.toHaveBeenCalled();
+    expect(Package.findOneAndUpdate.mock.calls.every(([, update]) => !update.$push)).toBe(true);
     expect(orderService.recomputeOrderStatus).toHaveBeenCalledWith({ orderId: "order1", source: "carrier" });
     expect(notificationService.sendOrderNotification).toHaveBeenCalledWith(expect.objectContaining({ event: "ORDER_OUT_FOR_DELIVERY" }));
     expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ status: "success" }));
@@ -539,9 +560,24 @@ describe("package webhook replay recovery", () => {
 it("persists RTO tracking without marking a package delivered or refunded", async () => {
   Package.findOne.mockResolvedValue({ _id: "pkg1", order_id: "order1", status: "shipped" });
   await updateOrderStatus({ headers: {}, body: { order_id: "123", current_status: "RTO IN TRANSIT", current_timestamp: "21 09 2026 08:30:00" } }, mockRes(), vi.fn());
-  expect(Package.updateOne).toHaveBeenCalledWith({ _id: "pkg1" }, { $set: {
+  expect(Package.findOneAndUpdate).toHaveBeenCalledWith(expect.objectContaining({ _id: "pkg1" }), { $set: {
     shiprocket_status: "RTO IN TRANSIT", shiprocket_status_updated_at: new Date("2026-09-21T03:00:00Z"),
-  } });
-  expect(Package.findOneAndUpdate).not.toHaveBeenCalled();
-  expect(orderService.recomputeOrderStatus).not.toHaveBeenCalled();
+  } }, { new: true });
+  expect(Package.findOneAndUpdate.mock.calls.every(([, update]) => !update.$push)).toBe(true);
+  expect(orderService.recomputeOrderStatus).toHaveBeenCalled();
 });
+
+ it("rejects identifiers that resolve to different packages", async () => {
+  Package.find.mockResolvedValue([{ _id: "p1" }, { _id: "p2" }]);
+  const res = mockRes();
+  await updateOrderStatus({ headers: {}, body: { order_id: "1", awb: "conflict", current_status: "delivered" } }, res, vi.fn());
+  expect(Package.findOneAndUpdate).not.toHaveBeenCalled();
+  expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ status: "ignored" }));
+ });
+ it("does not fall back to the parent when the package cannot be matched", async () => {
+  Order.findOne.mockResolvedValue({ _id: "order1", id: "ORD-1" });
+  Package.exists.mockResolvedValue({ _id: "p1" });
+  const res = mockRes();
+  await updateOrderStatus({ headers: {}, body: { order_id: "ORD-1", current_status: "delivered" } }, res, vi.fn());
+  expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ status: "ignored", message: expect.stringContaining("no exact package") }));
+ });

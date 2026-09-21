@@ -26,11 +26,19 @@ export const transitionOrder = async ({
   set = {},
   session = null,
   source = "application",
+  expectedState = null,
 }) => {
   const query = Order.findById(orderId);
   if (session) query.session(session);
   const current = await query;
   if (!current) throw StatusError.notFound("Order not found");
+  if (expectedState && (current.order_status !== expectedState.order_status || current.payment_status !== expectedState.payment_status
+    || ('shiprocket_status_updated_at' in expectedState && Number(new Date(current.shiprocket_status_updated_at || 0)) !== Number(new Date(expectedState.shiprocket_status_updated_at || 0)))
+    || ('package_count' in expectedState && (current.package_count || 0) !== expectedState.package_count))) {
+    const error = StatusError.conflict("Order changed during shipment reconciliation");
+    error.shipmentConflict = true;
+    throw error;
+  }
   if (orderStatus && !canTransitionOrder(current.order_status, orderStatus)) {
     await recordOperationalEvent({
       eventType: source === "carrier" ? "carrier_transition_rejected" : "illegal_order_transition",
@@ -53,10 +61,18 @@ export const transitionOrder = async ({
   if (paymentStatus) update.payment_status = paymentStatus;
   if (orderStatus === "packed") update["zoho.packed_at"] = current.zoho?.packed_at || new Date();
   const updated = await Order.findOneAndUpdate(
-    { _id: current._id, order_status: current.order_status, payment_status: current.payment_status },
+    { _id: current._id, order_status: current.order_status, payment_status: current.payment_status,
+      ...(expectedState && 'shiprocket_status_updated_at' in expectedState ? { shiprocket_status_updated_at: current.shiprocket_status_updated_at || null } : {}),
+      ...(expectedState && 'package_count' in expectedState ? { package_count: current.package_count ?? null } : {}),
+    },
     { $set: update, ...(orderStatus === "packed" || current.zoho?.packed_at ? { $inc: { "zoho.version": 1 } } : {}) },
     { new: true, session },
   );
+  if (!updated && expectedState) {
+    const error = StatusError.conflict("Order changed during shipment reconciliation");
+    error.shipmentConflict = true;
+    throw error;
+  }
   if (updated?.replacement_return_id && !session) {
     const { syncReplacement } = await import('../returnService/replacement.js');
     const request = await syncReplacement(updated);

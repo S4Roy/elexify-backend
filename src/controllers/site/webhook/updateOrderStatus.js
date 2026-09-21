@@ -1,4 +1,4 @@
-import { shiprocketEventDate, shiprocketStatusFields } from "../../../helpers/order/shiprocketStatus.js";
+import { shiprocketEventDate } from "../../../helpers/order/shiprocketStatus.js";
 import { packageReferenceQuery, orderReferenceQuery } from "../../../helpers/order/shipmentReferences.js";
 import { validReturnWebhookToken } from "../../../services/returnService/webhookAuth.js";
 import { StatusError } from "../../../config/index.js";
@@ -10,9 +10,9 @@ import OrderScans from "../../../models/OrderScans.js";
 import WebhookLog from "../../../models/WebhookLog.js";
 import moment from "moment-timezone";
 import { normalizeOrderStatus } from "../../../helpers/order/normalizeOrderStatus.js";
-import { PACKAGE_STATUS_MAP, isForwardPackageTransition } from "../../../helpers/order/packageStatus.js";
+import { applyPackageShipment, applyLegacyShipment, fulfillmentBlocked } from "../../../services/orderService/packages/applyShiprocketShipment.js";
 import { orderService, notificationService } from "../../../services/index.js";
-import { ORDER_STATUS, PAYMENT_STATUS } from "../../../constants/orderStatus.js";
+import { ORDER_STATUS } from "../../../constants/orderStatus.js";
 
 // No entries for partially_shipped/partially_delivered — a lookup miss
 // there is intentional: an existing customer notification event doesn't
@@ -184,63 +184,21 @@ export const updateOrderStatus = async (req, res, next) => {
     // under the old single-shipment flow has zero Package docs, so this
     // simply finds nothing and falls through to the untouched legacy path
     // below — that's what keeps historical orders fully backward compatible.
-    const pkg = await Package.findOne(packageReferenceQuery({ orderIds, awb: awbStr, shipmentId: body.shipment_id }));
+    const matches = await Package.find(packageReferenceQuery({ orderIds, awb: awbStr, shipmentId: body.shipment_id }));
+    if (matches.length > 1) {
+      return respond({ status: "ignored", message: "Conflicting package identifiers; review shipment links" });
+    }
+    const pkg = matches[0];
     if (pkg) {
       matchedPackageId = pkg._id;
       const parentOrder = await Order.findOne({ _id: pkg.order_id });
       resolvedOrderId = parentOrder?.id || null;
 
-      const packageStatus = PACKAGE_STATUS_MAP[normalizeOrderStatus(incoming.replace(/\s+/g, "_"))];
-
-      // Courier is picked manually in the Shiprocket dashboard, so the AWB/
-      // courier_name arrive on whichever webhook event happens to carry them
-      // first — often "AWB Assigned" or similar, which isn't one of our
-      // package statuses. Persist them regardless of whether this event also
-      // maps to a status transition, instead of discarding the whole event.
-      const metaSet = shiprocketStatusFields(current_status || shipment_status, eventTimestamp, pkg);
-      if (awbStr && awbStr !== pkg.awb) metaSet.awb = awbStr;
-      if (courier_name && courier_name !== pkg.courier_name) metaSet.courier_name = courier_name;
-      if (etd && etd !== pkg.etd) metaSet.etd = etd;
-
-      if (!packageStatus) {
-        if (Object.keys(metaSet).length) {
-          await Package.updateOne({ _id: pkg._id }, { $set: metaSet });
-        }
-        return respond({
-          status: "success",
-          message: "Shipment metadata updated; no package status change",
-          data: { packageId: pkg._id },
-        });
-      }
-
-      // Idempotent replay guard — a redelivered webhook for a status
-      // already recorded in this package's timeline, or a stale/
-      // out-of-order event for a status the package has already moved
-      // past, is a no-op 200, never a regression or an error that would
-      // make Shiprocket retry indefinitely.
-      const alreadyApplied = (pkg.timeline || []).some((entry) => entry.status === packageStatus);
-      if (alreadyApplied || !isForwardPackageTransition(pkg.status, packageStatus)) {
-        if (Object.keys(metaSet).length) {
-          await Package.updateOne({ _id: pkg._id }, { $set: metaSet });
-        }
-        await reconcilePackageOrder(pkg.order_id);
-        return respond({
-          status: "success",
-          message: "Package already processed; order status reconciled",
-          data: { packageId: pkg._id, mapped_status: packageStatus },
-        });
-      }
-
-      const set = { status: packageStatus, ...metaSet };
-      if (packageStatus === "shipped" && !pkg.shipped_at) set.shipped_at = eventTimestamp;
-      if (packageStatus === "delivered" && !pkg.delivered_at) set.delivered_at = eventTimestamp;
-      if (packageStatus === "cancelled" && !pkg.cancelled_at) set.cancelled_at = eventTimestamp;
-
-      const updatedPackage = await Package.findOneAndUpdate(
-        { _id: pkg._id },
-        { $set: set, $push: { timeline: { status: packageStatus, occurred_at: eventTimestamp, raw: body } } },
-        { new: true },
-      );
+      const result = await applyPackageShipment({
+        pkg, shipment: { id: body.shipment_id, awb: awbStr, courier_name, etd, current_status: current_status || shipment_status },
+        at: eventTimestamp, raw: body, allowTransition: !fulfillmentBlocked(parentOrder),
+      });
+      const updatedPackage = result.pkg;
 
       // Persist scan records against the parent order, same dedupe logic
       // as the legacy path below.
@@ -265,7 +223,8 @@ export const updateOrderStatus = async (req, res, next) => {
         }
       }
 
-      const { order: recomputedOrder } = await reconcilePackageOrder(pkg.order_id);
+      const recomputedOrder = fulfillmentBlocked(parentOrder)
+        ? parentOrder : (await reconcilePackageOrder(pkg.order_id)).order;
 
       return respond({
         status: "success",
@@ -283,7 +242,11 @@ export const updateOrderStatus = async (req, res, next) => {
     // pre-feature order shipped under the old single-shipment flow) ──────
     // Try find forward order
     const orderQuery = orderReferenceQuery({ orderIds, awb: awbStr });
-    let order = orderQuery.$or.length ? await Order.findOne(orderQuery) : null;
+    const orderMatches = orderQuery.$or.length ? await Order.find(orderQuery) : [];
+    if (orderMatches.length > 1) {
+      return respond({ status: "ignored", message: "Conflicting order identifiers; review shipment links" });
+    }
+    let order = orderMatches[0];
 
     if (!order) {
       // Not found: log and return success (to avoid retries). You can persist webhook for later if you want.
@@ -299,76 +262,11 @@ export const updateOrderStatus = async (req, res, next) => {
       });
     }
     resolvedOrderId = order.id;
-    const newStatus = normalizeOrderStatus(incoming.replace(/\s+/g, "_"));
-    Object.assign(order, shiprocketStatusFields(current_status || shipment_status, eventTimestamp, order));
-    if (!newStatus) {
-      await order.save();
-      return respond({ status: "success", message: "Shiprocket tracking status updated; fulfillment status unchanged" });
+    // Never treat a package-backed order as a legacy shipment just because
+    // this event could not be matched to a particular package.
+    if (await Package.exists({ order_id: order._id })) {
+      return respond({ status: "ignored", message: "Order has packages but no exact package matched; review shipment links" });
     }
-    // Historical orders may predate the free-form carrier metadata object.
-    // Initialize it before recording AWB/courier details so a valid webhook
-    // can never fail solely because the order has no prior carrier metadata.
-    order.meta = order.meta || {};
-
-    // const event = {
-    //   // provider: "shiprocket",
-    //   awb: awbStr,
-    //   courier_name: courier_name || null,
-    //   // channel: channel || null,
-    //   // channel_order_id: channel_order_id || null,
-    //   // shiprocket_order_id: order_id || null,
-    //   // incoming_status: current_status || shipment_status || null,
-    //   // incoming_status_id: current_status_id || shipment_status_id || null,
-    //   // mapped_status: newStatus,
-    //   // timestamp: eventTimestamp,
-    //   // raw: body,
-    // };
-
-    // --- Deduplicate event: check last N events for same incoming_status + timestamp + awb
-    // order.meta = order.meta || {};
-    // order.meta.shiprocket_events = order.meta.shiprocket_events || [];
-    // const lastEvents = order.meta.shiprocket_events;
-
-    // const isDuplicateEvent = lastEvents.some((e) => {
-    //   const sameAwb = (e.awb || null) && awbStr && String(e.awb) === awbStr;
-    //   const sameStatus = (e.incoming_status || "").toString().toUpperCase() === (current_status || shipment_status || "").toString().toUpperCase();
-    //   const sameTs =
-    //     e.timestamp &&
-    //     eventTimestamp &&
-    //     Math.abs(new Date(e.timestamp).getTime() - new Date(eventTimestamp).getTime()) < 1500; // within 1.5s
-    //   return sameStatus && (sameAwb || !awbStr) && sameTs;
-    // });
-
-    // if (!isDuplicateEvent) {
-    //   order.meta.shiprocket_events.push(event);
-    // }
-
-    // Update last AWB / courier meta
-    if (awbStr) {
-      order.meta.last_awb = awbStr;
-      // keep an array of awbs if you like
-      order.meta.awbs = order.meta.awbs || [];
-      if (!order.meta.awbs.includes(awbStr)) order.meta.awbs.push(awbStr);
-    }
-    if (courier_name) order.meta.last_courier = courier_name;
-
-    // Update order status if mapped, and set delivered timestamp if relevant
-    if (newStatus) {
-      const currentOrderStatus = (order.order_status || order.status || "")
-        .toString()
-        .toLowerCase();
-      if (currentOrderStatus !== newStatus) {
-        // Stamp the timestamp for the stage the order just entered
-        if (newStatus === "processing") {
-          order.processing_at = eventTimestamp;
-        } else if (newStatus === "shipped") {
-          order.shipped_at = eventTimestamp;
-        } else if (newStatus === "delivered") {
-          order.delivered_at = eventTimestamp;
-        }
-      }
-    }
-
     // ---- Persist scan records if present
     if (Array.isArray(scans) && scans.length) {
       // Build scan docs; avoid duplicates by checking date+activity+awb
@@ -423,30 +321,13 @@ export const updateOrderStatus = async (req, res, next) => {
       }
     }
 
-    // Save the updated order (meta + status)
-    await order.save();
-    // Partial COD: the advance was already collected online; delivery is
-    // when the courier collects the remaining COD balance, so that's the
-    // moment the order actually becomes fully paid.
-    const completesPartialCod =
-      newStatus === ORDER_STATUS.DELIVERED &&
-      order.payment_method === "cod" &&
-      order.payment_status === PAYMENT_STATUS.ADVANCE_PAID;
-    order = await orderService.transitionOrder({
-      orderId: order._id,
-      orderStatus: newStatus,
-      paymentStatus: completesPartialCod ? PAYMENT_STATUS.PAID : undefined,
-      source: "carrier",
-    });
-
+    const result = await applyLegacyShipment({ order,
+      shipment: { id: body.shipment_id, awb: awbStr, courier_name, etd, current_status: current_status || shipment_status }, at: eventTimestamp });
+    order = result.order;
+    const newStatus = order.order_status;
     const shipmentEvent = SHIPMENT_STATUS_EVENTS[newStatus];
-    if (shipmentEvent) {
-      notificationService
-        .sendOrderNotification({
-          order,
-          event: shipmentEvent,
-          dedupeKey: `${order.id}:${shipmentEvent}`,
-        });
+    if (result.statusChanged && shipmentEvent) {
+      notificationService.sendOrderNotification({ order, event: shipmentEvent, dedupeKey: `${order.id}:${shipmentEvent}` });
     }
 
     // Respond 200 (Shiprocket expects success).
