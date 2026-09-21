@@ -33,11 +33,10 @@ export const list = async (req, res, next) => {
     let matchFilter = { deleted_at: null };
 
     if (search_key) {
-      matchFilter.$or = [
-        { name: { $regex: ".*" + search_key + ".*", $options: "i" } },
-        { code: { $regex: ".*" + search_key + ".*", $options: "i" } },
-        { status: { $regex: ".*" + search_key + ".*", $options: "i" } },
-      ];
+      const escapedSearch = String(search_key).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      matchFilter.$or = ["name", "email", "phone", "subject", "message"].map(field => ({
+        [field]: { $regex: escapedSearch, $options: "i" },
+      }));
     }
     if (status) {
       matchFilter.status = { $in: status.split(",") };
