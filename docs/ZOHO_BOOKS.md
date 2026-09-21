@@ -53,6 +53,13 @@ initiating authenticated administrator. Outbound domains are allowlisted.
   Package recomputation covers retries and linked external packages observed
   as PACKED. Historical imports that skip directly to shipped/delivered do not
   fabricate a PACKED event and are not silently exported.
+- The minute worker also queues a separate `order_contact` job for each committed
+  order created on or after first activation, including guest orders. It uses the
+  order address snapshots and existing contact mappings, without waiting for packing,
+  payment, item or tax validation. Queue retries/review remain visible in Settings.
+  The durable enqueue marker is written only after the job exists, so a restart
+  cannot silently lose a customer. Existing orders since activation are picked up
+  in batches of 100; pre-activation history is not automatically exported.
 - The minute worker finds unprocessed versions, upserts jobs and synchronizes
   contact → items → Sales Order. Shiprocket continues immediately after the local
   packing commit; **remote Zoho completion is not a shipping prerequisite**.

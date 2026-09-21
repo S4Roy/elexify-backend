@@ -116,7 +116,7 @@ zohoBooksRouter.get("/logs", view, celebrate({ [Segments.QUERY]: Joi.object({ pa
   return ZohoIntegrationLog.find({ $or: [{ organization_id: connection.organization_id }, { organization_id: { $exists: false } }] })
     .sort({ created_at: -1 }).skip((req.query.page - 1) * 50).limit(50).lean();
 }));
-zohoBooksRouter.post("/sync", manage, body({ kind: Joi.string().valid("item", "variation", "contact", "salesorder").required(), ids: Joi.array().items(objectId).min(1).max(100).unique().required() }), endpoint(async req => {
+zohoBooksRouter.post("/sync", manage, body({ kind: Joi.string().valid("item", "variation", "contact", "order_contact", "salesorder").required(), ids: Joi.array().items(objectId).min(1).max(100).unique().required() }), endpoint(async req => {
   const connection = await current();
   const jobs = [];
   for (const entityId of req.body.ids) jobs.push(await enqueueSync(connection, req.body.kind, entityId, { retry: true }));
@@ -133,11 +133,21 @@ zohoBooksRouter.post("/jobs/:id/retry", manage, idParams, endpoint(async req => 
   return result;
 }));
 zohoBooksRouter.get("/orders/:id", view, idParams, endpoint(async req => {
-  const order = await Order.findOne({ _id: req.params.id, deleted_at: null }).select("zoho").lean();
+  const order = await Order.findOne({ _id: req.params.id, deleted_at: null }).select("zoho user id").lean();
   if (!order) throw StatusError.notFound("Order not found");
   const connection = await ZohoConnection.findOne({ key: "books" });
   const job = connection?.organization_id ? await ZohoSyncJob.findOne({ organization_id: connection.organization_id, kind: "salesorder", entity_id: req.params.id }).lean() : null;
-  return { zoho: order.zoho, job, enabled: Boolean(connection?.connected && connection?.enabled) };
+  let customer = { contact_id: null, job: null };
+  if (connection?.organization_id) {
+    const user = order.user ? await User.findById(order.user).select("zoho_contact_id zoho_customer_id zoho_organization_id").lean() : null;
+    const identity = user ? String(order.user) : `order-${order.id}`;
+    const mapping = await ZohoMapping.findOne({ organization_id: connection.organization_id, kind: "contact", identity, state: "mapped" }).lean();
+    customer = {
+      contact_id: mapping?.remote_id || (user?.zoho_organization_id === connection.organization_id ? user.zoho_contact_id || user.zoho_customer_id : null) || null,
+      job: await ZohoSyncJob.findOne({ organization_id: connection.organization_id, kind: "order_contact", entity_id: req.params.id }).lean(),
+    };
+  }
+  return { zoho: order.zoho, job, customer, enabled: Boolean(connection?.connected && connection?.enabled) };
 }));
 zohoBooksRouter.put("/accounting", configure, body({
   kind: Joi.string().valid("item", "variation", "contact").required(), id: objectId,

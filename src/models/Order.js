@@ -219,6 +219,7 @@ OrderSchema.index(
 // Apply pagination plugin
 OrderSchema.add({
   zoho: {
+    contact_queued_organization_id: String,
     packed_at: Date,
     version: { type: Number, default: 0 },
     completed_version: { type: Number, default: 0 },

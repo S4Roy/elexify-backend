@@ -1,3 +1,7 @@
+import Order from "../../models/Order.js";
+import User from "../../models/User.js";
+import ZohoMapping from "../../models/ZohoMapping.js";
+import ZohoSyncJob from "../../models/ZohoSyncJob.js";
 import express from "express";
 import request from "supertest";
 import { errors } from "celebrate";
@@ -52,5 +56,41 @@ describe("Zoho Books admin boundary", () => {
     expect(response.status).toBe(200);
     expect(completeAuthorization).toHaveBeenCalledWith("507f1f77bcf86cd799439011", "a".repeat(64), "code");
     expect(response.headers["cache-control"]).toBe("no-store");
+  });
+});
+
+vi.mock("../../models/Order.js", () => ({ default: { findOne: vi.fn() } }));
+vi.mock("../../models/User.js", () => ({ default: { findById: vi.fn() } }));
+vi.mock("../../models/ZohoMapping.js", () => ({ default: { findOne: vi.fn() } }));
+vi.mock("../../models/ZohoSyncJob.js", () => ({ default: { findOne: vi.fn() } }));
+
+describe("order customer sync controls", () => {
+  const id = "507f1f77bcf86cd799439012";
+  beforeEach(() => {
+    Order.findOne.mockReturnValue({ select: () => ({ lean: async () => ({ id: "ORD-1", user: null }) }) });
+    ZohoMapping.findOne.mockReturnValue({ lean: async () => ({ remote_id: "contact-123" }) });
+    ZohoSyncJob.findOne.mockReturnValue({ lean: async () => null });
+  });
+  it("queues manual customer sync for an order", async () => {
+    const response = await request(app("manager")).post("/sync").send({ kind: "order_contact", ids: [id] });
+    expect(response.status).toBe(200);
+    expect(enqueueSync).toHaveBeenCalledWith(expect.anything(), "order_contact", id, { retry: true });
+  });
+  it("returns the guest customer reference scoped to the selected organization", async () => {
+    const response = await request(app("manager")).get(`/orders/${id}`);
+    expect(response.status).toBe(200);
+    expect(response.body.data.customer.contact_id).toBe("contact-123");
+    expect(ZohoMapping.findOne).toHaveBeenCalledWith({ organization_id: "123", kind: "contact", identity: "order-ORD-1", state: "mapped" });
+  });
+  it("uses an existing same-organization customer link", async () => {
+    Order.findOne.mockReturnValue({ select: () => ({ lean: async () => ({ id: "ORD-1", user: id }) }) });
+    User.findById.mockReturnValue({ select: () => ({ lean: async () => ({ zoho_organization_id: "123", zoho_contact_id: "existing" }) }) });
+    ZohoMapping.findOne.mockReturnValue({ lean: async () => null });
+    const response = await request(app("manager")).get(`/orders/${id}`);
+    expect(response.body.data.customer.contact_id).toBe("existing");
+  });
+  it("rejects unauthorized customer sync", async () => {
+    expect((await request(app("customer")).post("/sync").send({ kind: "order_contact", ids: [id] })).status).toBe(403);
+    expect(enqueueSync).not.toHaveBeenCalled();
   });
 });

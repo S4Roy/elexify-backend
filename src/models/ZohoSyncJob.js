@@ -2,7 +2,7 @@ import mongoose from "mongoose";
 
 const schema = new mongoose.Schema({
   organization_id: { type: String, required: true },
-  kind: { type: String, enum: ["item", "variation", "contact", "salesorder"], required: true },
+  kind: { type: String, enum: ["item", "variation", "contact", "order_contact", "salesorder"], required: true },
   entity_id: { type: mongoose.Schema.Types.ObjectId, required: true },
   status: { type: String, enum: ["queued", "running", "retrying", "synced", "dead_letter", "review"], default: "queued" },
   revision: { type: Number, default: 1 },

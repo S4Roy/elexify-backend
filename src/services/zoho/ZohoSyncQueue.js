@@ -13,6 +13,10 @@ import { reconcileSourceChanges } from "./ZohoSourceChanges.js";
 
 export const enqueueSync = async (connection, kind, entityId, { sourceVersion = 0, retry = false } = {}) => {
   if (!connection?.enabled || !connection.connected) throw new ZohoError("ZOHO_SYNC_DISABLED");
+  if (kind === "order_contact") {
+    const order = await Order.findById(entityId).lean();
+    if (!order || order.deleted_at) throw new ZohoError("ORDER_NOT_FOUND");
+  }
   if (kind === "salesorder") assertOrderEligible(await Order.findById(entityId).lean());
   const key = { organization_id: connection.organization_id, kind, entity_id: entityId };
   try { await ZohoSyncJob.updateOne(key, { $setOnInsert: { ...key, source_version: sourceVersion } }, { upsert: true }); }
@@ -50,6 +54,23 @@ export const reconcilePackedOrders = async connection => {
   }
 };
 
+// Discover committed orders independently of packing and financial export.
+// Mark only after durable enqueue; replay after a crash reuses the unique job.
+export const reconcileOrderContacts = async connection => {
+  if (!connection.enabled_since) return;
+  const orders = await Order.find({
+    deleted_at: null,
+    created_at: { $gte: connection.enabled_since },
+    "zoho.contact_queued_organization_id": { $ne: connection.organization_id },
+  }).sort({ created_at: 1, _id: 1 }).limit(100).lean();
+  for (const order of orders) {
+    await enqueueSync(connection, "order_contact", order._id);
+    await Order.updateOne({ _id: order._id }, {
+      $set: { "zoho.contact_queued_organization_id": connection.organization_id },
+    });
+  }
+};
+
 export const processZohoQueue = async () => {
   const connection = await ZohoConnection.findOne({ key: "books", connected: true, enabled: true });
   if (!connection) return;
@@ -65,6 +86,7 @@ export const processZohoQueue = async () => {
   }, 30000);
   heartbeat.unref();
   try {
+    await reconcileOrderContacts(connection);
     await reconcilePackedOrders(connection);
     await reconcileSourceChanges(connection, enqueueSync);
     for (let count = 0; count < 20 && !leaseLost; count++) {
@@ -81,6 +103,11 @@ export const processZohoQueue = async () => {
       let delay = 0;
       try {
         if (job.kind === "salesorder") await syncSalesOrder(connection, job.entity_id);
+        else if (job.kind === "order_contact") {
+          const order = await Order.findById(job.entity_id).lean();
+          if (!order || order.deleted_at) throw new ZohoError("ORDER_NOT_FOUND");
+          await syncContact(connection, order.user, order);
+        }
         else if (job.kind === "contact") await syncContact(connection, job.entity_id);
         else await syncItem(connection, job.entity_id, job.kind === "variation");
       } catch (error) {

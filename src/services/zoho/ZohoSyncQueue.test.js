@@ -1,8 +1,9 @@
+import { syncContact } from "./ZohoContactService.js";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import ZohoConnection from "../../models/ZohoConnection.js";
 import ZohoSyncJob from "../../models/ZohoSyncJob.js";
 import Order from "../../models/Order.js";
-import { processZohoQueue, enqueueSync } from "./ZohoSyncQueue.js";
+import { processZohoQueue, enqueueSync, reconcileOrderContacts } from "./ZohoSyncQueue.js";
 import { acquireLease } from "./ZohoLease.js";
 import { syncItem } from "./ZohoItemService.js";
 import { ZohoError } from "./ZohoBooksClient.js";
@@ -22,6 +23,7 @@ const job = { _id: "job", kind: "item", entity_id: "entity", revision: 2, attemp
 
 beforeEach(() => {
   vi.clearAllMocks();
+  Order.findById.mockReturnValue({ lean: async () => ({ _id: "new-order" }) });
   ZohoConnection.findOne.mockResolvedValue(connection);
   ZohoConnection.exists.mockResolvedValue(true);
   acquireLease.mockResolvedValue({ key: "worker", owner: "one" });
@@ -70,5 +72,44 @@ describe("Zoho durable queue", () => {
     expect(ZohoSyncJob.updateOne).toHaveBeenNthCalledWith(1,
       { organization_id: "123", kind: "item", entity_id: "entity" }, expect.objectContaining({ $setOnInsert: expect.any(Object) }), { upsert: true });
     expect(ZohoSyncJob.updateOne).toHaveBeenNthCalledWith(2, expect.objectContaining({ source_version: { $lt: 3 } }), expect.objectContaining({ $inc: { revision: 1 } }));
+  });
+});
+
+
+describe("new order customer synchronization", () => {
+  it("queues unpacked orders since activation and records durable enqueue", async () => {
+    Order.find.mockReturnValue({ sort: () => ({ limit: () => ({ lean: async () => [{ _id: "new-order" }] }) }) });
+    await reconcileOrderContacts(connection);
+    expect(Order.find).toHaveBeenCalledWith({ deleted_at: null, created_at: { $gte: connection.enabled_since },
+      "zoho.contact_queued_organization_id": { $ne: "123" } });
+    expect(ZohoSyncJob.updateOne).toHaveBeenCalledWith(
+      { organization_id: "123", kind: "order_contact", entity_id: "new-order" },
+      expect.objectContaining({ $setOnInsert: expect.any(Object) }), { upsert: true });
+    expect(Order.updateOne).toHaveBeenCalledWith({ _id: "new-order" }, { $set: { "zoho.contact_queued_organization_id": "123" } });
+  });
+  it("leaves orders discoverable when enqueue fails", async () => {
+    Order.find.mockReturnValue({ sort: () => ({ limit: () => ({ lean: async () => [{ _id: "new-order" }] }) }) });
+    ZohoSyncJob.updateOne.mockRejectedValueOnce(new Error("Database unavailable"));
+    await expect(reconcileOrderContacts(connection)).rejects.toThrow("Database unavailable");
+    expect(Order.updateOne).not.toHaveBeenCalled();
+  });
+  it.each(["user1", null])("uses order address snapshots for customer %s", async user => {
+    const order = { _id: "order1", id: "ORD-1", user, order_status: "confirmed", billing_address_snapshot: { full_name: "Customer" } };
+    Order.findById.mockReturnValue({ lean: async () => order });
+    ZohoSyncJob.findOneAndUpdate.mockReset().mockResolvedValueOnce({ ...job, kind: "order_contact", entity_id: "order1" }).mockResolvedValue(null);
+    syncContact.mockResolvedValue("contact1");
+    await processZohoQueue();
+    expect(syncContact).toHaveBeenCalledWith(connection, user, order);
+    expect(syncItem).not.toHaveBeenCalled();
+    expect(ZohoSyncJob.updateOne).toHaveBeenCalledWith(expect.objectContaining({ _id: "job" }),
+      expect.objectContaining({ $set: expect.objectContaining({ status: "synced" }) }));
+  });
+  it("does not export deleted orders", async () => {
+    Order.findById.mockReturnValue({ lean: async () => ({ deleted_at: new Date() }) });
+    ZohoSyncJob.findOneAndUpdate.mockReset().mockResolvedValueOnce({ ...job, kind: "order_contact" }).mockResolvedValue(null);
+    await processZohoQueue();
+    expect(syncContact).not.toHaveBeenCalled();
+    expect(ZohoSyncJob.updateOne).toHaveBeenCalledWith(expect.objectContaining({ _id: "job" }),
+      expect.objectContaining({ $set: expect.objectContaining({ status: "dead_letter", last_error: "ORDER_NOT_FOUND" }) }));
   });
 });
