@@ -3,7 +3,7 @@ import Rating from "../../../models/Rating.js";
 import { StatusError } from "../../../config/index.js";
 import { envs } from "../../../config/index.js";
 import RatingResource from "../../../resources/RatingResource.js";
-import mongoose from "mongoose";
+
 
 /**
  * Rating List
@@ -23,28 +23,27 @@ export const list = async (req, res, next) => {
       status = null,
       rating = null,
     } = req.query;
-    const { slug = null } = req.params;
+
 
     const importSource = req.query.import_source;
     if (importSource && !['backup', 'other'].includes(importSource)) throw StatusError.badRequest('Invalid import source filter');
     let importedReviewIds = [];
-    try { importedReviewIds = await legacyReviewIds(); }
+    try { if (importSource) importedReviewIds = await legacyReviewIds(); }
     catch {
       if (importSource) throw StatusError.badRequest('The original backup must be available to identify reviews from the earlier import.');
     }
-    const options = {
-      page: page,
-      limit: limit,
-      sort: { [sort_by]: sort_order },
-    };
+    const pageNumber = Math.max(1, Number(page) || 1);
+    const pageSize = Math.min(100, Math.max(1, Number(limit) || 20));
+    const sortField = ["created_at", "updated_at", "status", "rating"].includes(sort_by) ? sort_by : "created_at";
+    const sort = { [sortField]: Number(sort_order) === 1 ? 1 : -1, _id: Number(sort_order) === 1 ? 1 : -1 };
     let matchFilter = { deleted_at: null };
 
     if (importSource) matchFilter.$and = [sourceCondition(importSource, importedReviewIds)];
     if (search_key) {
+      const escapedSearch = String(search_key).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
       matchFilter.$or = [
-        { name: { $regex: ".*" + search_key + ".*", $options: "i" } },
-        { code: { $regex: ".*" + search_key + ".*", $options: "i" } },
-        { status: { $regex: ".*" + search_key + ".*", $options: "i" } },
+        { description: { $regex: escapedSearch, $options: "i" } },
+        { status: { $regex: escapedSearch, $options: "i" } },
       ];
     }
     if (status) {
@@ -57,6 +56,9 @@ export const list = async (req, res, next) => {
     }
     const pipeline = [
       { $match: matchFilter },
+      { $sort: sort },
+      { $skip: (pageNumber - 1) * pageSize },
+      { $limit: pageSize },
       { $addFields: { imported_from_backup: sourceExpression(importedReviewIds) } },
 
       // 🔹 Join with users
@@ -135,12 +137,20 @@ export const list = async (req, res, next) => {
         },
       },
     ];
-    let data;
-    if (slug) {
-      pipeline.push({ $match: { slug: slug } });
-    }
-
-    data = await Rating.aggregatePaginate(Rating.aggregate(pipeline), options);
+    // Count only ratings; resolve related documents for the requested page.
+    const [docs, totalDocs] = await Promise.all([
+      Rating.aggregate(pipeline),
+      Rating.countDocuments(matchFilter),
+    ]);
+    const totalPages = Math.ceil(totalDocs / pageSize) || 1;
+    const data = {
+      docs, totalDocs, limit: pageSize, page: pageNumber, totalPages,
+      pagingCounter: (pageNumber - 1) * pageSize + 1,
+      hasPrevPage: pageNumber > 1,
+      hasNextPage: pageNumber < totalPages,
+      prevPage: pageNumber > 1 ? pageNumber - 1 : null,
+      nextPage: pageNumber < totalPages ? pageNumber + 1 : null,
+    };
     data.docs = await RatingResource.collection(data.docs);
 
     res.status(201).json({

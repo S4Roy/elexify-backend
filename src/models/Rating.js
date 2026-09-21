@@ -71,6 +71,11 @@ const RatingSchema = new Schema(
   { versionKey: false }
 );
 
+// Admin pagination sorts before resolving related documents.
+RatingSchema.index({ deleted_at: 1, created_at: -1, _id: -1 });
+RatingSchema.index({ deleted_at: 1, status: 1, created_at: -1, _id: -1 });
+RatingSchema.index({ "legacy_import.source": 1, deleted_at: 1, created_at: -1, _id: -1 });
+
 // Indexes for faster queries
 RatingSchema.index({ product_id: 1, status: 1 });
 RatingSchema.index(
