@@ -1,3 +1,4 @@
+import ZohoIntegrationLog from "../../models/ZohoIntegrationLog.js";
 import Order from "../../models/Order.js";
 import User from "../../models/User.js";
 import ZohoMapping from "../../models/ZohoMapping.js";
@@ -14,7 +15,7 @@ import { enqueueSync } from "../../services/zoho/ZohoSyncQueue.js";
 vi.mock("../../services/zoho/ZohoAuthService.js", () => ({ beginAuthorization: vi.fn(), completeAuthorization: vi.fn(), disconnect: vi.fn() }));
 vi.mock("../../services/zoho/ZohoSyncQueue.js", () => ({ enqueueSync: vi.fn() }));
 vi.mock("../../models/ZohoConnection.js", () => ({ default: { findOne: vi.fn() } }));
-vi.mock("../../models/ZohoIntegrationLog.js", () => ({ default: { create: vi.fn().mockResolvedValue({}) } }));
+vi.mock("../../models/ZohoIntegrationLog.js", () => ({ default: { create: vi.fn().mockResolvedValue({}), find: vi.fn(), countDocuments: vi.fn() } }));
 
 const app = role => {
   const server = express();
@@ -33,6 +34,23 @@ beforeEach(() => {
 });
 
 describe("Zoho Books admin boundary", () => {
+  it("returns log totals for pagination while preserving the legacy array response", async () => {
+    const logs = [{ event: "synced", entity_id: "record" }];
+    const query = { sort: vi.fn().mockReturnThis(), skip: vi.fn().mockReturnThis(), limit: vi.fn().mockReturnThis(), lean: vi.fn().mockResolvedValue(logs) };
+    ZohoIntegrationLog.find.mockReturnValue(query);
+    ZohoIntegrationLog.countDocuments.mockResolvedValue(73);
+    const response = await request(app("manager")).get("/logs?page=2&paginated=true");
+    expect(response.status).toBe(200);
+    expect(response.body.data).toEqual({ logs, total: 73 });
+    expect(query.skip).toHaveBeenCalledWith(50);
+    expect(query.limit).toHaveBeenCalledWith(50);
+    expect(ZohoIntegrationLog.countDocuments).toHaveBeenCalledWith(ZohoIntegrationLog.find.mock.calls[0][0]);
+    ZohoIntegrationLog.countDocuments.mockClear();
+    const legacy = await request(app("manager")).get("/logs");
+    expect(legacy.status).toBe(200);
+    expect(legacy.body.data).toEqual(logs);
+    expect(ZohoIntegrationLog.countDocuments).not.toHaveBeenCalled();
+  });
   it("denies non-authorized roles", async () => {
     expect((await request(app("staff")).get("/")).status).toBe(403);
     expect((await request(app("customer")).post("/sync").send({})).status).toBe(403);
