@@ -21,6 +21,17 @@ const WebhookLogSchema = new Schema(
     shiprocket_order_id: { type: String, default: null, index: true },
     awb: { type: String, default: null, index: true },
 
+    event_id: { type: String, default: null, index: true },
+    provider_order_id: { type: String, default: null, index: true },
+    payment_id: { type: String, default: null, index: true },
+    refund_id: { type: String, default: null, index: true },
+    signature_verified: { type: Boolean, default: null },
+    duplicate: { type: Boolean, default: false },
+    processing_state: { type: String, default: null },
+    attempts: { type: Number, default: null },
+    next_retry_at: { type: Date, default: null },
+    payload_hash: { type: String, default: null },
+
     incoming_status: { type: String, default: null },
     mapped_status: { type: String, default: null },
 
@@ -33,8 +44,8 @@ const WebhookLogSchema = new Schema(
     outcome_detail: { type: String, default: null },
     status_code: { type: Number, default: 200 },
 
-    // Raw request body as received — same convention as Package.timeline's
-    // `raw` field (src/models/Package.js) and OrderScans.raw.
+    // Provider payload: Razorpay stores only an allowlisted summary.
+    // Existing shipping entries retain their original payload format.
     payload: { type: Object, default: {} },
 
     processing_ms: { type: Number, default: null },

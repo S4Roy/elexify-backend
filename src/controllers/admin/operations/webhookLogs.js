@@ -29,6 +29,7 @@ export const list = async (req, res, next) => {
           { order_id: term },
           { awb: term },
           { shiprocket_order_id: term },
+          ...["event_id", "provider_order_id", "payment_id", "refund_id"].map(field => ({ [field]: term })),
         ];
       }
     }
@@ -49,6 +50,15 @@ export const list = async (req, res, next) => {
         $project: {
           provider: 1,
           event_type: 1,
+          event_id: 1,
+          provider_order_id: 1,
+          payment_id: 1,
+          refund_id: 1,
+          signature_verified: 1,
+          duplicate: 1,
+          processing_state: 1,
+          attempts: 1,
+          next_retry_at: 1,
           order_id: 1,
           package_id: 1,
           shiprocket_order_id: 1,

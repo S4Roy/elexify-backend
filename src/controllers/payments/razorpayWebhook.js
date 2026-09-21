@@ -6,18 +6,22 @@ import { PAYMENT_STATUS } from "../../constants/orderStatus.js";
 import { orderService, notificationService } from "../../services/index.js";
 import { recordOperationalEvent } from "../../services/observability/recordOperationalEvent.js";
 import { getRazorpayConfig } from "../../services/integrationCredentials/razorpay.js";
+import { recordRazorpayDelivery } from "../../services/webhooks/recordRazorpayDelivery.js";
 
 const MAX_WEBHOOK_ATTEMPTS = 5;
 
-const processEvent = async (event) => {
+const processEvent = async (event, audit = {}) => {
+  audit.handled = false;
   const refund = event?.payload?.refund?.entity;
   const payment = event?.payload?.payment?.entity;
   const refundId = refund?.id;
   const paymentId = refund?.payment_id || payment?.id;
 
   if (event?.event === "payment.captured" && payment) {
+    audit.handled = true;
     const order = await Order.findOne({ "payment_meta.razorpay_order_id": payment.order_id });
     if (!order) throw new Error("No local order matches captured payment");
+    audit.order_id = String(order._id || order.id);
     const result = await orderService.finalizeCapturedPayment({
       orderId: order.id, paymentData: payment, source: "webhook",
     });
@@ -30,6 +34,7 @@ const processEvent = async (event) => {
         });
     }
   } else if (["refund.processed", "refund.failed"].includes(event?.event) && (refundId || paymentId)) {
+    audit.handled = true;
     const returnRequest = await ReturnRequest.findOne({
       $or: [
         ...(refundId ? [{ "refund.provider_ref": refundId }] : []),
@@ -37,6 +42,7 @@ const processEvent = async (event) => {
       ],
     });
     if (returnRequest) {
+      audit.order_id = String(returnRequest.order_id);
       const processed = event.event === "refund.processed";
       returnRequest.status = processed ? "completed" : "refund_failed";
       returnRequest.refund.status = processed ? "processed" : "failed";
@@ -57,6 +63,7 @@ const processEvent = async (event) => {
       $or: [{ "refund.razorpay_refund_id": refundId }, { "payment_meta.razorpay_payment_id": paymentId }],
     });
     if (!order) throw new Error("No local order matches refund");
+    audit.order_id = String(order._id || order.id);
     await orderService.transitionOrder({
       orderId: order._id,
       paymentStatus: PAYMENT_STATUS.REFUNDED,
@@ -77,6 +84,7 @@ const processEvent = async (event) => {
       $or: [{ "refund.razorpay_refund_id": refundId }, { "payment_meta.razorpay_payment_id": paymentId }],
     });
     if (!order) throw new Error("No local order matches failed refund");
+    audit.order_id = String(order._id || order.id);
     await orderService.transitionOrder({
       orderId: order._id,
       paymentStatus: PAYMENT_STATUS.REFUND_FAILED,
@@ -89,28 +97,35 @@ const processEvent = async (event) => {
   }
 };
 
-export const replayRazorpayWebhook = async (eventId) => {
+export const replayRazorpayWebhook = async (eventId, audit = {}) => {
   const inbox = await WebhookEvent.findOneAndUpdate(
     { event_id: eventId, status: { $in: ["received", "failed"] }, attempts: { $lt: MAX_WEBHOOK_ATTEMPTS } },
     { $set: { status: "processing", last_error: null }, $inc: { attempts: 1 } },
     { new: true },
   );
   if (!inbox) return null;
+  audit.attempts = inbox.attempts;
+  audit.processing_state = "processing";
   try {
-    await processEvent(inbox.payload);
-    return WebhookEvent.findByIdAndUpdate(
+    await processEvent(inbox.payload, audit);
+    const completed = await WebhookEvent.findByIdAndUpdate(
       inbox._id,
-      { $set: { status: "completed", processed_at: new Date(), last_error: null } },
+      { $set: { status: "completed", processed_at: new Date(), last_error: null, next_retry_at: null } },
       { new: true },
     );
+    audit.processing_state = completed ? "completed" : "processing";
+    audit.next_retry_at = null;
+    return completed;
   } catch (error) {
     const exhausted = inbox.attempts >= MAX_WEBHOOK_ATTEMPTS;
+    audit.processing_state = exhausted ? "dead_letter" : "failed";
+    audit.next_retry_at = exhausted ? null : new Date(Date.now() + Math.min(60_000 * 2 ** inbox.attempts, 3_600_000));
     await WebhookEvent.updateOne(
       { _id: inbox._id },
       { $set: {
         status: exhausted ? "dead_letter" : "failed",
         last_error: String(error?.message || error).slice(0, 1000),
-        next_retry_at: exhausted ? null : new Date(Date.now() + Math.min(60_000 * 2 ** inbox.attempts, 3_600_000)),
+        next_retry_at: audit.next_retry_at,
       } },
     );
     await recordOperationalEvent({
@@ -124,40 +139,53 @@ export const replayRazorpayWebhook = async (eventId) => {
 };
 
 export const razorpayWebhook = async (req, res) => {
+  const receivedAt = new Date();
+  const audit = { event_id: req.headers["x-razorpay-event-id"] };
+  const respond = (statusCode, body, detail = body.message, outcome) => {
+    audit.detail = detail;
+    if (outcome) audit.outcome = outcome;
+    void recordRazorpayDelivery({ event: req.body, audit, statusCode, receivedAt });
+    return res.status(statusCode).json(body);
+  };
   const signature = req.headers["x-razorpay-signature"];
   let credentials;
   try {
     credentials = await getRazorpayConfig();
   } catch {
-    return res.status(503).json({ status: "error", message: "Payment provider unavailable" });
+    return respond(503, { status: "error", message: "Payment provider unavailable" });
   }
   const secret = credentials.webhook_secret;
-  if (!signature || !secret || !req.rawBody) {
-    return res.status(400).json({ status: "error", message: "Missing signature" });
+  if (typeof signature !== "string" || !secret || !req.rawBody) {
+    audit.signature_verified = false;
+    return respond(400, { status: "error", message: "Missing signature" });
   }
   const expected = crypto.createHmac("sha256", secret).update(req.rawBody).digest("hex");
-  const valid = signature.length === expected.length &&
-    crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expected));
-  if (!valid) return res.status(400).json({ status: "error", message: "Invalid signature" });
+  const valid = /^[a-f0-9]{64}$/i.test(signature) &&
+    crypto.timingSafeEqual(Buffer.from(signature, "hex"), Buffer.from(expected, "hex"));
+  audit.signature_verified = valid;
+  if (!valid) return respond(400, { status: "error", message: "Invalid signature" });
 
   const event = req.body;
   if (credentials.account_id && event?.account_id !== credentials.account_id) {
-    return res.status(400).json({ status: "error", message: "Webhook account mismatch" });
+    return respond(400, { status: "error", message: "Webhook account mismatch" });
   }
   const payloadHash = crypto.createHash("sha256").update(req.rawBody).digest("hex");
   const eventId = req.headers["x-razorpay-event-id"] || event?.id || event?.event_id || `${event?.event}:${payloadHash}`;
-  if (!event?.event) {
-    return res.status(400).json({ status: "error", message: "Invalid event" });
+  audit.event_id = eventId;
+  audit.payload_hash = payloadHash;
+  if (typeof event?.event !== "string" || !event.event) {
+    return respond(400, { status: "error", message: "Invalid event" });
   }
   try {
     let inbox = await WebhookEvent.findOne({ event_id: eventId });
+    audit.duplicate = !!inbox;
     // Records created by the previous inbox schema represent events that were
     // already acknowledged; preserve that history during rolling deployment.
     if (inbox && !inbox.status) {
-      return res.status(200).json({ status: "success", message: "Legacy event already processed" });
+      return respond(200, { status: "success", message: "Legacy event already processed" }, "Legacy event already processed", "ignored");
     }
     if (inbox && inbox.payload_hash !== payloadHash) {
-      return res.status(409).json({ status: "error", message: "Event payload mismatch" });
+      return respond(409, { status: "error", message: "Event payload mismatch" });
     }
     if (!inbox) {
       try {
@@ -167,17 +195,28 @@ export const razorpayWebhook = async (req, res) => {
         });
       } catch (error) {
         if (error?.code !== 11000) throw error;
+        audit.duplicate = true;
         inbox = await WebhookEvent.findOne({ event_id: eventId });
       }
     }
-    if (inbox.status === "completed") {
-      return res.status(200).json({ status: "success", message: "Already processed" });
+    if (!inbox) throw new Error("Webhook inbox unavailable");
+    // Recheck after a concurrent insert as well as the initial lookup.
+    if (inbox.payload_hash !== payloadHash) {
+      return respond(409, { status: "error", message: "Event payload mismatch" });
     }
-    const processed = await replayRazorpayWebhook(eventId);
-    if (!processed) return res.status(409).json({ status: "processing" });
-    return res.status(200).json({ status: "success" });
+    audit.processing_state = inbox.status;
+    audit.attempts = inbox.attempts;
+    audit.next_retry_at = inbox.next_retry_at;
+    if (inbox.status === "completed") {
+      return respond(200, { status: "success", message: "Already processed" }, "Duplicate delivery; event already processed", "ignored");
+    }
+    const processed = await replayRazorpayWebhook(eventId, audit);
+    if (!processed) return respond(409, { status: "processing" }, "Event is processing or unavailable for retry");
+    return respond(200, { status: "success" },
+      audit.handled ? "Event processed" : "Event type or payload not handled; acknowledged without changes",
+      audit.handled ? "processed" : "ignored");
   } catch (error) {
     console.error("❌ razorpayWebhook error:", error?.message || error);
-    return res.status(500).json({ status: "error", message: "Webhook processing failed" });
+    return respond(500, { status: "error", message: "Webhook processing failed" });
   }
 };
