@@ -1,3 +1,4 @@
+import { resolveCustomerAddress } from "./resolveCustomerAddress.js";
 import { customerPayload } from "./customerPayload.js";
 import Invoice from "../../models/Invoice.js";
 import Order from "../../models/Order.js";
@@ -16,7 +17,7 @@ const ensureZohoCustomer = async (order, invoice) => {
   const user = order.user ? await User.findById(order.user) : null;
   if (user?.zoho_customer_id) return user.zoho_customer_id;
   const identity = user ? String(user._id) : `order-${order.id}`;
-  const response = await createCustomer(customerPayload(user, invoice, identity), { recoverExisting: true });
+  const response = await createCustomer(customerPayload(user, { billing_address: await resolveCustomerAddress(invoice.billing_address), shipping_address: await resolveCustomerAddress(invoice.shipping_address) }, identity), { recoverExisting: true });
   const customerId = response?.data?.contact?.contact_id;
   if (!response?.success || !customerId) {
     throw new Error(`Unable to create the customer in Zoho Books: ${safeError(response?.error || 'No customer ID returned')}`);

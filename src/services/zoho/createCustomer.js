@@ -18,7 +18,7 @@ export const createCustomer = async (customerData, { recoverExisting = false } =
     const connection = await ZohoConnection.findOne({ key: 'books', connected: true });
     if (connection?.organization_id) {
       const contact = await syncMapped({ connection, kind: 'contact',
-        identity: customerData.contact_name.replace(/^Elexify /, ''), path: 'contacts', singular: 'contact', payload: customerData,
+        identity: customerData.notes?.match(/ — Elexify customer (.+)$/)?.[1] || customerData.contact_name.replace(/^Elexify /, ''), path: 'contacts', singular: 'contact', payload: customerData,
         lookup: () => findContact(connection, customerData),
         beforeUpdate: async remoteId => {
           const existing = (await booksClient(connection, 'GET', `contacts/${remoteId}`)).contact;

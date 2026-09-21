@@ -1,4 +1,4 @@
-const location = (value, fallback) => typeof value === 'string' ? value : value?.name || fallback || '';
+const location = (value, fallback) => typeof value === 'string' && value.trim() && !/^\d+$/.test(value) ? value : value?.name || fallback || '';
 
 export const zohoAddress = (address = {}) => ({
   attention: address.full_name || '',
@@ -6,6 +6,7 @@ export const zohoAddress = (address = {}) => ({
   street2: address.address_line_2 || '',
   city: location(address.city, address.city_name),
   state: location(address.state, address.state_name),
+  ...(address.state_code ? { state_code: address.state_code } : {}),
   country: location(address.country, address.country_name),
   zip: address.postcode || '',
   phone: address.phone ? `${address.phone_code ? '+' + address.phone_code : ''}${address.phone}` : '',
@@ -14,13 +15,16 @@ export const zohoAddress = (address = {}) => ({
 export const customerPayload = (user, invoice, identity) => {
   const address = invoice.billing_address || {};
   const name = String(user?.name || address.full_name || 'Customer').trim();
-  // Stable identity, independent of name/email changes, supports exact
-  // recovery after a provider success followed by a local write failure.
-  const contactName = `Elexify ${identity}`;
+  // Display the customer name; stable identity remains in mappings and notes.
+  const contactName = name;
   const [firstName, ...lastName] = name.split(/\s+/);
   return {
     contact_name: contactName,
     contact_type: 'customer', customer_sub_type: 'individual',
+    ...((address.country_code === 'IN' || location(address.country, address.country_name) === 'India') ? {
+      gst_treatment: address.gstin ? 'business_gst' : user?.gst_treatment || address.gst_treatment || 'consumer',
+      ...(address.state_code ? { place_of_contact: address.state_code } : {}),
+    } : {}),
     billing_address: zohoAddress(address),
     shipping_address: zohoAddress(invoice.shipping_address || address),
     contact_persons: [{ first_name: firstName.slice(0, 100), last_name: lastName.join(' ').slice(0, 100),
