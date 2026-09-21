@@ -1,8 +1,7 @@
 // services/shiprocket-serviceability.js
 import axios from "axios";
-import Token from "../../models/Token.js"; // used only for invalidation fallback (optional)
-import moment from "moment-timezone";
-import { shiprocket } from "../index.js"; // keep your existing import pattern
+import { getTokens } from "./getTokens.js";
+import { invalidateToken } from "./invalidateToken.js";
 
 const SERVICEABILITY_URL =
   "https://apiv2.shiprocket.in/v1/external/courier/serviceability/";
@@ -17,6 +16,7 @@ const volumetricWeightKg = (l = 0, w = 0, h = 0) => {
 /** Normalizes Shiprocket response into predictable fields */
 const normalizeCarriers = (raw) => {
   let carriers =
+    raw?.data?.available_courier_companies ||
     raw?.data?.available_couriers ||
     raw?.data?.couriers ||
     raw?.available_couriers ||
@@ -37,7 +37,7 @@ const normalizeCarriers = (raw) => {
     .map((c) => {
       const courierName =
         c.courier_name || c.name || c.courier || c.title || null;
-      const courierId = c.courier_id || c.id || c.courier_code || null;
+      const courierId = c.courier_company_id || c.courier_id || c.id || c.courier_code || null;
       const shippingCost =
         (c.charges &&
           (c.charges.total_charge || c.charges.total || c.charges.shipping)) ||
@@ -49,7 +49,7 @@ const normalizeCarriers = (raw) => {
         null;
       const gst = c.gst_charge || c.gst || 0;
       const eta =
-        c.delivery_time || c.estimated_delivery || c.sla || c.eta || null;
+        c.estimated_delivery_days || c.delivery_time || c.estimated_delivery || c.sla || c.eta || null;
       const service =
         c.service_type || c.service || c.product_name || c.product || null;
       const rateNum = shippingCost != null ? Number(shippingCost) : null;
@@ -69,28 +69,6 @@ const normalizeCarriers = (raw) => {
     .filter(
       (x) => x && x.total_charge != null && !Number.isNaN(x.total_charge)
     );
-};
-
-/** Try to obtain a token by calling common method names on your `shiprocket` export */
-const obtainTokenFromShiprocketExport = async () => {
-  // try multiple common names (be defensive)
-  if (!shiprocket)
-    throw new Error("shiprocket helper not imported or available");
-
-  const tryFns = ["getShiprocketToken", "getTokens", "getToken", "get_token"];
-  for (const fn of tryFns) {
-    if (typeof shiprocket[fn] === "function") {
-      return await shiprocket[fn]();
-    }
-  }
-
-  // fallback: maybe shiprocket itself exports a token string
-  if (typeof shiprocket === "string") return shiprocket;
-  throw new Error(
-    "No token getter found on shiprocket export (tried: " +
-      tryFns.join(", ") +
-      ")"
-  );
 };
 
 /**
@@ -114,6 +92,7 @@ export const serviceability = async (params = {}) => {
     width_cm = 0,
     height_cm = 0,
     declared_value,
+    timeout_ms = 15000,
   } = params;
 
   if (!pickup_pincode || !delivery_pincode) {
@@ -145,13 +124,13 @@ export const serviceability = async (params = {}) => {
         Authorization: `Bearer ${token}`,
         "Content-Type": "application/json",
       },
-      timeout: 15000,
+      timeout: timeout_ms,
     });
     return resp.data;
   };
 
   try {
-    let token = await obtainTokenFromShiprocketExport();
+    let token = await getTokens();
     let rawResp;
     try {
       rawResp = await callApi(token);
@@ -159,26 +138,10 @@ export const serviceability = async (params = {}) => {
       const status = err?.response?.status;
       // try once on auth error: invalidate persisted token if you have a Token model entry
       if (status === 401 || status === 403) {
-        try {
-          // optional: remove token doc from DB if present (your getTokens impl may rely on this)
-          await Token.updateOne(
-            { provider: "shiprocket" },
-            {
-              $set: {
-                access_token: null,
-                expires_at: moment()
-                  .subtract(1, "minute")
-                  .tz("Asia/Kolkata")
-                  .toDate(),
-              },
-            }
-          ).catch(() => {});
-        } catch (e) {
-          /* ignore */
-        }
+        await invalidateToken().catch(() => {});
 
         // re-obtain token and retry
-        token = await obtainTokenFromShiprocketExport();
+        token = await getTokens();
         rawResp = await callApi(token);
       } else {
         const body = err.response?.data || err.message;

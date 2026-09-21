@@ -54,6 +54,9 @@ export const estimate = async (req, res, next) => {
     });
 
     const delivery = await shippingService.calculateDeliveryEstimate({
+      postcode,
+      country,
+      weight: Number(source.weight || 0),
       min_delivery_days: rateResult.min_delivery_days,
       max_delivery_days: rateResult.max_delivery_days,
       isAvailable,

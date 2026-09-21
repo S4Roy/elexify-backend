@@ -278,6 +278,10 @@ const address = await Address.findOne({
     const shippingAmount = roundShippingCharge(rateResult.amount * exchangeRate, currency);
 
     const deliveryEstimate = await calculateDeliveryEstimate({
+      postcode: address.postcode,
+      country: address.country,
+      weight: items.reduce((sum, item) => sum + Number(item.weight || 0) * item.quantity, 0),
+      cod: payment_method === "cod",
       min_delivery_days: rateResult.min_delivery_days,
       max_delivery_days: rateResult.max_delivery_days,
       isAvailable: true,

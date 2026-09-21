@@ -1,9 +1,15 @@
+import { StatusError } from "../../../../config/index.js";
 import ShippingSettings from "../../../../models/ShippingSettings.js";
 import { auditService } from "../../../../services/index.js";
 
 export const edit = async (req, res, next) => {
   try {
     const {
+      delivery_estimate_source,
+      delivery_pickup_postcode,
+      delivery_courier_policy,
+      delivery_buffer_days,
+      delivery_fallback_enabled,
       processing_days_min,
       processing_days_max,
       exclude_weekends,
@@ -39,7 +45,21 @@ export const edit = async (req, res, next) => {
 
     const settings = await ShippingSettings.getSingleton();
 
+    if ((processing_days_max ?? settings.processing_days_max) < (processing_days_min ?? settings.processing_days_min)) {
+      throw StatusError.badRequest("Maximum processing days must be at least the minimum.");
+    }
+
+    if (delivery_estimate_source === "shiprocket" && !/^[1-9]\d{5}$/.test(delivery_pickup_postcode ?? settings.delivery_pickup_postcode ?? "")) {
+      throw StatusError.badRequest("Enter your Shiprocket pickup pincode for live estimates.");
+    }
+
     Object.assign(settings, {
+      ...(delivery_estimate_source !== undefined && { delivery_estimate_source }),
+      ...(delivery_pickup_postcode !== undefined && { delivery_pickup_postcode }),
+      ...(delivery_courier_policy !== undefined && { delivery_courier_policy }),
+      ...(delivery_buffer_days !== undefined && { delivery_buffer_days }),
+      ...(delivery_fallback_enabled !== undefined && { delivery_fallback_enabled }),
+
       ...(processing_days_min !== undefined && { processing_days_min }),
       ...(processing_days_max !== undefined && { processing_days_max }),
       ...(exclude_weekends !== undefined && { exclude_weekends }),
@@ -85,6 +105,12 @@ export const edit = async (req, res, next) => {
       req,
       event: "FULFILLMENT_POLICY_UPDATED",
       metadata: {
+        delivery_estimate_source: settings.delivery_estimate_source,
+        delivery_pickup_postcode: settings.delivery_pickup_postcode,
+        delivery_courier_policy: settings.delivery_courier_policy,
+        delivery_buffer_days: settings.delivery_buffer_days,
+        delivery_fallback_enabled: settings.delivery_fallback_enabled,
+
         customer_cancellation_enabled: settings.customer_cancellation_enabled,
         admin_cancellation_enabled: settings.admin_cancellation_enabled,
         returns_enabled: settings.returns_enabled,

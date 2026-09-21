@@ -359,6 +359,10 @@ export const carts = async (req, res, next) => {
 
         shipping = { amount: rateResult.amount, zone: rateResult.zone?.name ?? null };
         estimated_delivery = await shippingService.calculateDeliveryEstimate({
+          postcode: address.postcode,
+          country: address.country,
+          cod: req.query.payment_method === "cod",
+          weight: rawCarts.reduce((sum, c) => sum + Number((c.variation || c.product)?.weight || 0) * c.quantity, 0),
           min_delivery_days: rateResult.min_delivery_days,
           max_delivery_days: rateResult.max_delivery_days,
           isAvailable,

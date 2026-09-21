@@ -11,6 +11,7 @@ export const carts = celebrate({
       .allow("", null)
       .valid("name", "created_at"),
     sort_order: Joi.number().optional().allow(null).valid(-1, 1),
+    payment_method: Joi.string().valid("cod", "online").optional(),
     address_id: Joi.string().optional().allow("", null),
   }),
 });

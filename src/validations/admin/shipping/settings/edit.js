@@ -2,12 +2,16 @@ import { celebrate, Joi } from "celebrate";
 
 const ORDER_STATUSES = ["pending", "confirmed", "processing", "packed"];
 
-export const edit = celebrate({
-  body: Joi.object({
-    processing_days_min: Joi.number().integer().min(0).optional(),
-    processing_days_max: Joi.number().integer().min(0).optional(),
+export const shippingSettingsSchema = Joi.object({
+    delivery_estimate_source: Joi.string().valid("shiprocket", "manual").optional(),
+    delivery_pickup_postcode: Joi.string().pattern(/^[1-9]\d{5}$/).allow("").optional(),
+    delivery_courier_policy: Joi.string().valid("recommended", "fastest", "conservative").optional(),
+    delivery_buffer_days: Joi.number().integer().min(0).max(30).optional(),
+    delivery_fallback_enabled: Joi.boolean().optional(),
+    processing_days_min: Joi.number().integer().min(0).max(90).optional(),
+    processing_days_max: Joi.number().integer().min(0).max(90).optional(),
     exclude_weekends: Joi.boolean().optional(),
-    weekend_days: Joi.array().items(Joi.number().integer().min(0).max(6)).optional(),
+    weekend_days: Joi.array().items(Joi.number().integer().min(0).max(6)).unique().max(6).optional(),
     holidays: Joi.array().items(Joi.date()).optional(),
     order_cutoff_time: Joi.string()
       .pattern(/^([01]\d|2[0-3]):([0-5]\d)$/)
@@ -42,5 +46,6 @@ export const edit = celebrate({
     return_auto_approve: Joi.boolean().optional(),
     return_require_images: Joi.boolean().optional(),
     return_reasons: Joi.array().items(Joi.string().trim().min(2).max(100)).min(1).max(20).unique().optional(),
-  }),
 });
+
+export const edit = celebrate({ body: shippingSettingsSchema });

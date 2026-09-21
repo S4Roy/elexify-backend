@@ -5,13 +5,18 @@ const { Schema, model, Types } = mongoose;
 // Singleton document (find the single row with ShippingSettings.getSingleton()).
 const ShippingSettingsSchema = new Schema(
   {
+    delivery_estimate_source: { type: String, enum: ["shiprocket", "manual"], default: "shiprocket" },
+    delivery_pickup_postcode: { type: String, default: "" },
+    delivery_courier_policy: { type: String, enum: ["recommended", "fastest", "conservative"], default: "recommended" },
+    delivery_buffer_days: { type: Number, min: 0, max: 30, default: 1 },
+    delivery_fallback_enabled: { type: Boolean, default: true },
     processing_days_min: { type: Number, min: 0, default: 1 },
     processing_days_max: { type: Number, min: 0, default: 2 },
     // days of week to skip when counting business days: 0=Sun .. 6=Sat
     exclude_weekends: { type: Boolean, default: true },
     weekend_days: { type: [Number], default: [0] },
     holidays: { type: [Date], default: [] },
-    // orders placed after this time (HH:mm, server local time) push processing out by 1 day
+    // orders placed after this time (HH:mm, Asia/Kolkata) push processing out by 1 day
     order_cutoff_time: { type: String, default: null },
     default_shipping_zone: {
       type: Types.ObjectId,
