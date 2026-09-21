@@ -1,3 +1,4 @@
+import ShippingSettings from "../../../../models/ShippingSettings.js";
 import { resolveCatalogSlug, LEGACY_PRODUCT_SLUGS } from "../../../../services/inventory/resolveCatalogSlug.js";
 import Product from "../../../../models/Product.js";
 import ExchangeRate from "../../../../models/ExchangeRate.js";
@@ -628,6 +629,11 @@ export const details = async (req, res, next) => {
 
     const data = await Product.aggregate(pipeline);
     if (!data.length) throw StatusError.notFound("Product not found");
+    const shippingSettings = await ShippingSettings.getSingleton();
+    data[0].return_policy = {
+      enabled: shippingSettings.returns_enabled,
+      window_days: shippingSettings.return_window_days,
+    };
     data[0].short_description = productHighlights(data[0].short_description);
 
     res.status(200).json({
