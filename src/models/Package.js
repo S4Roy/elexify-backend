@@ -54,6 +54,8 @@ const PackageSchema = new Schema(
     shiprocket_order_id: { type: String, default: null },
     shiprocket_shipment_id: { type: String, default: null },
     awb: { type: String, default: null },
+    shiprocket_status: { type: String, default: null },
+    shiprocket_status_updated_at: { type: Date, default: null },
     courier_name: { type: String, default: null },
     etd: { type: String, default: null },
     tracking_url: { type: String, default: null },

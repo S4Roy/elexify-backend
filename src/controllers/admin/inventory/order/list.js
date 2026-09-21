@@ -70,6 +70,8 @@ export const list = async (req, res, next) => {
                 in: {
                   package_number: "$$pkg.package_number",
                   status: "$$pkg.status",
+                  shiprocket_status: "$$pkg.shiprocket_status",
+                  shiprocket_status_updated_at: "$$pkg.shiprocket_status_updated_at",
                   courier_name: "$$pkg.courier_name",
                   awb: "$$pkg.awb",
                   etd: "$$pkg.etd",

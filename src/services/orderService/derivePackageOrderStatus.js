@@ -30,15 +30,18 @@ export const derivePackageOrderStatus = (items) => {
   let totalAllocated = 0;
   let totalShipped = 0;
   let totalDelivered = 0;
+  let totalOutForDelivery = 0;
   for (const item of items) {
     totalOrdered += Number(item.ordered_qty) || 0;
     totalAllocated += Number(item.allocated_qty) || 0;
     totalShipped += Number(item.shipped_qty) || 0;
     totalDelivered += Number(item.delivered_qty) || 0;
+    totalOutForDelivery += Number(item.out_for_delivery_qty) || 0;
   }
 
   if (totalOrdered > 0 && totalDelivered >= totalOrdered) return ORDER_STATUS.DELIVERED;
   if (totalDelivered > 0) return ORDER_STATUS.PARTIALLY_DELIVERED;
+  if (totalOrdered > 0 && totalOutForDelivery >= totalOrdered) return ORDER_STATUS.OUT_FOR_DELIVERY;
   if (totalOrdered > 0 && totalShipped >= totalOrdered) return ORDER_STATUS.SHIPPED;
   if (totalShipped > 0) return ORDER_STATUS.PARTIALLY_SHIPPED;
   if (totalAllocated > 0) return ORDER_STATUS.PACKED;
@@ -54,6 +57,7 @@ export const summarizePackageQuantities = (orderItems, packages) => {
   const allocatedByItem = new Map();
   const shippedByItem = new Map();
   const deliveredByItem = new Map();
+  const outForDeliveryByItem = new Map();
 
   for (const pkg of packages) {
     if (pkg.status === "cancelled") continue;
@@ -63,6 +67,7 @@ export const summarizePackageQuantities = (orderItems, packages) => {
       const key = String(line.order_item_id);
       allocatedByItem.set(key, (allocatedByItem.get(key) || 0) + line.quantity);
       if (isShipped) shippedByItem.set(key, (shippedByItem.get(key) || 0) + line.quantity);
+      if (pkg.status === "out_for_delivery") outForDeliveryByItem.set(key, (outForDeliveryByItem.get(key) || 0) + line.quantity);
       if (isDelivered) deliveredByItem.set(key, (deliveredByItem.get(key) || 0) + line.quantity);
     }
   }
@@ -75,6 +80,7 @@ export const summarizePackageQuantities = (orderItems, packages) => {
       allocated_qty: allocatedByItem.get(key) || 0,
       shipped_qty: shippedByItem.get(key) || 0,
       delivered_qty: deliveredByItem.get(key) || 0,
+      out_for_delivery_qty: outForDeliveryByItem.get(key) || 0,
     };
   });
 

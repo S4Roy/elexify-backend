@@ -24,6 +24,8 @@ class PackageResource extends Resource {
       shiprocket_order_id: this.shiprocket_order_id || null,
       shiprocket_shipment_id: this.shiprocket_shipment_id || null,
       awb: this.awb || null,
+      shiprocket_status: this.shiprocket_status || null,
+      shiprocket_status_updated_at: this.shiprocket_status_updated_at || null,
       courier_name: this.courier_name || null,
       etd: this.etd || null,
       tracking_url: this.tracking_url || null,

@@ -1,3 +1,4 @@
+import { shiprocketEventDate, shiprocketStatusFields } from "../../../helpers/order/shiprocketStatus.js";
 import { packageReferenceQuery, orderReferenceQuery } from "../../../helpers/order/shipmentReferences.js";
 import { validReturnWebhookToken } from "../../../services/returnService/webhookAuth.js";
 import { StatusError } from "../../../config/index.js";
@@ -21,6 +22,19 @@ const SHIPMENT_STATUS_EVENTS = {
   [ORDER_STATUS.SHIPPED]: "ORDER_SHIPPED",
   [ORDER_STATUS.OUT_FOR_DELIVERY]: "ORDER_OUT_FOR_DELIVERY",
   [ORDER_STATUS.DELIVERED]: "ORDER_DELIVERED",
+};
+
+// Reconcile even on replay: a previous delivery may have saved the package
+// before failing to update its parent order.
+const reconcilePackageOrder = async (orderId) => {
+  const result = await orderService.recomputeOrderStatus({ orderId, source: "carrier" });
+  const event = SHIPMENT_STATUS_EVENTS[result.order.order_status];
+  if (result.statusChanged && event) {
+    notificationService.sendOrderNotification({
+      order: result.order, event, dedupeKey: `${result.order.id}:${event}`,
+    });
+  }
+  return result;
 };
 
 const processReverseWebhook = async ({ orderIds, awbStr, incoming, courierName, eventTimestamp, shipmentId, token }) => {
@@ -149,8 +163,7 @@ export const updateOrderStatus = async (req, res, next) => {
     // an unparseable value must never reach a Date-typed field as-is (an
     // "Invalid Date" fails Mongoose's cast and throws), so it falls back to
     // "now" instead.
-    const parsedTimestamp = current_timestamp ? new Date(current_timestamp) : new Date();
-    const eventTimestamp = Number.isNaN(parsedTimestamp.valueOf()) ? new Date() : parsedTimestamp;
+    const eventTimestamp = shiprocketEventDate(current_timestamp);
 
     // Reverse shipments are correlated by the return number/Shiprocket id/AWB
     // and update the same customer-visible event log as manual admin actions.
@@ -184,7 +197,7 @@ export const updateOrderStatus = async (req, res, next) => {
       // first — often "AWB Assigned" or similar, which isn't one of our
       // package statuses. Persist them regardless of whether this event also
       // maps to a status transition, instead of discarding the whole event.
-      const metaSet = {};
+      const metaSet = shiprocketStatusFields(current_status || shipment_status, eventTimestamp, pkg);
       if (awbStr && awbStr !== pkg.awb) metaSet.awb = awbStr;
       if (courier_name && courier_name !== pkg.courier_name) metaSet.courier_name = courier_name;
       if (etd && etd !== pkg.etd) metaSet.etd = etd;
@@ -210,9 +223,10 @@ export const updateOrderStatus = async (req, res, next) => {
         if (Object.keys(metaSet).length) {
           await Package.updateOne({ _id: pkg._id }, { $set: metaSet });
         }
+        await reconcilePackageOrder(pkg.order_id);
         return respond({
           status: "success",
-          message: "Already processed (idempotent)",
+          message: "Package already processed; order status reconciled",
           data: { packageId: pkg._id, mapped_status: packageStatus },
         });
       }
@@ -251,19 +265,7 @@ export const updateOrderStatus = async (req, res, next) => {
         }
       }
 
-      const { order: recomputedOrder, statusChanged } = await orderService.recomputeOrderStatus({
-        orderId: pkg.order_id,
-        source: "carrier",
-      });
-
-      const shipmentEvent = SHIPMENT_STATUS_EVENTS[recomputedOrder.order_status];
-      if (statusChanged && shipmentEvent) {
-        notificationService.sendOrderNotification({
-          order: recomputedOrder,
-          event: shipmentEvent,
-          dedupeKey: `${recomputedOrder.id}:${shipmentEvent}`,
-        });
-      }
+      const { order: recomputedOrder } = await reconcilePackageOrder(pkg.order_id);
 
       return respond({
         status: "success",
@@ -290,7 +292,7 @@ export const updateOrderStatus = async (req, res, next) => {
         awb: awbStr,
       });
       return respond({
-        status: "ok",
+        status: "ignored",
         message: "Order not found locally; webhook received",
         incomingOrderId,
         awb: awbStr,
@@ -298,10 +300,10 @@ export const updateOrderStatus = async (req, res, next) => {
     }
     resolvedOrderId = order.id;
     const newStatus = normalizeOrderStatus(incoming.replace(/\s+/g, "_"));
+    Object.assign(order, shiprocketStatusFields(current_status || shipment_status, eventTimestamp, order));
     if (!newStatus) {
-      // Same reasoning as the reverse-shipment branch above — ack with 200
-      // so an unsupported status doesn't loop Shiprocket's retries forever.
-      return respond({ status: "ignored", message: "Unsupported shipment status" });
+      await order.save();
+      return respond({ status: "success", message: "Shiprocket tracking status updated; fulfillment status unchanged" });
     }
     // Historical orders may predate the free-form carrier metadata object.
     // Initialize it before recording AWB/courier details so a valid webhook

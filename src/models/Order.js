@@ -105,6 +105,8 @@ const OrderSchema = new Schema(
     exchange_rate: { type: Number, default: 1 },
     awb: { type: String },
     etd: { type: String },
+    shiprocket_status: { type: String, default: null },
+    shiprocket_status_updated_at: { type: Date, default: null },
     courier_name: { type: String },
     processing_at: { type: Date, default: null },
     shipped_at: { type: Date, default: null },

@@ -1,3 +1,4 @@
+import { canTransitionOrder } from "../../constants/orderStatus.js";
 import { describe, expect, it } from "vitest";
 import { derivePackageOrderStatus, summarizePackageQuantities } from "./derivePackageOrderStatus.js";
 
@@ -74,4 +75,29 @@ describe("summarizePackageQuantities", () => {
     expect(a.allocated_qty).toBe(5);
     expect(a.shipped_qty).toBe(2);
   });
+});
+
+
+describe("out for delivery aggregation", () => {
+  const orders = [{ _id: "a", quantity: 2 }];
+  const pkg = (status, quantity) => ({ status, items: [{ order_item_id: "a", quantity }] });
+  it.each([
+    [[pkg("out_for_delivery", 2)], "out_for_delivery"],
+    [[pkg("out_for_delivery", 1), pkg("shipped", 1)], "shipped"],
+    [[pkg("out_for_delivery", 1), pkg("packed", 1)], "partially_shipped"],
+    [[pkg("out_for_delivery", 1), pkg("delivered", 1)], "partially_delivered"],
+    [[pkg("delivered", 2)], "delivered"],
+  ])("derives the customer status from shipment quantities: %j", (packages, expected) => {
+    expect(derivePackageOrderStatus(summarizePackageQuantities(orders, packages).items)).toBe(expected);
+  });
+});
+
+
+it("allows missed intermediate shipment events and partial delivery after out for delivery", () => {
+  for (const from of ["processing", "packed", "partially_shipped", "shipped"]) {
+    expect(canTransitionOrder(from, "out_for_delivery")).toBe(true);
+  }
+  expect(canTransitionOrder("out_for_delivery", "partially_delivered")).toBe(true);
+  expect(canTransitionOrder("cancelled", "out_for_delivery")).toBe(false);
+  expect(canTransitionOrder("delivered", "out_for_delivery")).toBe(false);
 });

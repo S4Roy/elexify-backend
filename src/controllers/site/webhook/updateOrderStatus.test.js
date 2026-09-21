@@ -31,6 +31,9 @@ const mockRes = () => {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  orderService.recomputeOrderStatus.mockResolvedValue({
+    order: { _id: "order1", id: "ORD-1", order_status: "packed" }, statusChanged: false,
+  });
   Package.findOne.mockResolvedValue(null);
   Order.findOne.mockResolvedValue(null);
   ReturnRequest.findOne.mockResolvedValue(null);
@@ -90,12 +93,12 @@ describe("updateOrderStatus — Shiprocket forward-shipment webhook", () => {
     });
     expect(Package.updateOne).toHaveBeenCalledWith(
       { _id: "pkg1" },
-      { $set: { awb: "59629792084", courier_name: "Delhivery Surface", etd: "2021-07-03" } },
+      { $set: expect.objectContaining({ awb: "59629792084", courier_name: "Delhivery Surface", etd: "2021-07-03", shiprocket_status: "Pickup Scheduled" }) },
     );
     // "Pickup Scheduled" normalizes to "packed" — same as the package's
     // current status — so this must not be treated as a status transition.
     expect(Package.findOneAndUpdate).not.toHaveBeenCalled();
-    expect(orderService.recomputeOrderStatus).not.toHaveBeenCalled();
+    expect(orderService.recomputeOrderStatus).toHaveBeenCalled();
     expect(res.status).toHaveBeenCalledWith(200);
   });
 
@@ -251,7 +254,7 @@ describe("updateOrderStatus — Shiprocket forward-shipment webhook", () => {
     await updateOrderStatus(req, res, vi.fn());
 
     expect(Package.findOneAndUpdate).not.toHaveBeenCalled();
-    expect(orderService.recomputeOrderStatus).not.toHaveBeenCalled();
+    expect(orderService.recomputeOrderStatus).toHaveBeenCalled();
     expect(res.status).toHaveBeenCalledWith(200);
   });
 
@@ -298,9 +301,9 @@ describe("updateOrderStatus — Shiprocket forward-shipment webhook", () => {
     expect(res.status).toHaveBeenCalledWith(200);
   });
 
-  it("acks 200 for a status this app doesn't recognize on a legacy (no-Package) order", async () => {
+  it("preserves an unmapped Shiprocket status on a legacy order", async () => {
     Package.findOne.mockResolvedValue(null);
-    Order.findOne.mockResolvedValue({ id: "ORD-000022", order_status: "processing", meta: {} });
+    Order.findOne.mockResolvedValue({ id: "ORD-000022", order_status: "processing", meta: {}, save: vi.fn().mockResolvedValue(undefined) });
 
     const req = {
       headers: {},
@@ -311,7 +314,7 @@ describe("updateOrderStatus — Shiprocket forward-shipment webhook", () => {
     await updateOrderStatus(req, res, vi.fn());
 
     expect(res.status).toHaveBeenCalledWith(200);
-    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ status: "ignored" }));
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ status: "success" }));
   });
 
   // The whole point of a webhook receiver: never hand the sender a reason
@@ -441,9 +444,9 @@ describe("updateOrderStatus — webhook audit log", () => {
     expect(logged.order_id).toBeNull();
   });
 
-  it("records an ignored call for an unsupported status with no package_id", async () => {
+  it("records a tracking-only update for an unmapped status with no package_id", async () => {
     Package.findOne.mockResolvedValue(null);
-    Order.findOne.mockResolvedValue({ id: "ORD-000031", order_status: "processing", meta: {} });
+    Order.findOne.mockResolvedValue({ id: "ORD-000031", order_status: "processing", meta: {}, save: vi.fn().mockResolvedValue(undefined) });
 
     const req = {
       headers: {},
@@ -455,7 +458,7 @@ describe("updateOrderStatus — webhook audit log", () => {
 
     expect(WebhookLog.create).toHaveBeenCalledTimes(1);
     const logged = WebhookLog.create.mock.calls[0][0];
-    expect(logged.outcome).toBe("ignored");
+    expect(logged.outcome).toBe("processed");
     expect(logged.package_id).toBeNull();
   });
 
@@ -504,4 +507,41 @@ describe('Shiprocket legacy identifier correlation', () => {
     await updateOrderStatus({ headers: {}, body: { shipment_id: 'shipment-1', current_status: 'shipped' } }, mockRes(), vi.fn());
     expect(Order.findOne).not.toHaveBeenCalled();
   });
+});
+
+
+describe("package webhook replay recovery", () => {
+  it("repairs a stale parent after the package status was already saved", async () => {
+    Package.findOne.mockResolvedValue({
+      _id: "pkg1", order_id: "order1", status: "out_for_delivery",
+      timeline: [{ status: "packed" }, { status: "out_for_delivery" }],
+    });
+    orderService.recomputeOrderStatus.mockResolvedValue({
+      order: { _id: "order1", id: "ORD-1", order_status: "out_for_delivery" }, statusChanged: true,
+    });
+    const res = mockRes();
+    await updateOrderStatus({ headers: {}, body: { order_id: "123", current_status: "OUT FOR DELIVERY" } }, res, vi.fn());
+    expect(Package.findOneAndUpdate).not.toHaveBeenCalled();
+    expect(orderService.recomputeOrderStatus).toHaveBeenCalledWith({ orderId: "order1", source: "carrier" });
+    expect(notificationService.sendOrderNotification).toHaveBeenCalledWith(expect.objectContaining({ event: "ORDER_OUT_FOR_DELIVERY" }));
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ status: "success" }));
+  });
+
+  it("does not send another notification when replay leaves the order unchanged", async () => {
+    Package.findOne.mockResolvedValue({ _id: "pkg1", order_id: "order1", status: "packed", timeline: [{ status: "packed" }] });
+    await updateOrderStatus({ headers: {}, body: { order_id: "123", current_status: "OUT FOR PICKUP" } }, mockRes(), vi.fn());
+    expect(orderService.recomputeOrderStatus).toHaveBeenCalled();
+    expect(notificationService.sendOrderNotification).not.toHaveBeenCalled();
+  });
+});
+
+
+it("persists RTO tracking without marking a package delivered or refunded", async () => {
+  Package.findOne.mockResolvedValue({ _id: "pkg1", order_id: "order1", status: "shipped" });
+  await updateOrderStatus({ headers: {}, body: { order_id: "123", current_status: "RTO IN TRANSIT", current_timestamp: "21 09 2026 08:30:00" } }, mockRes(), vi.fn());
+  expect(Package.updateOne).toHaveBeenCalledWith({ _id: "pkg1" }, { $set: {
+    shiprocket_status: "RTO IN TRANSIT", shiprocket_status_updated_at: new Date("2026-09-21T03:00:00Z"),
+  } });
+  expect(Package.findOneAndUpdate).not.toHaveBeenCalled();
+  expect(orderService.recomputeOrderStatus).not.toHaveBeenCalled();
 });

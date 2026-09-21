@@ -62,7 +62,7 @@ describe("syncShiprocketStatus", () => {
 
     const result = await syncShiprocketStatus({ orderId: "order1", adminId: "admin1" });
 
-    expect(Package.updateOne).toHaveBeenCalledWith({ _id: "pkg1" }, { $set: { awb: "AWB2" } });
+    expect(Package.updateOne).toHaveBeenCalledWith({ _id: "pkg1" }, { $set: expect.objectContaining({ awb: "AWB2", shiprocket_status: "Delivered" }) });
     expect(notificationService.sendOrderNotification).not.toHaveBeenCalled();
     expect(result.changed).toBe(true);
   });
@@ -86,7 +86,7 @@ describe("syncShiprocketStatus", () => {
     expect(applyManualOrderStatusChange).toHaveBeenCalledWith(
       expect.objectContaining({ order, status: "delivered", changedBy: "admin1" }),
     );
-    expect(Order.updateOne).toHaveBeenCalledWith({ _id: "order1" }, { $set: { awb: "AWB3" } });
+    expect(Order.updateOne).toHaveBeenCalledWith({ _id: "order1" }, { $set: expect.objectContaining({ awb: "AWB3", shiprocket_status: "Delivered" }) });
     expect(notificationService.sendOrderNotification).toHaveBeenCalledWith(
       expect.objectContaining({ event: "ORDER_DELIVERED" }),
     );

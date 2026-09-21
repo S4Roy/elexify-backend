@@ -1,3 +1,4 @@
+import { shiprocketStatusFields } from "../../../helpers/order/shiprocketStatus.js";
 import Order from "../../../models/Order.js";
 import Package from "../../../models/Package.js";
 import { StatusError } from "../../../config/index.js";
@@ -69,7 +70,7 @@ export const syncShiprocketStatus = async ({ orderId, adminId, shiprocketOrderId
         continue;
       }
 
-      const metaSet = {};
+      const metaSet = shiprocketStatusFields(shipment.current_status || remote.status, new Date(), pkg);
       if (shipment.id && String(shipment.id) !== pkg.shiprocket_shipment_id) metaSet.shiprocket_shipment_id = String(shipment.id);
       if (shipment.awb && shipment.awb !== pkg.awb) metaSet.awb = shipment.awb;
       if (shipment.courier_name && shipment.courier_name !== pkg.courier_name) metaSet.courier_name = shipment.courier_name;
@@ -120,7 +121,7 @@ export const syncShiprocketStatus = async ({ orderId, adminId, shiprocketOrderId
   }
   const shipment = Array.isArray(remote?.shipments) ? remote.shipments[0] : remote?.shipments;
 
-  const metaUpdates = {};
+  const metaUpdates = shiprocketStatusFields(shipment?.current_status || remote?.status, new Date(), order);
   if (shipment?.awb && shipment.awb !== order.awb) metaUpdates.awb = shipment.awb;
   if (shipment?.courier_name && shipment.courier_name !== order.courier_name) metaUpdates.courier_name = shipment.courier_name;
   if (shipment?.etd && shipment.etd !== order.etd) metaUpdates.etd = shipment.etd;

@@ -55,12 +55,12 @@ const ALLOWED_TRANSITIONS = {
   // (beyond "packed") let a multi-package order's derived status jump more
   // than one nominal step when concurrent package webhooks race — the
   // derivation function guarantees these jumps are always forward/correct.
-  processing: ["packed", "shipped", "cancelled", "partially_shipped", "partially_delivered", "delivered"],
-  packed: ["shipped", "cancelled", "partially_shipped", "partially_delivered", "delivered"],
-  partially_shipped: ["shipped", "partially_delivered", "delivered"],
+  processing: ["packed", "shipped", "cancelled", "partially_shipped", "partially_delivered", "out_for_delivery", "delivered"],
+  packed: ["shipped", "cancelled", "partially_shipped", "partially_delivered", "out_for_delivery", "delivered"],
+  partially_shipped: ["shipped", "out_for_delivery", "partially_delivered", "delivered"],
   shipped: ["out_for_delivery", "delivered", "partially_delivered"],
   partially_delivered: ["delivered", "return_requested"],
-  out_for_delivery: ["delivered"],
+  out_for_delivery: ["partially_delivered", "delivered"],
   delivered: ["return_requested"],
   return_requested: ["returned"],
 };
