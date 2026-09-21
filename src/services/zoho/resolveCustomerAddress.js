@@ -22,7 +22,11 @@ export const resolveCustomerAddress = async (address = {}) => {
   if (!result.state_code) {
     const name = result.state_name || (typeof result.state === 'string' ? result.state : result.state?.name);
     if (name) {
-      const state = await State.findOne({ name, country_code: result.country_code || 'IN' }).lean();
+      const escaped = name.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const state = await State.findOne({
+        name: new RegExp(`^${escaped}$`, 'i'),
+        country_code: result.country_code || 'IN',
+      }).lean();
       if (state) {
         result.state_code = state.iso2 || state.iso3166_2?.split('-').pop();
         result.country_code ||= state.country_code;
