@@ -58,7 +58,10 @@ export const buildPackagePayload = ({ order_data, shiprocketConfig, pkg, pickupL
       ? order_data.cod_due_amount
       : order_data.grand_total || order_data.sub_total || order_data.subtotal || 0,
   );
-  const shippingChargesValue = Number(order_data.shipping_charges || order_data.shipping || 0);
+  // COD handling is a separate stored charge already included in grand_total.
+  // Shiprocket receives it as shipping, so never add it to the collectible again.
+  const shippingChargesValue = Number(order_data.shipping_charges ?? order_data.shipping ?? 0)
+    + Number(order_data.cod_fee || 0);
   const giftwrapChargesValue = Number(order_data.giftwrap_charges || 0);
   const transactionChargesValue = Number(order_data.transaction_charges || 0);
   const discountValue = Number(order_data.discount || 0);

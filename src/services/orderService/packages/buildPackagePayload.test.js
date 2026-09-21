@@ -16,6 +16,55 @@ const build = (order_data) => buildPackagePayload({
   dims: { length: 10, width: 10, height: 10, weight: 0.5 },
 });
 
+describe("Shiprocket COD charges", () => {
+  const order = {
+    payment_method: "cod", shipping: 314, cod_fee: 50, grand_total: 3114,
+    order_items: [{ ...baseOrder.order_items[0], unit_price: 2750 }],
+  };
+  const payable = payload => payload.sub_total + payload.shipping_charges
+    + payload.giftwrap_charges + payload.transaction_charges - payload.total_discount;
+
+  it("includes the COD fee in shipping without inflating the product value or collection", () => {
+    const payload = build(order);
+    expect(payload.shipping_charges).toBe(364);
+    expect(payload.sub_total).toBe(2750);
+    expect(payable(payload)).toBe(3114);
+  });
+
+  it("preserves the remaining balance for partial COD without collecting the advance twice", () => {
+    const payload = build({ ...order, is_partial_cod: true, advance_amount: 622.8, cod_due_amount: 2491.2 });
+    expect(payload.shipping_charges).toBe(364);
+    expect(payload.order_items[0].selling_price).toBe(2750);
+    expect(payable(payload)).toBeCloseTo(2491.2, 2);
+  });
+
+  it("allocates shipping and the COD fee across split packages", () => {
+    const order_data = { ...baseOrder, ...order,
+      order_items: [{ ...order.order_items[0], quantity: 2 }], grand_total: 5864 };
+    const first = build(order_data);
+    const second = build(order_data);
+    expect(first.shipping_charges).toBe(182);
+    expect(first.shipping_charges + second.shipping_charges).toBe(364);
+    expect(first.sub_total + second.sub_total).toBe(5500);
+    expect(payable(first) + payable(second)).toBe(5864);
+  });
+
+  it("preserves prepaid amounts when there is no COD fee", () => {
+    const payload = build({ ...order, payment_method: "razorpay", cod_fee: 0, grand_total: 3064 });
+    expect(payload.shipping_charges).toBe(314);
+    expect(payload.sub_total).toBe(2750);
+    expect(payable(payload)).toBe(3064);
+  });
+
+  it("preserves order discounts and other charges", () => {
+    const payload = build({ ...order, discount: 100, giftwrap_charges: 20,
+      transaction_charges: 10, grand_total: 3044 });
+    expect(payload.sub_total).toBe(2750);
+    expect(payload.total_discount).toBe(100);
+    expect(payable(payload)).toBe(3044);
+  });
+});
+
 describe("Shiprocket package address", () => {
   it("limits long shipping cities while retaining the full locality and existing address", () => {
     const city = "Greater Kailash Part Two Near Central Market New Delhi";
