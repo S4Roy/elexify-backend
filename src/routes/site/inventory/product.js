@@ -1,3 +1,4 @@
+import { requireRecaptcha } from "../../../middleware/recaptcha.js";
 import { Router } from "express";
 import { inventoryController } from "../../../controllers/site/index.js";
 import { inventoryValidation } from "../../../validations/site/index.js";
@@ -84,7 +85,7 @@ productRouter.post(
 );
 
 productRouter.post(
-  "/enquiry",
+  "/enquiry", requireRecaptcha("contact"),
   inventoryValidation.productValidation.enquiry,
   inventoryController.productController.enquiry
 );

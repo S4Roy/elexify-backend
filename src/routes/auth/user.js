@@ -1,3 +1,4 @@
+import { requireRecaptcha } from "../../middleware/recaptcha.js";
 import { Router } from "express";
 import { authController } from "../../controllers/index.js";
 // import {
@@ -11,42 +12,42 @@ import { authValidation } from "../../validations/index.js";
 const userAuthRouter = Router();
 
 userAuthRouter.post(
-  "/signup",
+  "/signup", requireRecaptcha("registration"),
   authValidation.loginValidation.signup,
   authController.userSignup
 );
 userAuthRouter.post(
-  "/login",
+  "/login", requireRecaptcha("login"),
   authValidation.loginValidation.adminLogin,
   authController.userLogin
 );
 userAuthRouter.post(
-  "/request-password-reset",
+  "/request-password-reset", requireRecaptcha("forgot_password"),
   authValidation.loginValidation.requestPasswordReset,
   authController.requestPasswordReset
 );
 
 userAuthRouter.post(
-  "/reset-password",
+  "/reset-password", requireRecaptcha("forgot_password"),
   authValidation.loginValidation.resetPassword,
   authController.resetPassword
 );
 
 // OTP Based Login
 userAuthRouter.post(
-  "/send-otp",
+  "/send-otp", requireRecaptcha("login"),
   authValidation.loginValidation.sendOtp,
   authController.sendOtpToUser
 );
 userAuthRouter.post(
-  "/verify-otp",
+  "/verify-otp", requireRecaptcha("login"),
   authValidation.loginValidation.verifyOtp,
   authController.verifyUserOtp
 );
 
 // Google Sign-In
 userAuthRouter.post(
-  "/google",
+  "/google", requireRecaptcha("login"),
   authValidation.loginValidation.googleLogin,
   authController.googleLogin
 );

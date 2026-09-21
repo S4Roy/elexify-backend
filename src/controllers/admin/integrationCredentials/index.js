@@ -1,3 +1,4 @@
+import { RECAPTCHA_DEFAULTS, RECAPTCHA_ACTIONS, validateRecaptchaConfig } from "../../../services/recaptcha/config.js";
 import nodemailer from "nodemailer";
 import IntegrationCredential from "../../../models/IntegrationCredential.js";
 import Token from "../../../models/Token.js";
@@ -13,6 +14,7 @@ import { getRazorpayClient } from "../../../services/integrationCredentials/razo
 import { getIntegrationConfig } from "../../../services/integrationCredentials/index.js";
 
 const PROVIDERS = {
+  recaptcha: { label: "reCAPTCHA v3", fields: ["site_key", "secret_key", "allowed_hostnames", "mode", "score_threshold", "checkout_attempts", ...RECAPTCHA_ACTIONS.map(action => `protect_${action}`)], secret: ["secret_key"], plain: ["site_key", "allowed_hostnames", ...Object.keys(RECAPTCHA_DEFAULTS)] },
   shiprocket: { label: "Shiprocket", fields: ["email", "password", "channel_id", "pickup_location"], secret: ["password"], plain: ["channel_id", "pickup_location"] },
   zoho: { label: "Zoho Books", fields: ["org_id", "client_id", "client_secret", "refresh_token", "base_url"], secret: ["client_secret", "refresh_token"] },
   google: { label: "Google Sign-In", fields: ["client_id"], secret: [] },
@@ -29,7 +31,7 @@ const descriptor = async (provider) => {
     : "";
   const fields = Object.fromEntries(definition.fields.map((field) => {
     const configured = stored.has(field);
-    const plainValue = configured ? decryptCredential(stored.get(field)) : null;
+    const plainValue = configured ? decryptCredential(stored.get(field)) : provider === "recaptcha" ? RECAPTCHA_DEFAULTS[field] || null : null;
     // Non-secret operational fields (e.g. Shiprocket's pickup location
     // nickname) are shown in cleartext so the admin can pick/verify the
     // exact value instead of matching it against a masked placeholder.
@@ -42,7 +44,7 @@ const descriptor = async (provider) => {
     }];
   }));
   return {
-    provider, label: definition.label, enabled: doc?.enabled ?? true,
+    provider, label: definition.label, enabled: doc?.enabled ?? (provider !== "recaptcha"),
     configured: definition.fields.some((field) => stored.has(field)), fields,
     ...(provider === "razorpay" ? {
       mode: razorpayKeyId.startsWith("rzp_live_")
@@ -78,12 +80,17 @@ export const update = async (req, res, next) => {
     if (unknown.length) throw StatusError.badRequest(`Unsupported credential field: ${unknown[0]}`);
 
     let doc = await IntegrationCredential.findOne({ provider }).select("+credentials");
-    if (!doc) doc = new IntegrationCredential({ provider, created_by: req.auth.user_id });
+    if (!doc) doc = new IntegrationCredential({ provider, enabled: provider !== "recaptcha", created_by: req.auth.user_id });
     for (const [key, value] of Object.entries(supplied)) {
       if (value === "" || value == null) continue; // blank means preserve the write-only value
       doc.credentials.set(key, encryptCredential(String(value).trim()));
     }
     if (typeof req.body.enabled === "boolean") doc.enabled = req.body.enabled;
+    if (provider === "recaptcha" && doc.enabled) {
+      const values = Object.fromEntries([...doc.credentials.entries()].map(([key, value]) => [key, decryptCredential(value)]));
+      try { validateRecaptchaConfig({ ...RECAPTCHA_DEFAULTS, ...values }); }
+      catch (error) { throw StatusError.badRequest(error.message); }
+    }
     doc.updated_by = req.auth.user_id;
     doc.last_test_status = null;
     doc.last_test_message = null;
@@ -170,7 +177,11 @@ export const test = async (req, res, next) => {
     if (!doc.enabled) throw StatusError.badRequest("Enable the integration before testing.");
     await Token.updateOne({ provider }, { $set: { access_token: null, expires_at: new Date(0) } });
     let message = "Connection verified";
-    if (provider === "shiprocket") message = await testShiprocket();
+    if (provider === "recaptcha") {
+      validateRecaptchaConfig({ ...RECAPTCHA_DEFAULTS, ...await getIntegrationConfig("recaptcha") });
+      message = "Configuration format validated. Verify the key pair and domain with a storefront submission in monitor mode; this check does not verify a live token.";
+    }
+    else if (provider === "shiprocket") message = await testShiprocket();
     else if (provider === "zoho") await getZohoToken();
     else if (provider === "smtp") message = await testSmtp();
     else if (provider === "google") {

@@ -5,7 +5,7 @@ const OperationalEventSchema = new Schema({
   event_type: {
     type: String,
     enum: [
-      "illegal_order_transition", "illegal_payment_transition", "carrier_transition_rejected",
+      "recaptcha_verification", "illegal_order_transition", "illegal_payment_transition", "carrier_transition_rejected",
       "razorpay_webhook_failed", "webhook_dead_letter", "provider_attempt_orphaned",
       "provider_reconciliation_failed", "refund_failed", "transaction_aborted",
     ],

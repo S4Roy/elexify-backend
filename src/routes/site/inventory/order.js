@@ -1,3 +1,4 @@
+import { requireRecaptcha } from "../../../middleware/recaptcha.js";
 import { validateAccessToken } from "../../../middleware/accessToken.js";
 import { Router } from "express";
 import { inventoryController } from "../../../controllers/site/index.js";
@@ -12,7 +13,7 @@ orderRouter.get(
 );
 
 orderRouter.post(
-  "/place",
+  "/place", requireRecaptcha("checkout"),
   inventoryValidation.orderValidation.place,
   inventoryController.orderController.add
 );
@@ -21,7 +22,7 @@ orderRouter.post(
   inventoryValidation.orderValidation.verifyPayment,
   inventoryController.orderController.verifyPayment
 );
-orderRouter.post("/retry-payment", validateAccessToken, inventoryController.orderController.retryPayment);
+orderRouter.post("/retry-payment", requireRecaptcha("checkout"), validateAccessToken, inventoryController.orderController.retryPayment);
 orderRouter.post(
   "/cancel",
   inventoryValidation.orderValidation.cancel,
