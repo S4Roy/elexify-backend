@@ -224,5 +224,6 @@
 	"Mobile number updated and verified successfully": "Mobile number updated and verified successfully",
 	"SMS templates fetched successfully": "SMS templates fetched successfully",
 	"SMS template fetched successfully": "SMS template fetched successfully",
-	"Webhook logs fetched successfully": "Webhook logs fetched successfully"
+	"Webhook logs fetched successfully": "Webhook logs fetched successfully",
+	"Customer not found": "Customer not found"
 }
