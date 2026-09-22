@@ -45,12 +45,6 @@ export const attemptRefund = async (order) => {
     return Order.findById(order._id);
   }
 
-  notificationService.sendOrderNotification({
-    order: claimed,
-    event: "REFUND_INITIATED",
-    dedupeKey: `${claimed.id}:REFUND_INITIATED`,
-  });
-
   const razorpayPaymentId = claimed.payment_meta?.razorpay_payment_id;
 
   try {
@@ -75,6 +69,13 @@ export const attemptRefund = async (order) => {
       amountInPaise,
       idempotencyKey
     );
+
+    notificationService.sendOrderNotification({
+      order: claimed,
+      event: "REFUND_INITIATED",
+      data: { refund_amount: (refundResponse?.amount ?? amountInPaise) / 100 },
+      dedupeKey: `${claimed.id}:REFUND_INITIATED`,
+    });
 
     const isProcessed = refundResponse?.status === "processed";
 

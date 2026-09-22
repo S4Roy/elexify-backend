@@ -16,7 +16,14 @@ export const sendOrderNotification = ({ order, event, data = {}, dedupeKey }) =>
       sendNotification({
         userId: order.user,
         event,
-        data: { order_id: order.id, ...orderEmailData, ...data },
+        data: {
+          order_id: order.id,
+          ...orderEmailData,
+          ...(event === "PAYMENT_SUCCESS" ? {
+            payment_amount: order.is_partial_cod ? order.advance_amount : order.grand_total,
+          } : {}),
+          ...data,
+        },
         dedupeKey,
       })
     )
