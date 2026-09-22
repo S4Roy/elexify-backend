@@ -14,6 +14,7 @@ const AuditLogSchema = new Schema(
       type: String,
       required: true,
       enum: [
+        "RBAC_OWNER_SEEDED", "RBAC_ADMIN_ACTION", "RBAC_ROLE_CREATED", "RBAC_ROLE_UPDATED", "RBAC_ROLE_DELETED", "RBAC_STAFF_CREATED", "RBAC_STAFF_UPDATED", "RBAC_ROLE_ASSIGNED",
         "EMAIL_CHANGE_REQUESTED",
         "EMAIL_CHANGED",
         "CUSTOMER_ADDRESS_UPDATED",

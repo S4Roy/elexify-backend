@@ -1,3 +1,4 @@
+import { hasPermission } from '../../../services/rbac/authorization.js';
 import Page from "../../../models/Page.js";
 import { StatusError } from "../../../config/index.js";
 
@@ -20,6 +21,9 @@ export const add = async (req, res, next) => {
     // Check if page with the slug already exists
     const existingPage = await Page.findOne({ slug: trimmedSlug });
 
+    if (!hasPermission(req, existingPage ? 'pages.update' : 'pages.create')) {
+      throw StatusError.forbidden('You do not have permission to perform this action.');
+    }
     if (existingPage) {
       // 🔹 Update
       existingPage.title = title || existingPage.title;

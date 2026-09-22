@@ -1,3 +1,4 @@
+import { ROLE_PERMISSIONS } from "../../constants/adminPermissions.js";
 import ZohoIntegrationLog from "../../models/ZohoIntegrationLog.js";
 import Order from "../../models/Order.js";
 import User from "../../models/User.js";
@@ -20,7 +21,7 @@ vi.mock("../../models/ZohoIntegrationLog.js", () => ({ default: { create: vi.fn(
 const app = role => {
   const server = express();
   server.use(express.json());
-  server.use((req, res, next) => { req.auth = { role, user_id: "507f1f77bcf86cd799439011" }; next(); });
+  server.use((req, res, next) => { req.authorization = { permissions: new Set(ROLE_PERMISSIONS[role] || []) }; req.auth = { role, user_id: "507f1f77bcf86cd799439011" }; next(); });
   server.use(zohoBooksRouter);
   server.use(errors());
   server.use((error, req, res, next) => res.status(error.statusCode || 500).json({ message: error.message }));

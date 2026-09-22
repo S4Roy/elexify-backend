@@ -1,3 +1,4 @@
+import Role from "../../models/Role.js";
 import User from "../../models/User.js";
 import UserResource from "../../resources/UserResource.js";
 import { StatusError } from "../../config/index.js";
@@ -20,9 +21,7 @@ export const adminLogin = async (req, res, next) => {
 
     const user = await User.findOne({
       email,
-      role: {
-        $in: ["superadmin", "manager", "operator", "supervisor", "staff"],
-      },
+      admin_role_id: { $ne: null },
       deleted_at: null,
     }).exec();
 
@@ -44,6 +43,9 @@ export const adminLogin = async (req, res, next) => {
         req.__("The password you entered is incorrect")
       );
     }
+    const adminRole = await Role.findOne({ _id: user.admin_role_id, status: "active", deleted_at: null }).lean();
+    if (!adminRole) throw StatusError.forbidden("Admin access is unavailable.");
+
     // Generate JWT Token
     const token = await userService.generateTokens({
       user_id: user._id,

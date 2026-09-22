@@ -46,12 +46,12 @@ orderRouter.get("/create-options", requirePermission(PERMISSIONS.ORDER_CREATE), 
 orderRouter.post("/quote", requirePermission(PERMISSIONS.ORDER_CREATE), quote, inventoryController.orderController.add);
 
 orderRouter.get(
-  "/list",
+  "/list", requirePermission("orders.view"),
   inventoryValidation.orderValidation.list,
   inventoryController.orderController.list
 );
 orderRouter.get(
-  "/export",
+  "/export", requirePermission("orders.export"),
   celebrate({ query: Joi.object({
     import_source: Joi.string().valid("backup", "other").optional().allow("", null),
     customer_id: Joi.string().pattern(/^[0-9a-fA-F]{24}$/).optional().allow("", null)
@@ -70,17 +70,17 @@ orderRouter.get(
   inventoryController.orderController.exportOrders,
 );
 orderRouter.get(
-  "/customer-options",
+  "/customer-options", requirePermission("orders.view"),
   celebrate({ query: Joi.object({ search: Joi.string().max(100).allow("") }) }),
   inventoryController.orderController.customerOptions,
 );
-orderRouter.post("/shipping", inventoryController.orderController.shipping);
-orderRouter.get("/package/list", inventoryController.orderController.listPackages);
-orderRouter.post("/package/retry", inventoryController.orderController.retryPackage);
-orderRouter.post("/package/cancel", inventoryController.orderController.cancelPackage);
+orderRouter.post("/shipping", requirePermission("orders.fulfill"), inventoryController.orderController.shipping);
+orderRouter.get("/package/list", requirePermission("orders.view"), inventoryController.orderController.listPackages);
+orderRouter.post("/package/retry", requirePermission("orders.fulfill"), inventoryController.orderController.retryPackage);
+orderRouter.post("/package/cancel", requirePermission("orders.fulfill"), inventoryController.orderController.cancelPackage);
 
 orderRouter.get(
-  "/details",
+  "/details", requirePermission("orders.view"),
   // inventoryValidation.orderValidation.list,
   inventoryController.orderController.order_details
 );
@@ -90,29 +90,29 @@ orderRouter.post(
   inventoryValidation.orderValidation.place,
   inventoryController.orderController.add
 );
-orderRouter.get("/stats", inventoryController.orderController.stats);
-orderRouter.get("/trend", inventoryController.orderController.trend);
+orderRouter.get("/stats", requirePermission("orders.view"), inventoryController.orderController.stats);
+orderRouter.get("/trend", requirePermission("orders.view"), inventoryController.orderController.trend);
 orderRouter.get(
-  "/performance",
+  "/performance", requirePermission("orders.view"),
   inventoryController.orderController.performance
 );
 orderRouter.get(
-  "/leaderboard",
+  "/leaderboard", requirePermission("orders.view"),
   inventoryController.orderController.leaderboard
 );
 orderRouter.get(
-  "/geo-stats",
+  "/geo-stats", requirePermission("orders.view"),
   inventoryController.orderController.geoStats
 );
 orderRouter.post(
   "/cancel",
-  requirePermission(PERMISSIONS.ORDER_CANCEL_MANAGE),
+  requirePermission(PERMISSIONS.ORDER_CANCEL_MANAGE, "orders.refund"),
   inventoryValidation.orderValidation.cancel,
   inventoryController.orderController.cancel
 );
 orderRouter.post(
   "/cancel/force",
-  requirePermission(PERMISSIONS.ORDER_FORCE_CANCEL),
+  requirePermission(PERMISSIONS.ORDER_FORCE_CANCEL, "orders.refund"),
   inventoryValidation.orderValidation.forceCancel,
   inventoryController.orderController.forceCancel
 );
@@ -206,12 +206,12 @@ orderRouter.get(
   inventoryController.orderController.reconciliationList,
 );
 orderRouter.post(
-  "/refund/retry",
+  "/refund/retry", requirePermission("orders.refund"),
   inventoryValidation.orderValidation.retryRefund,
   inventoryController.orderController.retryRefund
 );
-orderRouter.get("/invoice", inventoryController.orderController.invoice);
-orderRouter.get("/invoice/zoho", inventoryController.orderController.zohoInvoiceStatus);
+orderRouter.get("/invoice", requirePermission("orders.view"), inventoryController.orderController.invoice);
+orderRouter.get("/invoice/zoho", requirePermission("orders.view"), inventoryController.orderController.zohoInvoiceStatus);
 orderRouter.post(
   "/invoice/zoho/sync",
   requirePermission(PERMISSIONS.ZOHO_INVOICE_MANAGE),
@@ -237,12 +237,14 @@ orderRouter.post(
 );
 orderRouter.post(
   "/returns/inspect",
+  requirePermission("orders.refund"),
   requirePermission(PERMISSIONS.RETURN_REVIEW),
   inventoryValidation.orderValidation.inspectReturn,
   inventoryController.orderController.inspectReturn,
 );
 orderRouter.post(
   "/returns/manual-refund/complete",
+  requirePermission("orders.refund"),
   requirePermission(PERMISSIONS.RETURN_REVIEW),
   inventoryValidation.orderValidation.completeManualRefund,
   inventoryController.orderController.completeManualRefund,
@@ -254,7 +256,7 @@ orderRouter.post(
   inventoryController.orderController.updatePickup,
 );
 
-orderRouter.post('/returns/operation', requirePermission(PERMISSIONS.RETURN_REVIEW), celebrate({ body: Joi.object({
+orderRouter.post('/returns/operation', (req, res, next) => req.body.operation === 'refund' ? requirePermission('orders.refund')(req, res, next) : next(), requirePermission(PERMISSIONS.RETURN_REVIEW), celebrate({ body: Joi.object({
   return_request_id: Joi.string().hex().length(24).required(),
   operation: Joi.string().valid('book', 'track', 'replacement', 'refund').required(),
   warehouse: Joi.string().trim().max(100).allow('').optional(),

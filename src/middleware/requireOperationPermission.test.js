@@ -1,3 +1,4 @@
+import { ROLE_PERMISSIONS } from "../constants/adminPermissions.js";
 import { describe, expect, it } from "vitest";
 import { requireOperationPermission, requireDataView, requireOperationHistoryView } from "./requireOperationPermission.js";
 
@@ -7,7 +8,7 @@ import { requireOperationPermission, requireDataView, requireOperationHistoryVie
 // validations/admin/emailTemplate/emailTemplate.validation.test.js.
 const runMiddleware = (middleware, { role, params = {} }) =>
   new Promise((resolve) => {
-    const req = { auth: role ? { role } : null, params };
+    const req = { auth: role ? { role } : null, params, ...(role ? { authorization: { permissions: new Set(ROLE_PERMISSIONS[role] || []) } } : {}) };
     const res = {};
     middleware(req, res, (err) => resolve(err));
   });
@@ -22,7 +23,7 @@ describe("requireOperationPermission — RBAC gate for /admin/data-operations/:k
   it("denies an unauthenticated request (no role on req.auth)", async () => {
     const err = await runMiddleware(requireOperationPermission("view"), { role: null, params: { key: "email-templates" } });
     expect(err).toBeTruthy();
-    expect(err.statusCode).toBe(403);
+    expect(err.statusCode).toBe(401);
   });
 
   it("allows manager to VIEW a SEEDER-type operation (email-templates) but DENIES execute", async () => {

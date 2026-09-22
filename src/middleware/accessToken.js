@@ -12,8 +12,10 @@ export const validateAccessToken = async (req, res, next) => {
     const token = req.headers.authorization?.split(" ")[1];
     const guest_id = req.headers["x-guest-id"] || null;
 
-    if (!token) throw StatusError.forbidden("Please login to continue.");
-    const decodedData = await userService.verifyToken(token);
+    if (!token) throw StatusError.unauthorized("Please login to continue.");
+    let decodedData;
+    try { decodedData = await userService.verifyToken(token); }
+    catch { throw StatusError.unauthorized("Invalid access token."); }
     if (!decodedData) throw StatusError.unauthorized("Invalid access token.");
 
     const userDetails = decodedData;

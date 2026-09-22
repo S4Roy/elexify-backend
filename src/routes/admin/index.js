@@ -1,3 +1,4 @@
+import { roleRouter } from "./role.js";
 import { Router } from "express";
 import { inventoryRouter } from "./inventory/index.js";
 import { masterRouter } from "./master/index.js";
@@ -36,6 +37,7 @@ import { zohoBooksRouter } from "./zohoBooks.js";
 
 const v1AdminRouter = Router();
 // All routes go here
+v1AdminRouter.use("/role", roleRouter);
 
 v1AdminRouter.use("/inventory", inventoryRouter);
 v1AdminRouter.use("/master", masterRouter);

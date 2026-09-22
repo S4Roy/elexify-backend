@@ -8,7 +8,8 @@ import swaggerUi from "swagger-ui-express";
 import { handleError, morganConf, StatusSuccess } from "./config/index.js";
 import fileUpload from "express-fileupload";
 import Pusher from "pusher";
-import mongoose from "./config/mongoose.js";
+import mongoose, { mongooseConnection } from "./config/mongoose.js";
+import { ensureOwnerAccess } from "./services/rbac/owner.js";
 import * as middleware from "./middleware/index.js";
 import i18n from "i18n";
 import cron from "node-cron";
@@ -308,6 +309,11 @@ app.use(handleError);
 // Start the Server
 const PORT = process.env.SERVER_PORT || 3000;
 const HOSTNAME = process.env.SERVER_HOSTNAME || "localhost";
+
+// Refresh the protected owner before accepting traffic; bootstrap failures fail startup.
+await mongooseConnection;
+if (mongoose.connection.readyState !== 1) throw new Error("Database unavailable during RBAC bootstrap");
+await ensureOwnerAccess();
 
 app.listen(PORT, HOSTNAME, () => {
   console.log(`Server running at http://${HOSTNAME}:${PORT}/`);

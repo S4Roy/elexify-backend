@@ -1,3 +1,4 @@
+import { ROLE_PERMISSIONS } from "../../../constants/adminPermissions.js";
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 import mongoose from 'mongoose';
 import Address from '../../../models/Address.js';
@@ -36,9 +37,9 @@ describe('customer address input and permissions', () => {
   ])('rejects invalid or protected input %j', change => {
     expect(addressEditSchema.validate({ ...input, ...change }).error).toBeDefined();
   });
-  it.each(['superadmin', 'manager', 'staff', 'supervisor', 'operator', 'customer'])('gates %s on the server', role => {
+  it.each(['superadmin', 'manager', 'staff', 'supervisor', 'operator', 'customer'])('gates %s on the server', async role => {
     const next = vi.fn();
-    requirePermission(PERMISSIONS.CUSTOMER_ADDRESS_MANAGE)({ auth: { role } }, {}, next);
+    await requirePermission(PERMISSIONS.CUSTOMER_ADDRESS_MANAGE)({ authorization: { permissions: new Set(ROLE_PERMISSIONS[role] || []) } }, {}, next);
     if (['superadmin', 'manager'].includes(role)) expect(next).toHaveBeenCalledWith();
     else expect(next.mock.calls[0][0].statusCode).toBe(403);
   });

@@ -1,3 +1,4 @@
+import { requirePermission } from "../../middleware/requirePermission.js";
 import { Router } from "express";
 import { contactUsController } from "../../controllers/admin/index.js";
 import { contactUsValidation } from "../../validations/admin/index.js";
@@ -5,17 +6,17 @@ import { contactUsValidation } from "../../validations/admin/index.js";
 const contactUsRouter = Router();
 
 contactUsRouter.get(
-  "/list",
+  "/list", requirePermission("contacts.view"),
   contactUsValidation.list,
   contactUsController.list
 );
 contactUsRouter.put(
-  "/edit",
+  "/edit", requirePermission("contacts.update"),
   contactUsValidation.edit,
   contactUsController.edit
 );
 contactUsRouter.delete(
-  "/delete",
+  "/delete", requirePermission("contacts.delete"),
   contactUsValidation.remove,
   contactUsController.remove
 );

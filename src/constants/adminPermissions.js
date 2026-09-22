@@ -1,9 +1,6 @@
-// Minimal, additive RBAC layer for the Phase 2 customer/notification admin
-// endpoints. No granular permission system exists elsewhere in this
-// codebase (only the coarse role allowlist in
-// middleware/userAdminAccessControl.js) — this is a small static role→
-// permission map, not a parallel authorization system: it only gates the
-// new routes in routes/admin/customer.js and routes/admin/notification.js.
+// Existing permission keys are retained for API compatibility.
+// ROLE_PERMISSIONS below is migration seed data only; runtime guards resolve
+// Role.permissions from MongoDB and never authorize by these labels.
 
 export const PERMISSIONS = {
   CUSTOMER_ADDRESS_MANAGE: "customer.address.manage",

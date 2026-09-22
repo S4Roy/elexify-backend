@@ -5,6 +5,8 @@ const { Schema, model, Types } = mongoose;
 
 const UserSchema = new Schema(
   {
+    rbac_migrated: { type: Boolean, default: false },
+    admin_role_id: { type: Types.ObjectId, ref: "roles", default: null, index: true },
     legacy_import: { type: Object, default: undefined },
     role: {
       type: String,

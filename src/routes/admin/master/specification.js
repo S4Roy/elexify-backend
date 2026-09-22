@@ -1,3 +1,4 @@
+import { requirePermission } from "../../../middleware/requirePermission.js";
 import { Router } from "express";
 import { masterController } from "../../../controllers/admin/index.js";
 import { masterValidation } from "../../../validations/admin/index.js";
@@ -5,30 +6,30 @@ import { masterValidation } from "../../../validations/admin/index.js";
 const specificationRouter = Router();
 
 specificationRouter.get(
-  "/list",
+  "/list", requirePermission("specifications.view"),
   masterValidation.specificationValidation.list,
   masterController.specificationController.list
 );
 
 specificationRouter.post(
-  "/add",
+  "/add", requirePermission("specifications.create"),
   masterValidation.specificationValidation.add,
   masterController.specificationController.add
 );
 
 specificationRouter.put(
-  "/edit",
+  "/edit", requirePermission("specifications.update"),
   masterValidation.specificationValidation.edit,
   masterController.specificationController.edit
 );
 specificationRouter.put(
-  "/order",
+  "/order", requirePermission("specifications.update"),
   masterValidation.specificationValidation.order,
   masterController.specificationController.order
 );
 
 specificationRouter.delete(
-  "/delete",
+  "/delete", requirePermission("specifications.delete"),
   masterValidation.specificationValidation.remove,
   masterController.specificationController.remove
 );
