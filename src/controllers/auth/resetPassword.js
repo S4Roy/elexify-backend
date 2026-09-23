@@ -1,11 +1,11 @@
 import User from "../../models/User.js";
 import UserResource from "../../resources/UserResource.js";
 import { StatusError } from "../../config/index.js";
-import { userService, userRoleService } from "../../services/index.js";
+import { userService, userRoleService, notificationService } from "../../services/index.js";
 import { generalHelper } from "../../helpers/index.js";
 
 /**
- * Admin Login
+ * Reset password via emailed token (forgot-password flow)
  * @param req
  * @param res
  * @param next
@@ -21,7 +21,23 @@ export const resetPassword = async (req, res, next) => {
 
     // Hash New Password
     const hashedPassword = await generalHelper.bcryptMake(new_password);
-    await User.findByIdAndUpdate(userId, { password: hashedPassword });
+    await User.findByIdAndUpdate(userId, {
+      password: hashedPassword,
+      // One-time use — this also stops the emailed link being replayed
+      // within its 1h window after it's already been used once.
+      reset_token: null,
+      // Invalidates every token issued before now — see resolveAuthorization().
+      password_changed_at: new Date(),
+      // A reset the owner completes is proof of ownership — clear any
+      // lockout from earlier failed login attempts too.
+      failed_login_attempts: 0,
+      login_locked_until: null,
+    });
+
+    // Mandatory security event, same as the self-service change-password path.
+    notificationService
+      .sendNotification({ userId, event: "PASSWORD_CHANGED", data: {} })
+      .catch(() => {});
 
     res.status(200).json({
       status: true,

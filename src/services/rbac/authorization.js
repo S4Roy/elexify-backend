@@ -7,8 +7,13 @@ export async function resolveAuthorization(req) {
   if (req.authorization) return req.authorization;
   if (!req.auth?.user_id) throw StatusError.unauthorized('Please login to continue.');
   const user = await User.findOne({ _id: req.auth.user_id, status: 'active', deleted_at: null })
-    .select('_id admin_role_id').lean();
+    .select('_id admin_role_id password_changed_at').lean();
   if (!user) throw StatusError.unauthorized('Please login to continue.');
+  // Token issued before the last password change — reject so a change-password
+  // action actually ends other sessions instead of just the current tab.
+  if (user.password_changed_at && req.auth.iat < Math.floor(new Date(user.password_changed_at).getTime() / 1000)) {
+    throw StatusError.unauthorized('Session expired. Please login again.');
+  }
   const role = user.admin_role_id ? await Role.findOne({ _id: user.admin_role_id, status: 'active', deleted_at: null }).lean() : null;
   req.authorization = { user, role, permissions: new Set(role?.permissions || []) };
   return req.authorization;

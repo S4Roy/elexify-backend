@@ -75,7 +75,11 @@ roleRouter.post('/staff', requirePermission('staff.create', 'roles.assign'), bod
   const password = await bcrypt.hash(req.body.password, 12);
   return transaction(async session => {
     const role = await assignableRole(req, req.body.role_id, session);
-    const [user] = await User.create([{ name: req.body.name, email: req.body.email, password, role: 'staff', admin_role_id: role._id, rbac_migrated: true }], { session });
+    // Created by a superadmin, not self-registered — the email is already
+    // trusted, so mark it verified now. Otherwise sendNotification()'s
+    // email_verified_at gate silently drops every security email (password
+    // change, reset, account lockout) for this account with no error logged.
+    const [user] = await User.create([{ name: req.body.name, email: req.body.email, password, role: 'staff', admin_role_id: role._id, rbac_migrated: true, email_verified_at: new Date() }], { session });
     await audit(req, session, 'RBAC_STAFF_CREATED', { role_id: role._id }, user._id);
     return { _id: user._id, name: user.name };
   });

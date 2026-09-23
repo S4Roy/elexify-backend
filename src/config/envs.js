@@ -33,9 +33,12 @@ export const envs = {
     encryptionKey:
       process.env.INTEGRATION_CREDENTIALS_ENCRYPTION_KEY || accessTokenSecret,
     usesAccessTokenFallback:
-      !process.env.INTEGRATION_CREDENTIALS_ENCRYPTION_KEY && Boolean(accessTokenSecret),
+      !process.env.INTEGRATION_CREDENTIALS_ENCRYPTION_KEY &&
+      Boolean(accessTokenSecret),
   },
-  MONGODB_URI: process.env.MONGODB_URI || `mongodb://${process.env.MONGODB_HOST}:${process.env.MONGODB_PORT}/${process.env.MONGODB_DATABASE}`,
+  MONGODB_URI:
+    process.env.MONGODB_URI ||
+    `mongodb://${process.env.MONGODB_HOST}:${process.env.MONGODB_PORT}/${process.env.MONGODB_DATABASE}`,
   passwordSalt: Number(process.env.PASSWORD_SALT_ROUND) || 12,
   jwt: {
     accessToken: {
@@ -57,6 +60,13 @@ export const envs = {
     resend_interval_seconds:
       Number(process.env.OTP_RESEND_INTERVAL_SECONDS) || 60,
   },
+  // Admin-login account lockout (controllers/auth/adminLogin.js). 5
+  // attempts / 30 minutes are the common industry defaults (OWASP
+  // Authentication Cheat Sheet).
+  adminLoginSecurity: {
+    max_attempts: Number(process.env.ADMIN_LOGIN_MAX_ATTEMPTS) || 5,
+    lockout_minutes: Number(process.env.ADMIN_LOGIN_LOCKOUT_MINUTES) || 5,
+  },
   aws: {
     accessKeyId: process.env.S3_ACCESS_KEY || "",
     secretAccessKey: process.env.S3_SECRET_KEY || "",
@@ -76,8 +86,14 @@ export const envs = {
   },
   operationalAlerts: {
     webhookUrl: process.env.OPERATIONS_ALERT_WEBHOOK_URL || "",
-    cooldownSeconds: Math.max(60, Number(process.env.OPERATIONS_ALERT_COOLDOWN_SECONDS) || 900),
-    transactionAbortThreshold: Math.max(1, Number(process.env.OPERATIONS_TRANSACTION_ABORT_THRESHOLD) || 3),
+    cooldownSeconds: Math.max(
+      60,
+      Number(process.env.OPERATIONS_ALERT_COOLDOWN_SECONDS) || 900,
+    ),
+    transactionAbortThreshold: Math.max(
+      1,
+      Number(process.env.OPERATIONS_TRANSACTION_ABORT_THRESHOLD) || 3,
+    ),
   },
   // Company/GST/invoice details live in SiteSetting (see
   // src/services/invoiceService/getCompanySettings.js) rather than here,

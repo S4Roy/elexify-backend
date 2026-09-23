@@ -53,6 +53,33 @@ const UserSchema = new Schema(
       required: false,
       default: null,
     },
+    // Set whenever the password changes. Access tokens issued before this
+    // moment are rejected in resolveAuthorization() (services/rbac/authorization.js)
+    // — this is what actually invalidates other sessions/devices on a
+    // password change, since JWTs are otherwise stateless. null means the
+    // password has never been changed via that flow, so no token is stale.
+    password_changed_at: {
+      type: Date,
+      required: false,
+      default: null,
+    },
+    // Admin-login lockout (controllers/auth/adminLogin.js). Counts
+    // consecutive wrong-password attempts; reset to 0 on any successful
+    // login or once a lockout is applied. Not used for the customer-facing
+    // storefront login, which has no lockout policy.
+    failed_login_attempts: {
+      type: Number,
+      required: false,
+      default: 0,
+    },
+    // Set once failed_login_attempts hits envs.adminLoginSecurity.max_attempts;
+    // login is rejected while this is in the future. Cleared on next
+    // successful login.
+    login_locked_until: {
+      type: Date,
+      required: false,
+      default: null,
+    },
     profile_image: {
       type: String,
       required: false,

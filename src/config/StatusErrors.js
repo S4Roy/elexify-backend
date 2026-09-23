@@ -41,6 +41,10 @@ export class StatusError extends Error {
     return new StatusError(409, message || "Conflict: Data Already Exists");
   }
 
+  static locked(message) {
+    return new StatusError(423, message || "Account Locked");
+  }
+
   static unprocessableEntity(message) {
     return new StatusError(422, message || "Unprocessable Entity");
   }

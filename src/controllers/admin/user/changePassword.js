@@ -1,6 +1,7 @@
 import User from "../../../models/User.js";
 import { StatusError } from "../../../config/index.js";
 import { generalHelper } from "../../../helpers/index.js";
+import { notificationService } from "../../../services/index.js";
 
 /**
  * Admin — change own password (self-service, from the header menu)
@@ -39,10 +40,20 @@ export const changePassword = async (req, res, next) => {
     }
 
     user.password = await generalHelper.bcryptMake(new_password);
+    // Invalidates every token issued before now — see resolveAuthorization().
+    user.password_changed_at = new Date();
     user.updated_by = user_id;
     user.updated_at = new Date();
 
     await user.save();
+
+    // PASSWORD_CHANGED is a mandatory security event: sends to whichever of
+    // email/sms the user has verified, ignoring notification preferences.
+    // Never throws — fire-and-forget, same pattern as the customer-facing
+    // change (controllers/user/account/edit.js).
+    notificationService
+      .sendNotification({ userId: user_id, event: "PASSWORD_CHANGED", data: {} })
+      .catch(() => {});
 
     res.status(200).json({
       status: "success",

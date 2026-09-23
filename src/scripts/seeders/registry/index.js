@@ -26,6 +26,7 @@ import fixUserIndexes from "./operations/fix-user-indexes.js";
 import fixWishlistIndexes from "./operations/fix-wishlist-indexes.js";
 import fixProductContent from "./operations/fix-product-content.js";
 import backfillVerifiedEmailOrderedUsers from "./operations/backfill-verified-email-ordered-users.js";
+import backfillVerifiedEmailAdminStaff from "./operations/backfill-verified-email-admin-staff.js";
 import backfillVerifiedMobileOrderedUsers from "./operations/backfill-verified-mobile-ordered-users.js";
 import normalizeExistingMobiles from "./operations/normalize-existing-mobiles.js";
 import dedupeUserMobiles from "./operations/dedupe-user-mobiles.js";
@@ -59,6 +60,7 @@ const RAW_ENTRIES = [
   fixWishlistIndexes,
   fixProductContent,
   backfillVerifiedEmailOrderedUsers,
+  backfillVerifiedEmailAdminStaff,
   backfillVerifiedMobileOrderedUsers,
   normalizeExistingMobiles,
   dedupeUserMobiles,

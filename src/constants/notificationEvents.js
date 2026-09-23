@@ -176,6 +176,17 @@ export const NOTIFICATION_EVENTS = {
     templateKey: "suspicious_activity",
     messagingVariables: ["name"],
   },
+  ACCOUNT_LOCKED: {
+    category: "security",
+    preferenceKey: "security",
+    mandatory: true,
+    // email only — no DLT-approved SMS template for this event yet (see
+    // constants/smsTemplateDefaults.js header). Add "sms" here once one's
+    // registered and added there.
+    channels: ["email"],
+    templateKey: "account_locked",
+    messagingVariables: ["name", "lockout_minutes"],
+  },
 
   PROMOTIONAL_OFFER: {
     category: "marketing",

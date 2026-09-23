@@ -283,6 +283,18 @@ ${small("If you didn't request this, you can safely ignore this email.")}
     required_variables: ["name", "account_url"],
     is_marketing: false,
   },
+  account_locked: {
+    subject: "Your account has been temporarily locked",
+    preheader: "Too many failed login attempts on your Elexify account.",
+    body: securityShell({
+      heading: "Account Temporarily Locked",
+      message:
+        "We locked your account for {{lockout_minutes}} minutes after too many failed login attempts. If this wasn't you, someone may be trying to guess your password.",
+      cta: `{{> ctaButton url=account_url text="Secure My Account"}}`,
+    }),
+    required_variables: ["name", "lockout_minutes", "account_url"],
+    is_marketing: false,
+  },
   promotional_offer: {
     subject: "A special offer just for you",
     preheader: "Check out our latest offers and discounts.",

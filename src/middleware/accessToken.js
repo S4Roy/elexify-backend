@@ -29,6 +29,9 @@ export const validateAccessToken = async (req, res, next) => {
       user_id: userDetails.user_id,
       email: userDetails.email,
       role: userDetails.role,
+      // jwt.sign() stamps this automatically (seconds since epoch); used to
+      // reject tokens issued before a password change — see resolveAuthorization().
+      iat: userDetails.iat,
     };
     next();
   } catch (error) {
