@@ -1,5 +1,15 @@
 import City from '../../models/City.js';
 
+// city/state/country on an Address are numeric catalog IDs, but some legacy
+// records (e.g. from older webhook imports where country/state resolution
+// only partially matched) carry non-numeric leftovers. Casting those into a
+// Mongo numeric-field query throws a CastError, so only ever query with a
+// value that's actually numeric.
+const numericId = (value) => {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
+};
+
 // Plain-object snapshot of an Address document's display fields — used both
 // at order-placement time (Order.billing_address_snapshot/
 // shipping_address_snapshot) and as a fallback at invoice-generation time
@@ -14,8 +24,11 @@ import City from '../../models/City.js';
 export const snapshotAddress = async (address) => {
   if (!address) return null;
   let { city_name, state_name, country_name } = address;
-  if ((!city_name || !state_name || !country_name) && address.city && address.state && address.country) {
-    const location = await City.findOne({ id: address.city, state_id: address.state, country_id: address.country }).lean();
+  const cityId = numericId(address.city);
+  const stateId = numericId(address.state);
+  const countryId = numericId(address.country);
+  if ((!city_name || !state_name || !country_name) && cityId && stateId && countryId) {
+    const location = await City.findOne({ id: cityId, state_id: stateId, country_id: countryId }).lean();
     city_name ||= location?.name || null;
     state_name ||= location?.state_name || null;
     country_name ||= location?.country_name || null;
