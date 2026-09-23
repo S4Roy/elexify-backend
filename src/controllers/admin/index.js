@@ -31,6 +31,7 @@ import * as navigationMenuController from "./navigation-menu/index.js";
 import * as navigationMenuItemController from "./navigation-menu-item/index.js";
 import * as navigationPreviewController from "./navigation/index.js";
 import * as customerAccountController from "./customerAccount/index.js";
+import * as userController from "./user/index.js";
 import * as notificationController from "./notification/index.js";
 import * as emailTemplateController from "./emailTemplate/index.js";
 import * as smsTemplateController from "./smsTemplate/index.js";
@@ -38,6 +39,7 @@ import * as dataOperationsController from "./dataOperations/index.js";
 
 export {
   customerAccountController,
+  userController,
   notificationController,
   emailTemplateController,
   smsTemplateController,

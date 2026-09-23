@@ -34,10 +34,12 @@ import { smsTemplatesRouter } from "./smsTemplates.js";
 import { dataOperationsRouter } from "./dataOperations.js";
 import { integrationCredentialsRouter } from "./integrationCredentials.js";
 import { zohoBooksRouter } from "./zohoBooks.js";
+import { userRouter } from "./user.js";
 
 const v1AdminRouter = Router();
 // All routes go here
 v1AdminRouter.use("/role", roleRouter);
+v1AdminRouter.use("/user", userRouter);
 
 v1AdminRouter.use("/inventory", inventoryRouter);
 v1AdminRouter.use("/master", masterRouter);

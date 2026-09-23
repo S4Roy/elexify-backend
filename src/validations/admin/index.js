@@ -30,11 +30,13 @@ import * as headerConfigValidation from "./header-config/index.js";
 import * as navigationMenuValidation from "./navigation-menu/index.js";
 import * as navigationMenuItemValidation from "./navigation-menu-item/index.js";
 import * as customerAccountValidation from "./customerAccount/index.js";
+import * as userValidation from "./user/index.js";
 import * as emailTemplateValidation from "./emailTemplate/index.js";
 import * as smsTemplateValidation from "./smsTemplate/index.js";
 
 export {
   customerAccountValidation,
+  userValidation,
   emailTemplateValidation,
   smsTemplateValidation,
   inventoryValidation,
