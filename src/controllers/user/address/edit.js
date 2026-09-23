@@ -47,8 +47,10 @@ export const edit = async (req, res, next) => {
       await assertPincodeServiceable(postcode, country ?? address.country);
     }
 
-    if (city !== undefined || state !== undefined || country !== undefined) {
-      await validateAddressCity(city ?? address.city, state ?? address.state, country ?? address.country);
+    let locationNames = null;
+    if (city !== undefined || state !== undefined || country !== undefined ||
+        !address.state_name || !address.city_name || !address.country_name) {
+      locationNames = await validateAddressCity(city ?? address.city, state ?? address.state, country ?? address.country);
     }
 
     // Unset other default addresses
@@ -74,6 +76,11 @@ export const edit = async (req, res, next) => {
     if (city !== undefined) address.city = city;
     if (state !== undefined) address.state = state;
     if (country !== undefined) address.country = country;
+    if (locationNames) {
+      address.city_name = locationNames.city_name;
+      address.state_name = locationNames.state_name;
+      address.country_name = locationNames.country_name;
+    }
     if (postcode !== undefined) address.postcode = postcode;
     if (latitude !== undefined) address.latitude = latitude;
     if (longitude !== undefined) address.longitude = longitude;

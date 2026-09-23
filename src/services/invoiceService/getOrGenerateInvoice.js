@@ -81,7 +81,7 @@ const resolveAddressSnapshot = async (order, snapshotField, refField) => {
   if (order[snapshotField]) return order[snapshotField];
   if (!order[refField]) return null;
   const address = await Address.findById(order[refField]);
-  return snapshotAddress(address);
+  return await snapshotAddress(address);
 };
 
 // Idempotent: returns the existing Invoice if one already exists for this

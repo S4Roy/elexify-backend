@@ -53,7 +53,7 @@ export const buildOrderEmailData = async (order) => {
   let shippingAddressSnapshot = order.shipping_address_snapshot;
   if (!shippingAddressSnapshot && order.shipping_address) {
     const address = await Address.findById(order.shipping_address).lean();
-    shippingAddressSnapshot = snapshotAddress(address);
+    shippingAddressSnapshot = await snapshotAddress(address);
   }
 
   return {

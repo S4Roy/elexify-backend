@@ -34,7 +34,7 @@ export const add = async (req, res, next) => {
     const user_id = req.auth?.user_id;
     if (!user_id) throw StatusError.unauthorized("Invalid access token.");
 
-    await validateAddressCity(city, state, country || 101);
+    const locationNames = await validateAddressCity(city, state, country || 101);
     await assertPincodeServiceable(postcode, country || 101);
 
     const addressFilter = {
@@ -73,6 +73,12 @@ export const add = async (req, res, next) => {
         addressExist.is_default = true;
         changed = true;
       }
+      if (!addressExist.state_name || !addressExist.city_name || !addressExist.country_name) {
+        addressExist.city_name = locationNames.city_name;
+        addressExist.state_name = locationNames.state_name;
+        addressExist.country_name = locationNames.country_name;
+        changed = true;
+      }
       if (changed) {
         addressExist.updated_by = user_id;
         addressExist.updated_at = Date.now();
@@ -103,8 +109,11 @@ export const add = async (req, res, next) => {
       address_line_2: address_line_2 || null,
       land_mark: land_mark || null,
       city,
+      city_name: locationNames.city_name,
       state,
+      state_name: locationNames.state_name,
       country: country || 101,
+      country_name: locationNames.country_name,
       postcode,
       latitude: latitude ?? null,
       longitude: longitude ?? null,

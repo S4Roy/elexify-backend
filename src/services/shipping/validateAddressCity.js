@@ -12,8 +12,17 @@ export const assertCityName = value => {
   return name;
 };
 
+// Returns the denormalized display names (already carried on the City
+// record alongside its own name) so callers can store city_name/state_name/
+// country_name on the address in the same query, instead of leaving them
+// blank — a blank state_name breaks downstream address snapshots (see
+// snapshotAddress.js) and Zoho state_code resolution.
 export const validateAddressCity = async (city, state, country) => {
   const location = await City.findOne({ id: city, state_id: state, country_id: country, status: "active" }).lean();
   if (!location) throw StatusError.badRequest("Select a city belonging to the selected state and country");
-  return assertCityName(location.name);
+  return {
+    city_name: assertCityName(location.name),
+    state_name: location.state_name || null,
+    country_name: location.country_name || null,
+  };
 };

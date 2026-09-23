@@ -48,8 +48,8 @@ export const updateAddress = async (req, res, next) => {
         created_by: req.auth.user_id, updated_by: req.auth.user_id, updated_at: now,
         deleted_at: now,
       }], { session });
-      const before = order[`${ref}_snapshot`] || snapshotAddress(original);
-      const after = snapshotAddress(updated);
+      const before = order[`${ref}_snapshot`] || await snapshotAddress(original);
+      const after = await snapshotAddress(updated);
       const changed = await Order.updateOne({ _id: order._id, [ref]: order[ref],
         updated_at: order.updated_at || null, order_status: order.order_status,
         'invoice.generated': { $ne: true },

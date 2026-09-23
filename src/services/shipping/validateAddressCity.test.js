@@ -23,8 +23,8 @@ describe('address city validation', () => {
       expect(find).toHaveBeenCalledWith({ id: 1, state_id: 2, country_id: 101, status: 'active' });
       find.mockReturnValue({ lean: async () => null });
       await expect(validateAddressCity(1, 2, 101)).rejects.toThrow('Select a city');
-      find.mockReturnValue({ lean: async () => ({ name: 'Delhi' }) });
-      await expect(validateAddressCity(1, 2, 101)).resolves.toBe('Delhi');
+      find.mockReturnValue({ lean: async () => ({ name: 'Delhi', state_name: 'Delhi', country_name: 'India' }) });
+      await expect(validateAddressCity(1, 2, 101)).resolves.toEqual({ city_name: 'Delhi', state_name: 'Delhi', country_name: 'India' });
     } finally { find.mockRestore(); }
   });
 });

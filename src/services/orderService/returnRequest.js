@@ -66,7 +66,7 @@ export const createReturnRequest = async ({ orderId, customerId, items, reason, 
       }
       const year = new Date().getFullYear();
       const counter = await Counter.findOneAndUpdate({ _id: `return_${year}` }, { $inc: { seq: 1 } }, { upsert: true, new: true, session });
-      const address = order.shipping_address_snapshot || snapshotAddress(await Address.findById(order.shipping_address).session(session));
+      const address = order.shipping_address_snapshot || await snapshotAddress(await Address.findById(order.shipping_address).session(session));
       const autoApprove = Boolean(policy.return_auto_approve);
       [result] = await ReturnRequest.create([{
         request_number: `RET-${year}-${String(counter.seq).padStart(4, '0')}`,
