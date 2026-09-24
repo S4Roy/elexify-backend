@@ -1,4 +1,5 @@
 import WebhookLog from "../../../models/WebhookLog.js";
+import Order from "../../../models/Order.js";
 import { StatusError } from "../../../config/index.js";
 import { envs } from "../../../config/index.js";
 
@@ -7,6 +8,29 @@ import { envs } from "../../../config/index.js";
 // whether it changed anything. Filterable by provider/outcome/date and by
 // order id, AWB, or Shiprocket's own order id so an admin can pull up
 // everything received for one shipment while investigating an issue.
+
+const OBJECT_ID = /^[a-f0-9]{24}$/i;
+
+// WebhookLog.order_id is loose: Shiprocket rows carry the order number
+// ("ORD-000152"), Razorpay rows the order's _id. Resolve both to
+// { _id, id } so the admin can link every row to the order-details page.
+const attachOrders = async (docs = []) => {
+  const refs = [...new Set(docs.map((d) => d.order_id).filter(Boolean))];
+  if (!refs.length) return docs;
+  const orders = await Order.find({
+    $or: [{ _id: { $in: refs.filter((r) => OBJECT_ID.test(r)) } }, { id: { $in: refs } }],
+  }).select("_id id").lean();
+  const byRef = new Map();
+  for (const o of orders) {
+    byRef.set(String(o._id), o);
+    byRef.set(o.id, o);
+  }
+  return docs.map((d) => {
+    const o = byRef.get(d.order_id);
+    return { ...d, order: o ? { _id: o._id, id: o.id } : null };
+  });
+};
+
 export const list = async (req, res, next) => {
   try {
     const {
@@ -25,8 +49,13 @@ export const list = async (req, res, next) => {
     if (search) {
       const term = String(search).trim();
       if (term) {
+        // An order number also finds Razorpay rows, which store the _id.
+        const order = /^#?ord-?\d+$/i.test(term)
+          ? await Order.findOne({ id: term.replace(/^#/, "").toUpperCase() }).select("_id").lean()
+          : null;
         match.$or = [
           { order_id: term },
+          ...(order ? [{ order_id: String(order._id) }] : []),
           { awb: term },
           { shiprocket_order_id: term },
           ...["event_id", "provider_order_id", "payment_id", "refund_id"].map(field => ({ [field]: term })),
@@ -81,6 +110,7 @@ export const list = async (req, res, next) => {
       page,
       limit,
     });
+    data.docs = await attachOrders(data.docs);
 
     res.status(200).json({
       status: "success",
