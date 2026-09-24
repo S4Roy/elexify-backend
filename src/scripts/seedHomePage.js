@@ -76,10 +76,11 @@ export const runSeedHomePage = async ({ logger = createLogger() } = {}) => {
       type: "cta_banner",
       order: 6,
       config: {
-        heading: "Now it's easier to open your shop",
-        description: "With simple step by step and easy help instructions to follow",
-        button_label: "Open Shop",
-        button_link: "/seller/register",
+        heading: "Buying in bulk for your business?",
+        description:
+          "Special pricing and GST invoices on bulk orders for workshops, installers, repair shops and resellers.",
+        button_label: "Request a bulk quote",
+        button_link: "/contact-us",
         show_newsletter_panel: true,
       },
     },
