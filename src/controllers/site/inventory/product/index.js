@@ -19,8 +19,10 @@ import { customiseMalaCartManage } from "./customiseMalaCartManage.js";
 import { applyCoupon } from "./applyCoupon.js";
 import { availableCoupons } from "./availableCoupons.js";
 import { compare } from "./compare.js";
+import { suggestions } from "./suggestions.js";
 
 export {
+  suggestions,
   list,
   alsoLike,
   wishlist,

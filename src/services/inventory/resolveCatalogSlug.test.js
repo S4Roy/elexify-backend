@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { resolveCatalogSlug, LEGACY_PRODUCT_SLUGS } from './resolveCatalogSlug.js';
+import { resolveCatalogSlug, LEGACY_PRODUCT_SLUGS, hyphenInsensitivePattern, suggestCatalog } from './resolveCatalogSlug.js';
 
 const model = (exact, matches = []) => ({
   findOne: vi.fn(() => ({ select: () => ({ lean: async () => exact }) })),
@@ -42,5 +42,27 @@ describe('catalog legacy URLs', () => {
     const Model = model(null);
     expect(await resolveCatalogSlug(Model, slug)).toBeNull();
     expect(Model.findOne).not.toHaveBeenCalled();
+  });
+  it('matches old WooCommerce slugs that differ only in hyphens', async () => {
+    const pattern = hyphenInsensitivePattern('ifr-32700-3-2v-6000mah-lifepo4');
+    expect(pattern.test('ifr-32700-3-2v-6000m-ah-li-fe-po4')).toBe(true);
+    expect(pattern.test('ifr-32700-3-2v-6000mah-lifepo4-2')).toBe(false);
+    expect(hyphenInsensitivePattern('a-b')).toBeNull();
+    const Model = model(null);
+    Model.find.mockReturnValueOnce({ select: () => ({ limit: () => ({ lean: async () => [] }) }) })
+      .mockReturnValueOnce({ select: () => ({ limit: () => ({ lean: async () => [{ _id: '1', slug: 'li-fe-po4-cell' }] }) }) });
+    expect(await resolveCatalogSlug(Model, 'lifepo4-cell')).toEqual({ _id: '1', slug: 'li-fe-po4-cell' });
+  });
+  it('ranks suggestions by shared words and never returns unrelated records', async () => {
+    const Model = { find: vi.fn(() => ({ select: () => ({ limit: () => ({ lean: async () => [
+      { name: 'Battery Holder', slug: 'holder' },
+      { name: 'IFR 32700 LiFePO4 Battery', slug: 'ifr-32700' },
+      { name: 'Unrelated', slug: 'x' },
+    ] }) }) })) };
+    expect(await suggestCatalog(Model, 'ifr-32700-lifepo4-battery-2')).toEqual([
+      { name: 'IFR 32700 LiFePO4 Battery', slug: 'ifr-32700' },
+      { name: 'Battery Holder', slug: 'holder' },
+    ]);
+    expect(await suggestCatalog(Model, 'a-b')).toEqual([]);
   });
 });

@@ -13,6 +13,11 @@ productRouter.get(
 productRouter.post("/compare", inventoryController.productController.compare);
 
 productRouter.get(
+  "/suggestions/:slug",
+  inventoryValidation.productValidation.suggestions,
+  inventoryController.productController.suggestions
+);
+productRouter.get(
   "/details/:slug",
   inventoryValidation.productValidation.details,
   inventoryController.productController.details
