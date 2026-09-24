@@ -5,6 +5,7 @@ import NotificationJob from "../../models/NotificationJob.js";
 import { getNotificationEvent } from "../../constants/notificationEvents.js";
 import { getPreferenceValue } from "./preferencePath.js";
 import { generalHelper } from "../../helpers/index.js";
+import { isConfigured as whatsappConfigured } from "./whatsapp.provider.js";
 
 const getOrCreatePreferences = async (userId) => {
   const existing = await NotificationPreference.findOne({ user_id: userId }).lean();
@@ -97,6 +98,10 @@ export const sendNotification = async ({ userId, event, data = {}, dedupeKey = n
     const results = [];
 
     for (const channel of eventMeta.channels) {
+      // WhatsApp stays off until Business API credentials are set — don't
+      // queue jobs that can only fail as "provider not configured".
+      if (channel === "whatsapp" && !whatsappConfigured()) continue;
+
       // email is gated on email_verified_at; sms and whatsapp are both
       // mobile-based channels, gated on mobile_verified_at.
       const isVerified = channel === "email" ? !!user.email_verified_at : !!user.mobile_verified_at;
