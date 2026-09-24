@@ -315,6 +315,12 @@ await mongooseConnection;
 if (mongoose.connection.readyState !== 1) throw new Error("Database unavailable during RBAC bootstrap");
 await ensureOwnerAccess();
 
-app.listen(PORT, HOSTNAME, () => {
+const server = app.listen(PORT, HOSTNAME, () => {
   console.log(`Server running at http://${HOSTNAME}:${PORT}/`);
 });
+// Node's default 5s keep-alive closes idle sockets while the storefront's
+// SSR client (and nginx) may still reuse them, which shows up there as
+// "socket hang up" (ECONNRESET). Outlive the clients' idle timeouts;
+// headersTimeout must exceed keepAliveTimeout.
+server.keepAliveTimeout = 65_000;
+server.headersTimeout = 66_000;
