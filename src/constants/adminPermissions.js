@@ -51,6 +51,13 @@ export const PERMISSIONS = {
   REPAIR_VIEW: "system.repair.view",
   REPAIR_EXECUTE: "system.repair.execute",
   OPERATION_HISTORY_VIEW: "system.operation.history.view",
+
+  // Admin-facing view of the append-only audit trail (models/AuditLog.js) —
+  // RBAC changes, customer/order edits, verification overrides, data
+  // operations, etc. Deliberately separate from the individual domain
+  // permissions above: viewing the audit trail is a broader, more sensitive
+  // capability than viewing the records it describes.
+  AUDIT_LOG_VIEW: "audit_log.view",
 };
 
 const ALL_PERMISSIONS = Object.values(PERMISSIONS);
@@ -95,6 +102,7 @@ export const ROLE_PERMISSIONS = {
     // this file. Adjustable later if a manager role needs to run LOW-risk
     // seeders themselves.
     ...DATA_OPERATIONS_VIEW_ONLY,
+    PERMISSIONS.AUDIT_LOG_VIEW,
   ],
   supervisor: [...VIEW_ONLY, PERMISSIONS.RETURN_VIEW],
   staff: VIEW_ONLY,

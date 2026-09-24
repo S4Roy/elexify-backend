@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import mongooseAggregatePaginate from "mongoose-aggregate-paginate-v2";
 const { Schema, model, Types } = mongoose;
 
 // Append-only audit trail for sensitive profile changes. Never store OTP
@@ -51,6 +52,13 @@ const AuditLogSchema = new Schema(
         "ORDER_FORCE_CANCELLED",
         "ORDER_REOPENED",
         "ORDER_EXPORTED",
+        "CATEGORY_EXPORTED",
+        "PRODUCT_EXPORTED",
+        "RETURN_OPERATION",
+        "SMS_TEMPLATE_UPDATED",
+        "SMS_TEMPLATE_RESET",
+        "SMS_TEMPLATE_SEED_RUN",
+        "AUDIT_LOG_EXPORTED",
       ],
     },
     // Set for admin-initiated events (verification override, manual retry,
@@ -90,6 +98,11 @@ const AuditLogSchema = new Schema(
 );
 
 AuditLogSchema.index({ user_id: 1, created_at: -1 });
+AuditLogSchema.index({ event: 1, created_at: -1 });
+AuditLogSchema.index({ actor_id: 1, created_at: -1 });
+AuditLogSchema.index({ created_at: -1 });
+
+AuditLogSchema.plugin(mongooseAggregatePaginate);
 
 const AuditLog = model("audit_logs", AuditLogSchema);
 

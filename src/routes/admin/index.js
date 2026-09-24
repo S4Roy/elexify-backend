@@ -35,6 +35,7 @@ import { dataOperationsRouter } from "./dataOperations.js";
 import { integrationCredentialsRouter } from "./integrationCredentials.js";
 import { zohoBooksRouter } from "./zohoBooks.js";
 import { userRouter } from "./user.js";
+import { auditLogsRouter } from "./auditLogs.js";
 
 const v1AdminRouter = Router();
 // All routes go here
@@ -75,5 +76,6 @@ v1AdminRouter.use("/sms-templates", smsTemplatesRouter);
 v1AdminRouter.use("/data-operations", dataOperationsRouter);
 v1AdminRouter.use("/integration-credentials", integrationCredentialsRouter);
 v1AdminRouter.use("/integrations/zoho-books", zohoBooksRouter);
+v1AdminRouter.use("/audit-logs", auditLogsRouter);
 
 export { v1AdminRouter };
