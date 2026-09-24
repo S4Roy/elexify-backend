@@ -5,6 +5,7 @@ const SECTION_TYPES = [
   "product_section",
   "category_section",
   "trust_badges",
+  "promo_banners",
   "cta_banner",
   "content_section",
 ];

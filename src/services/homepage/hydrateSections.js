@@ -7,12 +7,14 @@ import MediaResource from "../../resources/MediaResource.js";
 // productService.list()/categoryService.list() with, reusing the existing
 // (already pricing/wishlist/cart-aware) list endpoints instead of
 // duplicating that logic here.
-const resolveHeroMedia = async (section) => {
-  const slides = section.config?.slides || [];
+// Replaces desktop_image/mobile_image ids on each entry of config[key]
+// (hero `slides`, promo_banners `items`) with resolved media objects.
+const resolveBannerMedia = async (section, key) => {
+  const entries = section.config?.[key] || [];
   const mediaIds = [];
-  slides.forEach((slide) => {
-    if (slide.desktop_image) mediaIds.push(slide.desktop_image);
-    if (slide.mobile_image) mediaIds.push(slide.mobile_image);
+  entries.forEach((entry) => {
+    if (entry.desktop_image) mediaIds.push(entry.desktop_image);
+    if (entry.mobile_image) mediaIds.push(entry.mobile_image);
   });
   if (!mediaIds.length) return section;
 
@@ -20,16 +22,16 @@ const resolveHeroMedia = async (section) => {
   const byId = new Map(
     mediaDocs.map((doc) => [String(doc._id), new MediaResource(doc).exec()]),
   );
-  const resolvedSlides = slides.map((slide) => ({
-    ...slide,
-    desktop_image: slide.desktop_image
-      ? (byId.get(String(slide.desktop_image)) ?? null)
+  const resolved = entries.map((entry) => ({
+    ...entry,
+    desktop_image: entry.desktop_image
+      ? (byId.get(String(entry.desktop_image)) ?? null)
       : null,
-    mobile_image: slide.mobile_image
-      ? (byId.get(String(slide.mobile_image)) ?? null)
+    mobile_image: entry.mobile_image
+      ? (byId.get(String(entry.mobile_image)) ?? null)
       : null,
   }));
-  return { ...section, config: { ...section.config, slides: resolvedSlides } };
+  return { ...section, config: { ...section.config, [key]: resolved } };
 };
 
 const resolveProductSectionQuery = async (section) => {
@@ -97,7 +99,10 @@ export const hydrateSections = async (sections = []) => {
   for (const section of sections) {
     switch (section.type) {
       case "hero":
-        hydrated.push(await resolveHeroMedia(section));
+        hydrated.push(await resolveBannerMedia(section, "slides"));
+        break;
+      case "promo_banners":
+        hydrated.push(await resolveBannerMedia(section, "items"));
         break;
       case "product_section":
         hydrated.push(await resolveProductSectionQuery(section));

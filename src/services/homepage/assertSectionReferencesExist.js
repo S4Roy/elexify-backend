@@ -31,9 +31,9 @@ export const assertSectionReferencesExist = async (type, config) => {
     await assertIdsExist(Category, config.category_ids, "categories");
   }
 
-  if (type === "hero") {
+  if (type === "hero" || type === "promo_banners") {
     const mediaIds = [];
-    (config.slides || []).forEach((slide) => {
+    (config[type === "hero" ? "slides" : "items"] || []).forEach((slide) => {
       if (slide.desktop_image) mediaIds.push(slide.desktop_image);
       if (slide.mobile_image) mediaIds.push(slide.mobile_image);
     });

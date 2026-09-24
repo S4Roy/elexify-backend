@@ -16,10 +16,13 @@ export const resolveVisibleSections = (sections = [], { now = new Date() } = {})
     .filter((section) => section.enabled && isWithinSchedule(section.schedule, now))
     .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
     .map((section) => {
-      if (section.type !== "hero") return section;
-      const slides = (section.config?.slides || [])
-        .filter((slide) => slide.enabled !== false && isWithinSchedule(slide.schedule, now))
+      // Per-entry enable/schedule for banner-style sections.
+      const key =
+        section.type === "hero" ? "slides" : section.type === "promo_banners" ? "items" : null;
+      if (!key) return section;
+      const entries = (section.config?.[key] || [])
+        .filter((entry) => entry.enabled !== false && isWithinSchedule(entry.schedule, now))
         .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
-      return { ...section, config: { ...section.config, slides } };
+      return { ...section, config: { ...section.config, [key]: entries } };
     });
 };

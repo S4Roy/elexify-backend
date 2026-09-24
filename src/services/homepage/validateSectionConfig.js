@@ -14,6 +14,25 @@ const ctaSchema = Joi.object({
   link: safeLink.allow("", null),
 });
 
+const scheduleSchema = Joi.object({
+  startAt: Joi.date().allow(null),
+  endAt: Joi.date().allow(null),
+});
+
+// Presentation fields shared by hero slides and promo banners. None carry a
+// Joi default, so slides saved before these existed keep rendering exactly as
+// they did (the storefront applies the defaults).
+const bannerPresentation = {
+  // Whole-banner click target; falls back to the primary CTA's link.
+  link: safeLink.allow("", null),
+  alt_text: Joi.string().allow("", null).max(150),
+  // Small label above the heading, e.g. "NEW LAUNCH".
+  eyebrow: Joi.string().allow("", null).max(40),
+  text_position: Joi.string().valid("left", "center", "right").optional(),
+  text_theme: Joi.string().valid("light", "dark").optional(),
+  overlay_opacity: Joi.number().min(0).max(1).optional(),
+};
+
 const slideSchema = Joi.object({
   desktop_image: objectId.allow(null, ""),
   mobile_image: objectId.allow(null, ""),
@@ -21,7 +40,7 @@ const slideSchema = Joi.object({
   description: Joi.string().allow("", null).max(300),
   primary_cta: ctaSchema.optional(),
   secondary_cta: ctaSchema.optional(),
-  overlay_opacity: Joi.number().min(0).max(1).optional(),
+  ...bannerPresentation,
   order: Joi.number().optional(),
   enabled: Joi.boolean().optional(),
   schedule: Joi.object({
@@ -30,8 +49,25 @@ const slideSchema = Joi.object({
   }).optional(),
 });
 
+const promoBannerSchema = Joi.object({
+  desktop_image: objectId.allow(null, ""),
+  mobile_image: objectId.allow(null, ""),
+  heading: Joi.string().allow("", null).max(80),
+  subheading: Joi.string().allow("", null).max(150),
+  cta_label: Joi.string().allow("", null).max(40),
+  ...bannerPresentation,
+  order: Joi.number().optional(),
+  enabled: Joi.boolean().optional(),
+  schedule: scheduleSchema.optional(),
+});
+
+export const PROMO_BANNER_LAYOUTS = ["strip", "grid_2", "grid_3", "grid_4", "feature_left"];
+
 const CONFIG_SCHEMAS = {
   hero: Joi.object({
+    // split: preview card + main slide (original design) · full: one
+    // full-width slider.
+    layout: Joi.string().valid("split", "full").default("split"),
     slides: Joi.array().items(slideSchema).default([]),
     autoplay: Joi.boolean().default(true),
     autoplay_interval_ms: Joi.number().integer().min(1000).max(20000).default(4000),
@@ -68,6 +104,12 @@ const CONFIG_SCHEMAS = {
         }),
       )
       .default([]),
+  }),
+  promo_banners: Joi.object({
+    layout: Joi.string()
+      .valid(...PROMO_BANNER_LAYOUTS)
+      .default("grid_2"),
+    items: Joi.array().items(promoBannerSchema).max(8).default([]),
   }),
   cta_banner: Joi.object({
     heading: Joi.string().max(150).allow("", null),

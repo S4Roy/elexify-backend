@@ -12,6 +12,12 @@ const { Schema, model, Types } = mongoose;
 //                          view_all_link, countdown_end_at, badge_icon }
 //   category_section -> { source_mode: manual|all, category_ids, limit }
 //   trust_badges     -> { items: [{icon, label, sub}] }
+//                   (+ link, alt_text, eyebrow, text_position, text_theme per slide;
+//                    section-level layout: split|full)
+//   promo_banners    -> { layout: strip|grid_2|grid_3|grid_4|feature_left,
+//                          items: [{desktop_image, mobile_image, heading, subheading,
+//                          cta_label, link, alt_text, eyebrow, text_position,
+//                          text_theme, overlay_opacity, order, enabled, schedule}] }
 //   cta_banner       -> { heading, description, button_label, button_link, show_newsletter_panel }
 //   content_section  -> { heading, body }
 const HomeSectionSchema = new Schema(
@@ -24,6 +30,7 @@ const HomeSectionSchema = new Schema(
         "product_section",
         "category_section",
         "trust_badges",
+        "promo_banners",
         "cta_banner",
         "content_section",
       ],
