@@ -4,9 +4,7 @@ import User from "../../../../models/User.js";
 import Address from "../../../../models/Address.js";
 import Product from "../../../../models/Product.js";
 import ProductVariation from "../../../../models/ProductVariation.js";
-import Country from "../../../../models/Country.js";
-import State from "../../../../models/State.js";
-import City from "../../../../models/City.js";
+import { resolveLocation } from "../../../../services/location/resolveLocation.js";
 import { StatusError } from "../../../../config/index.js";
 import { zohoService, orderService } from "../../../../services/index.js";
 import { derivePaymentStatus } from "../../../../helpers/order/derivePaymentStatus.js";
@@ -183,9 +181,8 @@ export const addOrder = async (req, res, next) => {
     // 🏠 3. Billing address
     let billingAddress = null;
     if (billing_address?.address_1) {
-      const { country, state, city } = await findCountryStateCity(
-        billing_address
-      );
+      const { country, state, city, country_name, state_name, city_name } =
+        await findCountryStateCity(billing_address);
 
       const billingFilter = {
         user: user._id,
@@ -205,9 +202,9 @@ export const addOrder = async (req, res, next) => {
           ...billingFilter,
           address_line_2: billing_address.address_2 || "",
           land_mark: billing_address.landmark || "",
-          country_name: billing_address.country || "",
-          state_name: billing_address.state || "",
-          city_name: billing_address.city || "",
+          country_name: country_name || billing_address.country || "",
+          state_name: state_name || billing_address.state || "",
+          city_name: city_name || billing_address.city || "",
           purpose: "billing",
           is_default: true,
           created_by: user._id,
@@ -218,9 +215,8 @@ export const addOrder = async (req, res, next) => {
     // 📬 4. Shipping address
     let shippingAddress = null;
     if (shipping_address?.address_1) {
-      const { country, state, city } = await findCountryStateCity(
-        shipping_address
-      );
+      const { country, state, city, country_name, state_name, city_name } =
+        await findCountryStateCity(shipping_address);
 
       const shippingFilter = {
         user: user._id,
@@ -240,9 +236,9 @@ export const addOrder = async (req, res, next) => {
           ...shippingFilter,
           address_line_2: shipping_address.address_2 || "",
           land_mark: shipping_address.landmark || "",
-          country_name: shipping_address.country || "",
-          state_name: shipping_address.state || "",
-          city_name: shipping_address.city || "",
+          country_name: country_name || shipping_address.country || "",
+          state_name: state_name || shipping_address.state || "",
+          city_name: city_name || shipping_address.city || "",
           purpose: "shipping",
           is_default: false,
           created_by: user._id,
@@ -396,60 +392,9 @@ async function resolveOrderItems(orderId, items) {
   return orderItems;
 }
 
-const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-
-const normalize = (v) => v?.toString().trim().toLowerCase();
-
+// WooCommerce sends ISO/state codes ("IN", "WB") and a city name; store catalog
+// ids and display names, never the raw codes.
 const findCountryStateCity = async (address) => {
-  if (!address) return { country: null, state: null, city: null };
-
-  const countryInput = normalize(address.country);
-  const stateInput = normalize(address.state);
-  const cityInput = normalize(address.city);
-
-  /* -------- COUNTRY -------- */
-  const country = await Country.findOne({
-    status: "active",
-    $or: [
-      { iso2: address.country?.toUpperCase() },
-      { iso3: address.country?.toUpperCase() },
-      { name: { $regex: `^${escapeRegex(countryInput)}$`, $options: "i" } },
-      {
-        "translations.en": {
-          $regex: `^${escapeRegex(countryInput)}$`,
-          $options: "i",
-        },
-      },
-    ],
-  }).select("id");
-
-  if (!country) return { country: null, state: null, city: null };
-
-  /* -------- STATE -------- */
-  const state = await State.findOne({
-    status: "active",
-    country_id: country.id,
-    $or: [
-      { iso2: address.state?.toUpperCase() },
-      { state_code: address.state?.toUpperCase() },
-      { name: { $regex: `^${escapeRegex(stateInput)}$`, $options: "i" } },
-    ],
-  }).select("id");
-
-  if (!state) {
-    return { country: country.id, state: null, city: null };
-  }
-
-  /* -------- CITY -------- */
-  const city = await City.findOne({
-    status: "active",
-    state_id: state.id,
-    name: { $regex: `^${escapeRegex(cityInput)}$`, $options: "i" },
-  }).select("id");
-
-  return {
-    country: country.id,
-    state: state.id,
-    city: city?.id || null,
-  };
+  const location = address && await resolveLocation(address);
+  return location || { country: null, state: null, city: null };
 };

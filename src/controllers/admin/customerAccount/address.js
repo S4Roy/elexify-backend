@@ -9,6 +9,7 @@ import AuditLog from '../../../models/AuditLog.js';
 import AddressResource from '../../../resources/AddressResource.js';
 import { StatusError } from '../../../config/index.js';
 import { assertPincodeServiceable } from '../../../services/shipping/assertPincodeServiceable.js';
+import { numericId } from '../../../services/location/resolveLocation.js';
 
 const customerFilter = id => ({ _id: id, role: { $in: ['user', 'customer'] }, deleted_at: null });
 
@@ -16,10 +17,12 @@ export const listAddresses = async (req, res, next) => {
   try {
     if (!await User.exists(customerFilter(req.params.id))) throw StatusError.notFound('Customer not found');
     const addresses = await Address.find({ user: req.params.id, deleted_at: null }).sort({ is_default: -1, created_at: -1 }).lean();
-    // Older addresses may only contain numeric location IDs.
-    const countries = await Country.find({ id: { $in: addresses.map(a => a.country) } }).lean();
-    const states = await State.find({ id: { $in: addresses.map(a => a.state).filter(Boolean) } }).lean();
-    const cities = await City.find({ id: { $in: addresses.map(a => a.city).filter(Boolean) } }).lean();
+    // Older addresses may only contain location IDs; legacy WooCommerce ones may
+    // still hold codes ("IN", "WB") until normalizeLegacyAddressLocations runs.
+    const ids = field => addresses.map(a => numericId(a[field])).filter(Boolean);
+    const countries = await Country.find({ id: { $in: ids('country') } }).lean();
+    const states = await State.find({ id: { $in: ids('state') } }).lean();
+    const cities = await City.find({ id: { $in: ids('city') } }).lean();
     const data = addresses.map(address => new AddressResource({ ...address,
       country_name: address.country_name || countries.find(c => c.id === address.country)?.name,
       state_name: address.state_name || states.find(s => s.id === address.state)?.name,

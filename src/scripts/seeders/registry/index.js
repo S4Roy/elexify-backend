@@ -28,6 +28,7 @@ import fixProductContent from "./operations/fix-product-content.js";
 import backfillVerifiedEmailOrderedUsers from "./operations/backfill-verified-email-ordered-users.js";
 import backfillVerifiedEmailAdminStaff from "./operations/backfill-verified-email-admin-staff.js";
 import backfillOrderAddressSnapshots from "./operations/backfill-order-address-snapshots.js";
+import normalizeLegacyAddressLocations from "./operations/normalize-legacy-address-locations.js";
 import backfillVerifiedMobileOrderedUsers from "./operations/backfill-verified-mobile-ordered-users.js";
 import normalizeExistingMobiles from "./operations/normalize-existing-mobiles.js";
 import dedupeUserMobiles from "./operations/dedupe-user-mobiles.js";
@@ -63,6 +64,7 @@ const RAW_ENTRIES = [
   backfillVerifiedEmailOrderedUsers,
   backfillVerifiedEmailAdminStaff,
   backfillOrderAddressSnapshots,
+  normalizeLegacyAddressLocations,
   backfillVerifiedMobileOrderedUsers,
   normalizeExistingMobiles,
   dedupeUserMobiles,

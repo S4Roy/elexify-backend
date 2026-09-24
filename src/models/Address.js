@@ -26,6 +26,9 @@ const AddressSchema = new Schema(
       ref: "countries",
     },
     country_name: { type: String },
+    // Original WooCommerce-era values (e.g. country "IN", state "WB") kept by
+    // scripts/normalizeLegacyAddressLocations.js after converting to catalog ids.
+    legacy_location: { type: Object, default: undefined },
     postcode: { type: String, required: true },
     latitude: { type: Number, min: -90, max: 90, default: null },
     longitude: { type: Number, min: -180, max: 180, default: null },
