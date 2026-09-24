@@ -68,6 +68,7 @@ export const list = async (req, res, next) => {
                 input: "$packages_raw",
                 as: "pkg",
                 in: {
+                  _id: "$$pkg._id",
                   package_number: "$$pkg.package_number",
                   status: "$$pkg.status",
                   shiprocket_status: "$$pkg.shiprocket_status",
@@ -79,6 +80,8 @@ export const list = async (req, res, next) => {
                   shipped_at: "$$pkg.shipped_at",
                   delivered_at: "$$pkg.delivered_at",
                   cancelled_at: "$$pkg.cancelled_at",
+                  integration_status: "$$pkg.integration_status",
+                  last_error: "$$pkg.last_error",
                   item_count: { $size: { $ifNull: ["$$pkg.items", []] } },
                   items: { $ifNull: ["$$pkg.items", []] },
                 },

@@ -5,6 +5,7 @@ import { updateAddress } from "../../../controllers/admin/inventory/order/update
 import { addressOptions } from "../../../controllers/admin/customerAccount/address.js";
 import { addressEditSchema } from "../../../validations/admin/customerAccount/address.js";
 import { recordManualPayment } from "../../../controllers/admin/inventory/order/recordManualPayment.js";
+import { tracking } from "../../../controllers/admin/inventory/order/tracking.js";
 import { celebrate, Joi } from "celebrate";
 import { returnOperation } from "../../../controllers/admin/inventory/order/returnOperations.js";
 import { bulkUpdateStatus, BULK_ORDER_STATUS_LIMIT } from "../../../controllers/admin/inventory/order/bulkUpdateStatus.js";
@@ -79,6 +80,11 @@ orderRouter.get("/package/list", requirePermission("orders.view"), inventoryCont
 orderRouter.post("/package/retry", requirePermission("orders.fulfill"), inventoryController.orderController.retryPackage);
 orderRouter.post("/package/cancel", requirePermission("orders.fulfill"), inventoryController.orderController.cancelPackage);
 
+orderRouter.get("/tracking", requirePermission("orders.view"),
+  celebrate({ query: Joi.object({
+    order_id: Joi.string().hex().length(24).required(),
+    refresh: Joi.boolean().default(false),
+  }) }), tracking);
 orderRouter.get(
   "/details", requirePermission("orders.view"),
   // inventoryValidation.orderValidation.list,

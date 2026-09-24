@@ -5,6 +5,7 @@ import Product from "../../../models/Product.js";
 import Media from "../../../models/Media.js";
 import MediaResource from "../../../resources/MediaResource.js";
 import Address from "../../../models/Address.js";
+import User from "../../../models/User.js";
 import moment from "moment-timezone";
 import { syncShipmentScans } from "./syncShipmentScans.js";
 
@@ -15,7 +16,8 @@ import { syncShipmentScans } from "./syncShipmentScans.js";
 //                courier/AWB/ETA and its full event log (courier scans +
 //                our own package updates), newest first
 //   activity   — order-level events (placed, paid, confirmed, cancelled…)
-// Internal notes (manual status reasons, who changed what) never leave here.
+// Internal notes (manual status reasons, who changed what) only appear in the
+// admin view (adminView), which adds Shiprocket ids and an audit-style log.
 
 export const ORDER_STATUS_LABELS = {
   pending: "Order placed",
@@ -183,13 +185,14 @@ const buildMilestones = (order, packages, scans) => {
   return milestones;
 };
 
-const buildShipment = ({ key, label, source, scans, items, publicView }) => {
+const buildShipment = ({ key, label, source, scans, items, publicView, adminView }) => {
   const courierEvents = scans.map((s) => ({
     at: s.date,
     title: s.activity,
     location: s.location || null,
     status_label: s.status_label || null,
     kind: "courier",
+    ...(adminView ? { source: s.source || null } : {}),
   }));
   const updates = (source.timeline || []).map((e) => ({
     at: e.occurred_at,
@@ -219,6 +222,16 @@ const buildShipment = ({ key, label, source, scans, items, publicView }) => {
     items: publicView ? items.map(({ slug, ...rest }) => rest) : items,
     events,
     last_event_at: events[0]?.at || null,
+    ...(adminView
+      ? {
+          package_id: source.package_number != null ? source._id : null,
+          shiprocket_order_id: source.shiprocket_order_id || null,
+          shiprocket_shipment_id: source.shiprocket_shipment_id || null,
+          integration_status: source.integration_status || null,
+          courier_status_at: source.shiprocket_status_updated_at || null,
+          tracking_synced_at: source.tracking_synced_at || null,
+        }
+      : {}),
   };
 };
 
@@ -240,6 +253,53 @@ const buildActivity = (order) => {
   return events.map((e) => ({ ...e, kind: "order" })).sort(byDateDesc);
 };
 
+// Staff view of the order's history: every status change with who made it
+// and why, plus payment, cancellation and refund events.
+const buildAdminActivity = async (order) => {
+  const history = order.manual_status_history || [];
+  const userIds = [...new Set(history.map((h) => h.changed_by).filter(Boolean).map(String))];
+  const users = userIds.length ? await User.find({ _id: { $in: userIds } }).select("name email").lean() : [];
+  const userName = new Map(users.map((u) => [String(u._id), u.name || u.email || null]));
+
+  const events = [{ at: order.created_at, title: "Order placed", detail: order.payment_method ? `Payment method: ${String(order.payment_method).toUpperCase()}` : null }];
+  if (order.paid_at) {
+    events.push({
+      at: order.paid_at,
+      title: order.is_partial_cod ? "Advance payment received" : "Payment received",
+      detail: order.is_partial_cod && order.advance_amount ? `Advance ${order.advance_amount} ${order.currency || "INR"}` : null,
+    });
+  }
+  if (order.processing_at) events.push({ at: order.processing_at, title: "Order confirmed" });
+  for (const h of history) {
+    if (!h.to || h.from === h.to) continue;
+    events.push({
+      at: h.changed_at,
+      title: h.from ? `Status changed: ${statusLabel(h.from)} → ${statusLabel(h.to)}` : `Status set to ${statusLabel(h.to)}`,
+      detail: h.reason || null,
+      actor: h.changed_by ? userName.get(String(h.changed_by)) || "Admin" : "System",
+    });
+  }
+  const c = order.cancellation || {};
+  if (c.requested_at) events.push({ at: c.requested_at, title: "Cancellation requested", detail: [c.reason, c.comment].filter(Boolean).join(" — ") || null, actor: "Customer" });
+  if (c.cancelled_at) {
+    events.push({
+      at: c.cancelled_at,
+      title: c.forced ? "Order force-cancelled" : "Order cancelled",
+      detail: [c.reason, c.comment].filter(Boolean).join(" — ") || null,
+      actor: c.cancelled_by === "customer" ? "Customer" : c.cancelled_by === "admin" ? "Admin" : null,
+    });
+  }
+  const r = order.refund || {};
+  if (r.status && r.status !== "not_required") {
+    events.push({
+      at: r.completed_at || r.attempted_at || r.initiated_at || c.cancelled_at || order.updated_at,
+      title: `Refund ${humanize(r.status).toLowerCase()}`,
+      detail: [r.amount != null ? `${r.amount} ${order.currency || "INR"}` : null, r.failure_reason || null].filter(Boolean).join(" — ") || null,
+    });
+  }
+  return events.map((e) => ({ detail: null, actor: null, ...e, kind: "order" })).sort(byDateDesc);
+};
+
 const withTimeout = (promise, ms) =>
   Promise.race([promise, new Promise((resolve) => setTimeout(() => resolve({ timedOut: true }), ms))]);
 
@@ -247,9 +307,12 @@ const withTimeout = (promise, ms) =>
  * @param order     lean Order document
  * @param publicView  true for the unauthenticated /track-order lookup — omits
  *                    prices, street address and product links
+ * @param adminView staff view — adds Shiprocket ids, scan sources and the
+ *                  full status history with reasons and who made each change
  * @param refresh   pull fresh courier scans (throttled) before building
+ * @param force     admin refresh: shorter throttle (see syncShipmentScans)
  */
-export const buildOrderTracking = async (order, { publicView = false, refresh = true } = {}) => {
+export const buildOrderTracking = async (order, { publicView = false, adminView = false, refresh = true, force = false } = {}) => {
   let packages = await Package.find({ order_id: order._id, integration_status: { $ne: "failed" } })
     .sort({ package_number: 1 })
     .lean();
@@ -257,7 +320,7 @@ export const buildOrderTracking = async (order, { publicView = false, refresh = 
   if (refresh) {
     // Wait briefly for fresh scans; a slow courier API must not stall the page.
     // The sync keeps running and the next view picks up what it stored.
-    const result = await withTimeout(syncShipmentScans({ order, packages }), 4000);
+    const result = await withTimeout(syncShipmentScans({ order, packages, force }), force ? 8000 : 4000);
     if (result?.refreshed) {
       packages = await Package.find({ order_id: order._id, integration_status: { $ne: "failed" } })
         .sort({ package_number: 1 })
@@ -285,6 +348,7 @@ export const buildOrderTracking = async (order, { publicView = false, refresh = 
           })
           .filter(Boolean),
         publicView,
+        adminView,
       }),
     );
   } else if (order.awb || order.courier_name || scans.length) {
@@ -296,6 +360,7 @@ export const buildOrderTracking = async (order, { publicView = false, refresh = 
         scans,
         items: [...itemsById.values()],
         publicView,
+        adminView,
       }),
     ];
   }
@@ -345,7 +410,7 @@ export const buildOrderTracking = async (order, { publicView = false, refresh = 
               .filter((i) => i.quantity > 0);
           })()
         : [],
-    activity: buildActivity(order),
+    activity: adminView ? await buildAdminActivity(order) : buildActivity(order),
     generated_at: new Date(),
   };
 };

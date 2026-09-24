@@ -9,6 +9,8 @@ import { recordScans } from "./recordScans.js";
 // package/order status — status transitions stay with the webhook and the
 // admin "fetch current status" sync, which own notifications and derivation.
 export const TRACKING_SYNC_TTL_MS = 15 * 60 * 1000;
+// Admin "Refresh" bypasses the TTL but still can't hammer the courier API.
+export const TRACKING_FORCE_SYNC_TTL_MS = 60 * 1000;
 const FINAL_STATUSES = new Set(["delivered", "cancelled", "returned"]);
 const MAX_SHIPMENTS_PER_SYNC = 5;
 
@@ -29,10 +31,10 @@ export const fetchAwbTracking = async (awb) => {
  * TTL gets to fetch. Delivered/cancelled/returned shipments are refreshed
  * once (to backfill their log) and then never again.
  */
-const claim = async (Model, doc, now) => {
+const claim = async (Model, doc, now, force = false) => {
   if (!doc?.awb) return false;
-  if (FINAL_STATUSES.has(doc.status || doc.order_status) && doc.tracking_synced_at) return false;
-  const cutoff = new Date(now.getTime() - TRACKING_SYNC_TTL_MS);
+  if (!force && FINAL_STATUSES.has(doc.status || doc.order_status) && doc.tracking_synced_at) return false;
+  const cutoff = new Date(now.getTime() - (force ? TRACKING_FORCE_SYNC_TTL_MS : TRACKING_SYNC_TTL_MS));
   const res = await Model.updateOne(
     { _id: doc._id, $or: [{ tracking_synced_at: null }, { tracking_synced_at: { $lt: cutoff } }] },
     { $set: { tracking_synced_at: now } },
@@ -53,18 +55,19 @@ const syncOne = async ({ Model, doc, orderId, packageId }) => {
 /**
  * Refreshes courier scans for an order's shipments (packages, or the legacy
  * order-level AWB). Never throws — tracking must still render from stored
- * data when Shiprocket is slow, down or not configured.
+ * data when Shiprocket is slow, down or not configured. `force` (admin
+ * refresh) shortens the throttle to a minute and re-checks final shipments.
  */
-export const syncShipmentScans = async ({ order, packages = [] }) => {
+export const syncShipmentScans = async ({ order, packages = [], force = false }) => {
   const now = new Date();
   const jobs = [];
   if (packages.length) {
     for (const pkg of packages.filter((p) => p.awb).slice(0, MAX_SHIPMENTS_PER_SYNC)) {
-      if (await claim(Package, pkg, now)) {
+      if (await claim(Package, pkg, now, force)) {
         jobs.push(syncOne({ Model: Package, doc: pkg, orderId: order._id, packageId: pkg._id }));
       }
     }
-  } else if (order.awb && (await claim(Order, order, now))) {
+  } else if (order.awb && (await claim(Order, order, now, force))) {
     jobs.push(syncOne({ Model: Order, doc: order, orderId: order._id, packageId: null }));
   }
   if (!jobs.length) return { refreshed: 0, inserted: 0 };
