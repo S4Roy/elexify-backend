@@ -13,7 +13,7 @@ import axios from "axios";
 import { envs } from "../../config/index.js";
 import { NOTIFICATION_EVENTS } from "../../constants/notificationEvents.js";
 
-const isConfigured = () => !!(envs.whatsapp.phoneNumberId && envs.whatsapp.accessToken);
+export const isConfigured = () => !!(envs.whatsapp.phoneNumberId && envs.whatsapp.accessToken);
 
 // Maps our internal template keys (constants/notificationEvents.js
 // `templateKey`) to Meta-approved WhatsApp template names. WhatsApp
