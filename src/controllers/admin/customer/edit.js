@@ -11,7 +11,7 @@ import { generalHelper } from "../../../helpers/index.js";
  */
 export const edit = async (req, res, next) => {
   try {
-    const { _id, name, email, phone_code, mobile, password, status } = req.body;
+    const { _id, name, email, phone_code, mobile, password, status, dob, gender } = req.body;
 
     if (!_id) {
       throw StatusError.badRequest(req.__("Customer ID is required"));
@@ -61,6 +61,8 @@ export const edit = async (req, res, next) => {
     const updateData = {
       ...(name && { name: name.trim() }),
       ...(status !== undefined && { status }),
+      ...(dob !== undefined && { dob: dob || null }),
+      ...(gender !== undefined && { gender: gender || null }),
       updated_by: req.auth.user_id,
       updated_at: new Date(),
     };

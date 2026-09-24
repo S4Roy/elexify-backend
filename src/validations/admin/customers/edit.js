@@ -29,5 +29,11 @@ export const edit = celebrate({
     }),
 
     status: Joi.string().valid("active", "inactive").optional(),
+
+    // Profile fields; null/"" clears them.
+    dob: Joi.date().max("now").allow(null, "").optional().messages({
+      "date.max": "Date of birth can't be in the future",
+    }),
+    gender: Joi.string().valid("male", "female", "other").allow(null, "").optional(),
   }),
 });

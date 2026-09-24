@@ -6,6 +6,10 @@ import mongoose from "mongoose";
 import OrderResource from "../../../../resources/OrderResource.js";
 import User from "../../../../models/User.js";
 
+// Customer summary buckets (focused customer-orders view).
+const NON_REVENUE_STATUSES = ["cancelled", "failed", "returned"];
+const IN_PROGRESS_STATUSES = ["pending", "confirmed", "processing", "packed", "shipped", "partially_shipped", "out_for_delivery", "partially_delivered", "cancel_requested", "return_requested"];
+
 export const list = async (req, res, next) => {
   try {
     const {
@@ -595,7 +599,7 @@ export const list = async (req, res, next) => {
           deleted_at: null,
           user: new mongoose.Types.ObjectId(customer_id),
         };
-        const [customer, totalOrders, paidSummary, lastOrder] = await Promise.all([
+        const [customer, totalOrders, paidSummary, lastOrder, lifetime] = await Promise.all([
           User.findOne({ _id: customer_id, deleted_at: null })
             .select("name email mobile phone_code status")
             .lean(),
@@ -606,7 +610,45 @@ export const list = async (req, res, next) => {
             { $project: { _id: 0, currency: { $ifNull: ["$_id", "INR"] }, orders: 1, value: 1 } },
           ]),
           Order.findOne(customerFilter).sort({ created_at: -1 }).select("created_at").lean(),
+          // Lifetime view for the focused header: order value excludes orders
+          // that never became a sale; "collected" counts money actually
+          // received — full payments plus partial-COD advances.
+          Order.aggregate([
+            { $match: customerFilter },
+            {
+              $group: {
+                _id: null,
+                in_progress: { $sum: { $cond: [{ $in: ["$order_status", IN_PROGRESS_STATUSES] }, 1, 0] } },
+                delivered: { $sum: { $cond: [{ $eq: ["$order_status", "delivered"] }, 1, 0] } },
+                unsuccessful: { $sum: { $cond: [{ $in: ["$order_status", NON_REVENUE_STATUSES] }, 1, 0] } },
+                revenue_orders: { $sum: { $cond: [{ $in: ["$order_status", NON_REVENUE_STATUSES] }, 0, 1] } },
+                order_value: { $sum: { $cond: [{ $in: ["$order_status", NON_REVENUE_STATUSES] }, 0, "$grand_total"] } },
+                collected: {
+                  $sum: {
+                    $switch: {
+                      branches: [
+                        { case: { $eq: ["$payment_status", "paid"] }, then: "$grand_total" },
+                        { case: { $eq: ["$payment_status", "advance_paid"] }, then: { $ifNull: ["$advance_amount", 0] } },
+                      ],
+                      default: 0,
+                    },
+                  },
+                },
+                cod_due: {
+                  $sum: {
+                    $cond: [
+                      { $and: [{ $eq: ["$payment_status", "advance_paid"] }, { $not: [{ $in: ["$order_status", NON_REVENUE_STATUSES] }] }] },
+                      { $ifNull: ["$cod_due_amount", 0] },
+                      0,
+                    ],
+                  },
+                },
+              },
+            },
+          ]),
         ]);
+        const stats = lifetime[0] || {};
+        const money = (v) => Math.round((v || 0) * 100) / 100;
         if (!customer) throw StatusError.notFound(req.__("Customer not found"));
         result.filter_context = {
           customer,
@@ -615,6 +657,13 @@ export const list = async (req, res, next) => {
             paid_orders: paidSummary.reduce((sum, row) => sum + row.orders, 0),
             totals_by_currency: paidSummary,
             last_order_at: lastOrder?.created_at || null,
+            in_progress_orders: stats.in_progress || 0,
+            delivered_orders: stats.delivered || 0,
+            unsuccessful_orders: stats.unsuccessful || 0,
+            order_value: money(stats.order_value),
+            average_order_value: stats.revenue_orders ? money(stats.order_value / stats.revenue_orders) : 0,
+            collected: money(stats.collected),
+            cod_due: money(stats.cod_due),
           },
         };
       }

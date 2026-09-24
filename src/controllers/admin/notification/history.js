@@ -42,6 +42,7 @@ export const history = async (req, res, next) => {
           provider: 1,
           status: 1,
           attempts: "$attempt_count",
+          last_error: "$last_error_safe",
           created_at: 1,
           sent_at: 1,
         },
