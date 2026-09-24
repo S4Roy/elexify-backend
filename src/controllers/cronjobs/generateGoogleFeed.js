@@ -1,8 +1,12 @@
 import { inventoryService } from "../../services/index.js";
 
+// Core logic (reusable) — the hourly cron calls this directly.
+export const regenerateGoogleFeed = () => inventoryService.productService.generateGoogleFeedFile();
+
+// Express handler (debug route)
 export const generateGoogleFeed = async (req, res) => {
   try {
-    await inventoryService.productService.generateGoogleFeedFile();
+    await regenerateGoogleFeed();
 
     return res.json({
       status: "success",

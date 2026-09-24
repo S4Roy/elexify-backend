@@ -180,7 +180,7 @@ cron.schedule("*/10 * * * *", async () => {
 // checkout would be wasteful and isn't necessary for Merchant Center.
 cron.schedule("0 * * * *", async () => {
   try {
-    await CronJobs.generateGoogleFeed(); // ✅ invoke the function
+    await CronJobs.regenerateGoogleFeed();
   } catch (e) {
     console.error("generateGoogleFeed Cron Failed", e);
   }
