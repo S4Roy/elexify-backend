@@ -2,12 +2,18 @@ import moment from "moment-timezone";
 import { StatusError, envs } from "../../../config/index.js";
 import { packageReference } from "./packageReference.js";
 
-// Builds the Shiprocket adhoc-order payload for one package. Mirrors
-// src/controllers/admin/inventory/order/shipping.js's payload exactly
-// (address fields, the sub_total-solved-backwards arithmetic that avoids
-// double-counting shipping/discount — see that file's comment for why),
-// scoped down to just this package's items/weight/dims, with a package-
-// unique `order_id` so each package is a distinct Shiprocket order.
+// Builds the Shiprocket adhoc-order payload for one package, scoped to just
+// this package's items/weight/dims, with a package-unique `order_id` so each
+// package is a distinct Shiprocket order.
+//
+// Amounts: Shiprocket's order total (and, for COD, the amount the courier
+// collects) is sub_total + shipping + giftwrap + transaction − total_discount.
+// sub_total is always the real value of the package's line items, so the
+// items and "Product Total" in Shiprocket agree. Whatever the customer does
+// not pay on delivery — coupon discount and, for Partial COD, the online
+// advance already paid — goes in total_discount, so the total comes out to
+// exactly the amount due. (It used to be solved backwards into sub_total,
+// which made the product total disagree with the items it listed.)
 //
 // COD amount split: for a Partial-COD or full-COD order shipped across
 // multiple packages, each package collects a share of the COD-due amount
@@ -69,18 +75,53 @@ export const buildPackagePayload = ({ order_data, shiprocketConfig, pkg, pickupL
   // Whole-order amounts, split proportionally across packages by item value.
   const scale = (value) => Number((value * packageShare).toFixed(2));
 
+  const round2 = (value) => Number(Number(value).toFixed(2));
   const packageCodCollectible = scale(codCollectibleAmount);
   const packageShippingCharges = scale(shippingChargesValue);
   const packageGiftwrapCharges = scale(giftwrapChargesValue);
   const packageTransactionCharges = scale(transactionChargesValue);
   const packageDiscount = scale(discountValue);
 
+  const payload_items = packageOrderItems.map((item) => ({
+    name: item.display_name || item.name,
+    sku: item.sku || (item.product && item.product.sku) || `SKU-${item.product_id || item._id}`,
+    units: Number(quantityByItemId.get(String(item._id)) || 0),
+    selling_price: Number(item.unit_price || item.selling_price || item.price || 0),
+    discount: item.discount || "",
+    tax: item.tax || "",
+    hsn: item.hsn || "",
+  }));
+  const packageItemsTotal = round2(payload_items.reduce((sum, i) => sum + i.selling_price * i.units, 0));
+  const packageCharges = packageShippingCharges + packageGiftwrapCharges + packageTransactionCharges;
+  // What Shiprocket's total must equal for this package: the COD amount the
+  // courier collects, or (prepaid) this package's share of the order total.
+  const packageTarget = packageCodCollectible;
+  let packageSubTotal = packageItemsTotal;
+  let packageTotalDiscount = round2(packageItemsTotal + packageCharges - packageTarget);
+  if (packageTotalDiscount < 0) {
+    // The order total exceeds items + charges (e.g. a charge not modelled
+    // here). Never send a negative discount — carry the difference in
+    // sub_total so the collectible stays exact.
+    console.warn(
+      `Shiprocket payload ${order_data.id}-P${pkg.package_number}: order total exceeds items + charges by ${-packageTotalDiscount}; adding it to sub_total`,
+    );
+    packageSubTotal = round2(packageItemsTotal - packageTotalDiscount);
+    packageTotalDiscount = 0;
+  }
+  const packageAdvance = round2(Math.max(0, packageTotalDiscount - packageDiscount));
+  const isCod = String(order_data.payment_method || "Prepaid").toLowerCase().includes("cod");
+  const note = order_data.note || order_data.comment || "";
+  const partialCodNote =
+    isCod && order_data.is_partial_cod && packageAdvance > 0
+      ? `Partial COD: Rs ${packageAdvance.toFixed(2)} paid online (shown as discount). Collect Rs ${packageTarget.toFixed(2)}.`
+      : "";
+
   const payload = {
     order_id: packageReference(order_data.id, pkg.package_number),
     order_date: moment(order_data.created_at || new Date()).tz("Asia/Kolkata").format("YYYY-MM-DD HH:mm"),
     pickup_location: (pickupLocation && String(pickupLocation).trim()) || shiprocketConfig.pickup_location || envs.PROJECT_NAME,
     ...(shiprocketConfig.channel_id ? { channel_id: shiprocketConfig.channel_id } : {}),
-    comment: order_data.note || order_data.comment || "",
+    comment: [note, partialCodNote].filter(Boolean).join(" | "),
     billing_customer_name: billing.full_name || shippingAddr.full_name || order_data.user?.name || "",
     billing_last_name: billing.last_name || "",
     billing_address: billing.address_line_1 || "",
@@ -102,24 +143,13 @@ export const buildPackagePayload = ({ order_data, shiprocketConfig, pkg, pickupL
     shipping_country: "",
     shipping_email: "",
     shipping_phone: "",
-    order_items: packageOrderItems.map((item) => ({
-      name: item.display_name || item.name,
-      sku: item.sku || (item.product && item.product.sku) || `SKU-${item.product_id || item._id}`,
-      units: Number(quantityByItemId.get(String(item._id)) || 0),
-      selling_price: Number(item.unit_price || item.selling_price || item.price || 0),
-      discount: item.discount || "",
-      tax: item.tax || "",
-      hsn: item.hsn || "",
-    })),
-    payment_method: String(order_data.payment_method || "Prepaid").toLowerCase().includes("cod") ? "COD" : "Prepaid",
+    order_items: payload_items,
+    payment_method: isCod ? "COD" : "Prepaid",
     shipping_charges: packageShippingCharges,
     giftwrap_charges: packageGiftwrapCharges,
     transaction_charges: packageTransactionCharges,
-    total_discount: packageDiscount,
-    sub_total: Math.max(
-      0,
-      packageCodCollectible - packageShippingCharges - packageGiftwrapCharges - packageTransactionCharges + packageDiscount,
-    ),
+    total_discount: packageTotalDiscount,
+    sub_total: packageSubTotal,
     length: String(Math.round(dims.length)),
     breadth: String(Math.round(dims.width)),
     height: String(Math.round(dims.height)),

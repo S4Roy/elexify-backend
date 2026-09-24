@@ -35,7 +35,57 @@ describe("Shiprocket COD charges", () => {
     const payload = build({ ...order, is_partial_cod: true, advance_amount: 622.8, cod_due_amount: 2491.2 });
     expect(payload.shipping_charges).toBe(364);
     expect(payload.order_items[0].selling_price).toBe(2750);
+    // Product total matches the items; the advance is the discount.
+    expect(payload.sub_total).toBe(2750);
+    expect(payload.total_discount).toBeCloseTo(622.8, 2);
     expect(payable(payload)).toBeCloseTo(2491.2, 2);
+    expect(payload.comment).toContain("Partial COD: Rs 622.80 paid online");
+  });
+
+  it("matches the ORD-000107 partial COD shipment: items total, charges and the due amount", () => {
+    const items = [
+      ["a", 469, 4], ["b", 299, 1], ["c", 199, 2], ["d", 149, 2],
+      ["e", 29, 1], ["f", 179, 1], ["g", 27, 2], ["h", 249, 1],
+    ].map(([id, unit_price, quantity]) => ({ _id: id, display_name: id, sku: id, unit_price, quantity }));
+    const payload = buildPackagePayload({
+      order_data: {
+        ...baseOrder, payment_method: "cod", note: "Checkout", order_items: items,
+        shipping: 197, cod_fee: 50, grand_total: 3629,
+        is_partial_cod: true, advance_amount: 725.8, cod_due_amount: 2903.2,
+      },
+      shiprocketConfig: { pickup_location: "Warehouse" },
+      pkg: { package_number: 1, items: items.map((i) => ({ order_item_id: i._id, quantity: i.quantity })) },
+      dims: { length: 10, width: 10, height: 10, weight: 2.65 },
+    });
+    const itemsTotal = payload.order_items.reduce((sum, i) => sum + i.selling_price * i.units, 0);
+    expect(itemsTotal).toBe(3382);
+    expect(payload.sub_total).toBe(3382);
+    expect(payload.shipping_charges).toBe(247);
+    expect(payload.total_discount).toBeCloseTo(725.8, 2);
+    expect(payload.payment_method).toBe("COD");
+    expect(payable(payload)).toBeCloseTo(2903.2, 2);
+    expect(payload.comment).toBe("Checkout | Partial COD: Rs 725.80 paid online (shown as discount). Collect Rs 2903.20.");
+  });
+
+  it("splits a partial COD order across packages with each product total matching its items", () => {
+    const items = [
+      { _id: "x", display_name: "X", sku: "X", unit_price: 1000, quantity: 1 },
+      { _id: "y", display_name: "Y", sku: "Y", unit_price: 500, quantity: 2 },
+    ];
+    const order_data = {
+      ...baseOrder, payment_method: "cod", order_items: items, shipping: 100, cod_fee: 50, grand_total: 2150,
+      is_partial_cod: true, advance_amount: 430, cod_due_amount: 1720,
+    };
+    const pkgBuild = (lines, n) => buildPackagePayload({
+      order_data, shiprocketConfig: {}, pkg: { package_number: n, items: lines },
+      dims: { length: 10, width: 10, height: 10, weight: 1 },
+    });
+    const p1 = pkgBuild([{ order_item_id: "x", quantity: 1 }], 1);
+    const p2 = pkgBuild([{ order_item_id: "y", quantity: 2 }], 2);
+    expect(p1.sub_total).toBe(1000);
+    expect(p2.sub_total).toBe(1000);
+    expect(payable(p1) + payable(p2)).toBeCloseTo(1720, 2);
+    expect(p1.total_discount + p2.total_discount).toBeCloseTo(430, 2);
   });
 
   it("allocates shipping and the COD fee across split packages", () => {
