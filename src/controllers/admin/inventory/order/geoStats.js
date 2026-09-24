@@ -26,6 +26,7 @@ export const geoStats = async (req, res, next) => {
         {
           $match: {
             deleted_at: null,
+            ...dashboardHelper.orderSegmentMatch(req.query),
             created_at: { $gte: startDate, $lte: endDate },
           },
         },

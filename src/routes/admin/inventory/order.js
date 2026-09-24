@@ -97,6 +97,7 @@ orderRouter.post(
   inventoryController.orderController.add
 );
 orderRouter.get("/stats", requirePermission("orders.view"), inventoryController.orderController.stats);
+orderRouter.get("/overview", requirePermission("orders.view"), inventoryController.orderController.overview);
 orderRouter.get("/trend", requirePermission("orders.view"), inventoryController.orderController.trend);
 orderRouter.get(
   "/performance", requirePermission("orders.view"),

@@ -36,6 +36,7 @@ export const leaderboard = async (req, res, next) => {
     const qualifyingOrders = await Order.find(
       {
         deleted_at: null,
+        ...dashboardHelper.orderSegmentMatch(req.query),
         ...dashboardHelper.revenueStatusMatch,
         created_at: { $gte: startDate, $lte: endDate },
       },

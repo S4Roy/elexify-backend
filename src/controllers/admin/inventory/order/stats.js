@@ -1,17 +1,20 @@
 import Order from "../../../../models/Order.js";
+import { dashboardHelper } from "../../../../helpers/index.js";
 
 /**
- * GET /api/admin/orders/status-counts
- * Returns count of orders grouped by current statuses (dynamic).
+ * GET /api/admin/inventory/order/stats?from&to&channel&payment
+ * Order counts grouped by current status for the dashboard's date range and
+ * segment filters (all-time when no range is given, as before).
  */
 export const stats = async (req, res, next) => {
   try {
+    const match = { deleted_at: null, ...dashboardHelper.orderSegmentMatch(req.query) };
+    if (req.query.from || req.query.to) {
+      const { startDate, endDate } = dashboardHelper.resolveDateRange(req.query);
+      match.created_at = { $gte: startDate, $lte: endDate };
+    }
     const result = await Order.aggregate([
-      {
-        $match: {
-          deleted_at: null,
-        },
-      },
+      { $match: match },
       {
         $group: {
           _id: "$order_status",

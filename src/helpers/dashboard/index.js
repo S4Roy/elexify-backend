@@ -4,3 +4,4 @@ export {
   revenueStatusMatch,
   revenueSumExpr,
 } from "./revenueMatch.js";
+export { orderSegmentMatch, getComparisonRange } from "./orderFilters.js";

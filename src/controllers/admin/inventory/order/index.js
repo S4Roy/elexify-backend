@@ -8,6 +8,7 @@ import { trend } from "./trend.js";
 import { performance } from "./performance.js";
 import { leaderboard } from "./leaderboard.js";
 import { geoStats } from "./geoStats.js";
+import { overview } from "./overview.js";
 import { shipping } from "./shipping.js";
 import { cancel, forceCancel, reopen } from "./cancel.js";
 import { updateStatus } from "./updateStatus.js";
@@ -35,6 +36,7 @@ export {
   performance,
   leaderboard,
   geoStats,
+  overview,
   shipping,
   cancel,
   forceCancel,

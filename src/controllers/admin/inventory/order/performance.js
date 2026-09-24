@@ -6,27 +6,33 @@ const percentDelta = (current, previous) => {
   return ((current - previous) / previous) * 100;
 };
 
-const summarize = async (startDate, endDate) => {
+const summarize = async (startDate, endDate, segment) => {
   const [orders, revenueResult] = await Promise.all([
     Order.countDocuments({
       deleted_at: null,
+      ...segment,
       created_at: { $gte: startDate, $lte: endDate },
     }),
     Order.aggregate([
       {
         $match: {
           deleted_at: null,
+          ...segment,
           ...dashboardHelper.revenueStatusMatch,
           created_at: { $gte: startDate, $lte: endDate },
         },
       },
-      { $group: { _id: null, total: { $sum: "$grand_total" } } },
+      { $group: { _id: null, total: { $sum: "$grand_total" }, count: { $sum: 1 } } },
     ]),
   ]);
 
+  const revenue = revenueResult[0]?.total || 0;
+  const revenueOrders = revenueResult[0]?.count || 0;
   return {
     orders,
-    revenue: revenueResult[0]?.total || 0,
+    revenue,
+    // Average value of orders that count towards revenue.
+    aov: revenueOrders ? revenue / revenueOrders : 0,
   };
 };
 
@@ -41,14 +47,13 @@ export const performance = async (req, res, next) => {
     const { startDate, endDate } = dashboardHelper.resolveDateRange(
       req.query
     );
-    const { prevStart, prevEnd } = dashboardHelper.getPreviousRange(
-      startDate,
-      endDate
-    );
+    const compare = req.query.compare === "previous_year" ? "previous_year" : "previous_period";
+    const { prevStart, prevEnd } = dashboardHelper.getComparisonRange(startDate, endDate, compare);
+    const segment = dashboardHelper.orderSegmentMatch(req.query);
 
     const [current, previous] = await Promise.all([
-      summarize(startDate, endDate),
-      summarize(prevStart, prevEnd),
+      summarize(startDate, endDate, segment),
+      summarize(prevStart, prevEnd, segment),
     ]);
 
     res.status(200).json({
@@ -59,8 +64,12 @@ export const performance = async (req, res, next) => {
         revenue: current.revenue,
         prev_orders: previous.orders,
         prev_revenue: previous.revenue,
+        aov: Math.round(current.aov * 100) / 100,
+        prev_aov: Math.round(previous.aov * 100) / 100,
         orders_delta_pct: percentDelta(current.orders, previous.orders),
         revenue_delta_pct: percentDelta(current.revenue, previous.revenue),
+        aov_delta_pct: percentDelta(current.aov, previous.aov),
+        compare,
         range: {
           from: startDate.toISOString().slice(0, 10),
           to: endDate.toISOString().slice(0, 10),
