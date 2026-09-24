@@ -6,10 +6,15 @@ const { Schema, model, Types } = mongoose;
 // values or other secrets here.
 const AuditLogSchema = new Schema(
   {
+    // Optional: a failed-login attempt against an email with no matching
+    // account (enumeration/credential-stuffing) has no user document to
+    // point at. Callers that can't resolve a user should still record the
+    // attempt with user_id: null and the attempted identifier in metadata,
+    // rather than skip logging it.
     user_id: {
       type: Types.ObjectId,
       ref: "users",
-      required: true,
+      default: null,
     },
     event: {
       type: String,
@@ -59,11 +64,17 @@ const AuditLogSchema = new Schema(
         "SMS_TEMPLATE_RESET",
         "SMS_TEMPLATE_SEED_RUN",
         "AUDIT_LOG_EXPORTED",
+        "ADMIN_LOGIN_FAILED",
+        "ADMIN_ACCOUNT_LOCKED",
+        "CUSTOMER_LOGIN_FAILED",
+        "PAYMENT_VERIFICATION_FAILED",
+        "PAYMENT_FAILED",
       ],
     },
     // Set for admin-initiated events (verification override, manual retry,
     // admin preference change) — the admin user who performed the action.
-    // user_id above always identifies the customer the action concerns.
+    // user_id above identifies the customer/account the action concerns,
+    // when one could be resolved (see its own comment).
     actor_id: {
       type: Types.ObjectId,
       ref: "users",

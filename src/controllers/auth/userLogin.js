@@ -1,7 +1,7 @@
 import User from "../../models/User.js";
 import UserResource from "../../resources/UserResource.js";
 import { StatusError } from "../../config/index.js";
-import { userService, inventoryService } from "../../services/index.js";
+import { userService, inventoryService, auditService } from "../../services/index.js";
 import { generalHelper } from "../../helpers/index.js";
 
 /**
@@ -28,6 +28,12 @@ export const userLogin = async (req, res, next) => {
     }).exec();
 
     if (!user) {
+      // No matching account — still record the attempt (user_id: null,
+      // the attempted email in metadata), same as the admin login path, so
+      // credential-stuffing/enumeration against unknown customer emails
+      // shows up in the audit trail.
+      await auditService.recordAudit({ userId: null, event: "CUSTOMER_LOGIN_FAILED", req,
+        metadata: { reason: "unknown_email", attempted_email: email } });
       throw StatusError.unauthorized(
         req.__("The email you entered is invalid")
       );
@@ -43,6 +49,8 @@ export const userLogin = async (req, res, next) => {
       user.password
     );
     if (!isPasswordValid) {
+      await auditService.recordAudit({ userId: user._id, event: "CUSTOMER_LOGIN_FAILED", req,
+        metadata: { reason: "wrong_password" } });
       throw StatusError.unauthorized(
         req.__("The password you entered is incorrect")
       );

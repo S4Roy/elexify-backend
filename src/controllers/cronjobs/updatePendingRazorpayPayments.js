@@ -1,6 +1,6 @@
 import Order from "../../models/Order.js";
 import axios from "axios";
-import { orderService, notificationService } from "../../services/index.js";
+import { orderService, notificationService, auditService } from "../../services/index.js";
 import { getRazorpayConfig } from "../../services/integrationCredentials/razorpay.js";
 
 export const updatePendingRazorpayPayments = async () => {
@@ -40,6 +40,8 @@ export const updatePendingRazorpayPayments = async () => {
           event: "PAYMENT_FAILED",
           dedupeKey: `${order.id}:PAYMENT_FAILED`,
         });
+        await auditService.recordAudit({ userId: order.user, event: "PAYMENT_FAILED",
+          metadata: { order_id: order.id, reason: "razorpay_failed" } });
       } else if (!payments.length) {
         const createdAt = order.created_at || order._id.getTimestamp();
         if ((now - createdAt) / 60000 > 15) {
@@ -51,6 +53,8 @@ export const updatePendingRazorpayPayments = async () => {
             event: "PAYMENT_FAILED",
             dedupeKey: `${order.id}:PAYMENT_FAILED`,
           });
+          await auditService.recordAudit({ userId: order.user, event: "PAYMENT_FAILED",
+            metadata: { order_id: order.id, reason: "timed_out" } });
         }
       }
     } catch (error) {

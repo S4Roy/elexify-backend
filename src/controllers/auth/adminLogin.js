@@ -2,7 +2,7 @@ import Role from "../../models/Role.js";
 import User from "../../models/User.js";
 import UserResource from "../../resources/UserResource.js";
 import { StatusError, envs } from "../../config/index.js";
-import { userService, userRoleService, notificationService } from "../../services/index.js";
+import { userService, userRoleService, notificationService, auditService } from "../../services/index.js";
 import { generalHelper } from "../../helpers/index.js";
 
 /**
@@ -26,6 +26,11 @@ export const adminLogin = async (req, res, next) => {
     }).exec();
 
     if (!user) {
+      // No matching account — still record the attempt (user_id: null,
+      // the attempted email in metadata) so credential-stuffing/enumeration
+      // against unknown admin emails shows up in the audit trail.
+      await auditService.recordAudit({ userId: null, event: "ADMIN_LOGIN_FAILED", req,
+        metadata: { reason: "unknown_email", attempted_email: email } });
       throw StatusError.notFound(req.__("The email you entered is invalid"));
     }
 
@@ -40,6 +45,8 @@ export const adminLogin = async (req, res, next) => {
       const minutesLeft = Math.ceil(
         (user.login_locked_until.getTime() - Date.now()) / 60000
       );
+      await auditService.recordAudit({ userId: user._id, event: "ADMIN_LOGIN_FAILED", req,
+        metadata: { reason: "account_locked" } });
       throw StatusError.locked(
         req.__(
           `Too many failed login attempts. Try again in ${minutesLeft} minute(s).`
@@ -71,6 +78,8 @@ export const adminLogin = async (req, res, next) => {
             data: { lockout_minutes: lockoutMinutes },
           })
           .catch(() => {});
+        await auditService.recordAudit({ userId: user._id, event: "ADMIN_ACCOUNT_LOCKED", req,
+          metadata: { lockout_minutes: lockoutMinutes } });
 
         throw StatusError.locked(
           req.__(
@@ -80,6 +89,8 @@ export const adminLogin = async (req, res, next) => {
       }
 
       await user.save();
+      await auditService.recordAudit({ userId: user._id, event: "ADMIN_LOGIN_FAILED", req,
+        metadata: { reason: "wrong_password", attempts: user.failed_login_attempts } });
       throw StatusError.unauthorized(
         req.__("The password you entered is incorrect")
       );
