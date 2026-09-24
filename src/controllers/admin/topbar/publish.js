@@ -10,6 +10,7 @@ export const publish = async (req, res, next) => {
     topBar.published_contact_items = JSON.parse(
       JSON.stringify(topBar.contact_items)
     );
+    topBar.published_settings = JSON.parse(JSON.stringify(topBar.settings ?? {}));
     topBar.status = "published";
     topBar.published_at = new Date();
     topBar.updated_by = req.auth.user_id;

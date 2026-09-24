@@ -22,7 +22,7 @@ export const preview = async (req, res, next) => {
     res.status(200).json({
       status: "success",
       message: req.__("Top bar preview fetched successfully"),
-      data: { announcements, contact_items, status: plain.status },
+      data: { announcements, contact_items, settings: plain.settings ?? {}, status: plain.status },
     });
   } catch (error) {
     next(error);

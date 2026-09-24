@@ -22,7 +22,7 @@ const buildDraftTopbar = (topBar) => {
   const contact_items = (topBar.contact_items || [])
     .filter((c) => c.enabled !== false)
     .sort(sortByOrder);
-  return { announcements, contact_items };
+  return { announcements, contact_items, settings: topBar.settings ?? {}, version: 0 };
 };
 
 const buildDraftMenu = async (menu) => {

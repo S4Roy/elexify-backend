@@ -32,15 +32,41 @@ const ContactItemSchema = new Schema(
   { _id: false },
 );
 
+// Bar-level presentation — how the announcements are shown, not what they say.
+const SettingsSchema = new Schema(
+  {
+    // marquee: continuous scrolling ticker · rotate: one at a time, fading ·
+    // static: first announcement only.
+    display_mode: {
+      type: String,
+      enum: ["marquee", "rotate", "static"],
+      default: "marquee",
+    },
+    speed: { type: String, enum: ["slow", "normal", "fast"], default: "normal" },
+    pause_on_hover: { type: Boolean, default: true },
+    // Shows a close (×) button for the whole bar.
+    closeable: { type: Boolean, default: true },
+    // How long a closed bar stays hidden for that visitor; 0 = until the
+    // browser tab is closed. Republishing new content shows it again.
+    dismiss_days: { type: Number, default: 1, min: 0, max: 365 },
+    separator: { type: String, default: "•" },
+    background_color: { type: String, default: null },
+    text_color: { type: String, default: null },
+  },
+  { _id: false },
+);
+
 const TopBarSchema = new Schema(
   {
     key: { type: String, default: "top_bar", unique: true },
     // Draft/working copy — what the admin edits.
     announcements: [AnnouncementSchema],
     contact_items: [ContactItemSchema],
+    settings: { type: SettingsSchema, default: () => ({}) },
     // Last-published snapshot — what the public API serves.
     published_announcements: [AnnouncementSchema],
     published_contact_items: [ContactItemSchema],
+    published_settings: { type: SettingsSchema, default: () => ({}) },
     status: { type: String, enum: ["draft", "published"], default: "draft" },
     published_at: { type: Date, default: null },
     updated_by: { type: Types.ObjectId, ref: "users", default: null },

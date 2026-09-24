@@ -38,9 +38,26 @@ const contactItemSchema = Joi.object({
   enabled: Joi.boolean().optional(),
 });
 
+const hexColor = Joi.string()
+  .pattern(/^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/)
+  .allow("", null)
+  .messages({ "string.pattern.base": "Colors must be a hex value like #00796A" });
+
+const settingsSchema = Joi.object({
+  display_mode: Joi.string().valid("marquee", "rotate", "static").optional(),
+  speed: Joi.string().valid("slow", "normal", "fast").optional(),
+  pause_on_hover: Joi.boolean().optional(),
+  closeable: Joi.boolean().optional(),
+  dismiss_days: Joi.number().integer().min(0).max(365).optional(),
+  separator: Joi.string().max(8).allow("").optional(),
+  background_color: hexColor.optional(),
+  text_color: hexColor.optional(),
+});
+
 export const update = celebrate({
   body: Joi.object({
     announcements: Joi.array().items(announcementSchema).optional(),
     contact_items: Joi.array().items(contactItemSchema).optional(),
+    settings: settingsSchema.optional(),
   }),
 });

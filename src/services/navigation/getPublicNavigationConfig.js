@@ -27,7 +27,13 @@ const resolveTopBar = (topBar) => {
   const contactItems = (topBar.published_contact_items || [])
     .filter((c) => c.enabled)
     .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
-  return { announcements, contact_items: contactItems };
+  return {
+    announcements,
+    contact_items: contactItems,
+    settings: topBar.published_settings?.toObject?.() ?? topBar.published_settings ?? {},
+    // Lets the storefront re-show a dismissed bar once new content is published.
+    version: topBar.published_at ? new Date(topBar.published_at).getTime() : 0,
+  };
 };
 
 const resolveHeaderConfig = async (headerConfig) => {
