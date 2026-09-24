@@ -15,7 +15,10 @@ export const findExact = async (connection, path, params, predicate) => {
   throw new ZohoError("REMOTE_LOOKUP_LIMIT_REVIEW_REQUIRED");
 };
 
-export const syncMapped = async ({ connection, kind, identity, path, singular, payload, lookup, beforeUpdate }) => {
+// onCreateConflict(error) may adjust `payload` and return true to retry the
+// create once — used when Zoho rejects a new contact whose display name is
+// already taken by a different customer.
+export const syncMapped = async ({ connection, kind, identity, path, singular, payload, lookup, beforeUpdate, onCreateConflict }) => {
   const key = { organization_id: connection.organization_id, kind, identity };
   const lease = await acquireLease(`mapping:${key.organization_id}:${kind}:${kind === "contact" ? "all" : identity}`, 120000);
   if (!lease) throw new ZohoError("ZOHO_MAPPING_BUSY", { retryable: true });
@@ -49,7 +52,13 @@ export const syncMapped = async ({ connection, kind, identity, path, singular, p
       const claim = await ZohoMapping.updateOne({ ...key, state: "new", remote_id: { $exists: false } }, { $set: { state: "creating" } });
       if (claim.modifiedCount !== 1) throw new ZohoError("AMBIGUOUS_CREATE_REVIEW_REQUIRED");
       try {
-        remote = (await booksClient(connection, "POST", path, { data: payload }))[singular];
+        try {
+          remote = (await booksClient(connection, "POST", path, { data: payload }))[singular];
+        } catch (error) {
+          if (!onCreateConflict || !(error instanceof ZohoError) || error.ambiguous || !onCreateConflict(error)) throw error;
+          await assertLease();
+          remote = (await booksClient(connection, "POST", path, { data: payload }))[singular];
+        }
       } catch (error) {
         if (error instanceof ZohoError && !error.ambiguous) await ZohoMapping.updateOne({ ...key, state: "creating" }, { $set: { state: "new" } });
         throw error;

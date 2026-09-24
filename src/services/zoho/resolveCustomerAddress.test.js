@@ -9,7 +9,7 @@ const lean = value => ({ lean: async () => value });
 describe('resolveCustomerAddress', () => {
   afterEach(() => vi.restoreAllMocks());
 
-  it.each([['TG', 'Telangana', 'TS'], ['CT', 'Chhattisgarh', 'CG'], ['WB', 'West Bengal', 'WB']])(
+  it.each([['TG', 'Telangana', 'TS'], ['CT', 'Chhattisgarh', 'CG'], ['OR', 'Odisha', 'OD'], ['WB', 'West Bengal', 'WB']])(
     'sends Zoho the GST state code for %s', async (iso2, name, expected) => {
       vi.spyOn(City, 'findOne').mockReturnValue(lean(null));
       vi.spyOn(State, 'findOne').mockReturnValue(lean({ id: 1, iso2, name, country_code: 'IN', country_name: 'India' }));

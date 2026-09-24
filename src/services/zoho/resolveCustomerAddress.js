@@ -4,7 +4,8 @@ import Country from '../../models/Country.js';
 
 // Zoho Books' GST state codes differ from the catalog's ISO 3166-2 codes for
 // these states; sending the ISO code as place_of_contact is rejected by Zoho.
-export const ZOHO_STATE_CODES = { TG: 'TS', CT: 'CG' };
+// (The catalog still carries Odisha's pre-2019 code "OR"; GST uses "OD".)
+export const ZOHO_STATE_CODES = { TG: 'TS', CT: 'CG', OR: 'OD' };
 const stateCode = (record) => {
   const code = record.iso2 || record.iso3166_2?.split('-').pop();
   return record.country_code === 'IN' ? ZOHO_STATE_CODES[code] || code : code;

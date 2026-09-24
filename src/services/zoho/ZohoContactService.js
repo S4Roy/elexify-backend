@@ -3,7 +3,7 @@ import User from "../../models/User.js";
 import Address from "../../models/Address.js";
 import { booksClient, ZohoError } from "./ZohoBooksClient.js";
 import { findExact, syncMapped } from "./ZohoMappingService.js";
-import { customerPayload } from "./customerPayload.js";
+import { customerPayload, disambiguatedContactName, isDuplicateContactName } from "./customerPayload.js";
 import { sourceHash, recordSource } from "./ZohoSourceChanges.js";
 
 export const findContact = async (connection, payload) => {
@@ -63,6 +63,11 @@ export const syncContact = async (connection, userId, order = null) => {
       if (existing.contact_name !== `Elexify ${identity}`) payload.contact_name = existing.contact_name;
       const primary = existing.contact_persons?.find(person => person.is_primary_contact);
       if (primary) payload.contact_persons[0].contact_person_id = primary.contact_person_id;
+    },
+    onCreateConflict: error => {
+      if (!isDuplicateContactName(error)) return false;
+      payload.contact_name = disambiguatedContactName(payload.contact_name, identity);
+      return true;
     },
   });
   if (user) await User.updateOne({ _id: user._id }, { $set: { zoho_contact_id: remote.contact_id,

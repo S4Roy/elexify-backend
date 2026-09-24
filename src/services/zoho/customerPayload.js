@@ -35,3 +35,19 @@ export const customerPayload = (user, invoice, identity) => {
     notes: `${name} — Elexify customer ${identity}`,
   };
 };
+
+// Zoho Books requires unique contact display names, so a second customer
+// called e.g. "Om Sah" is rejected. Such a contact is created as
+// "Om Sah (ORD-000152)" for guests or "Om Sah (#a1b2c3)" for accounts; the
+// suffix is derived from the stable identity so retries pick the same name.
+export const isDuplicateContactName = (error) => {
+  const detail = error?.detail || {};
+  // Only consulted for a contact create, where "already exists" means the name.
+  return String(detail.zoho_code) === '3062' || /already exists/i.test(detail.message || '');
+};
+
+export const disambiguatedContactName = (name, identity) => {
+  const id = String(identity || '');
+  const suffix = id.startsWith('order-') ? id.slice(6) : `#${id.slice(-6)}`;
+  return `${String(name).slice(0, 180)} (${suffix})`;
+};

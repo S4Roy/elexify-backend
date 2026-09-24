@@ -50,6 +50,23 @@ describe("durable Zoho mapping claims", () => {
     await expect(syncMapped(options())).rejects.toThrow("RATE_LIMIT");
     expect(ZohoMapping.updateOne).toHaveBeenLastCalledWith(expect.objectContaining({ state: "creating" }), { $set: { state: "new" } });
   });
+  it("retries a rejected create once when the conflict hook adjusts the payload", async () => {
+    const duplicate = new ZohoError("ZOHO_HTTP_400_CODE_3062", { detail: { zoho_code: 3062, message: "The contact name already exists." } });
+    booksClient.mockRejectedValueOnce(duplicate).mockResolvedValueOnce({ contact: { contact_id: "999" } });
+    const payload = { contact_name: "Om Sah" };
+    const onCreateConflict = vi.fn(() => { payload.contact_name = "Om Sah (ORD-000152)"; return true; });
+    const remote = await syncMapped({ ...options(), kind: "contact", path: "contacts", singular: "contact", payload, onCreateConflict });
+    expect(remote.contact_id).toBe("999");
+    expect(onCreateConflict).toHaveBeenCalledWith(duplicate);
+    expect(booksClient).toHaveBeenLastCalledWith(expect.anything(), "POST", "contacts", { data: { contact_name: "Om Sah (ORD-000152)" } });
+  });
+  it("does not retry an ambiguous create even with a conflict hook", async () => {
+    booksClient.mockRejectedValue(new ZohoError("TIMEOUT", { ambiguous: true }));
+    const onCreateConflict = vi.fn(() => true);
+    await expect(syncMapped({ ...options(), onCreateConflict })).rejects.toThrow("TIMEOUT");
+    expect(onCreateConflict).not.toHaveBeenCalled();
+    expect(booksClient).toHaveBeenCalledTimes(1);
+  });
   it("searches all pages before deciding no match exists", async () => {
     booksClient.mockResolvedValueOnce({ items: [], page_context: { has_more_page: true } })
       .mockResolvedValueOnce({ items: [{ item_id: "1234", sku: "SKU-1" }], page_context: { has_more_page: false } });
