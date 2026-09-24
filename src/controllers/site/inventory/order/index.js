@@ -6,5 +6,6 @@ import { retryPayment } from "./retryPayment.js";
 import { cancel } from "./cancel.js";
 import { invoice } from "./invoice.js";
 import { createReturn, listReturns } from "./returnRequest.js";
+import { tracking, trackPublic } from "./tracking.js";
 
-export { add, list, order_details, verifyPayment, retryPayment, cancel, invoice, createReturn, listReturns };
+export { add, list, order_details, verifyPayment, retryPayment, cancel, invoice, createReturn, listReturns, tracking, trackPublic };

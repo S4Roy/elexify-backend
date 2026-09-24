@@ -25,3 +25,16 @@ export const accountChangeRateLimiter = rateLimit({
   legacyHeaders: false,
   message: { message: "Too many attempts. Please try again later." },
 });
+
+/**
+ * Public order-tracking lookup (order number + email/mobile). Enough for a
+ * customer re-checking a few orders; low enough to make guessing order
+ * number/contact pairs impractical.
+ */
+export const trackOrderRateLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: process.env.NODE_ENV === "test" ? 1_000 : 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { message: "Too many tracking attempts. Please try again in a few minutes." },
+});

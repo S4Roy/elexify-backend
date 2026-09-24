@@ -6,7 +6,7 @@ vi.mock("../../../models/Package.js", () => ({
 vi.mock("../../../models/Order.js", () => ({ default: { findOne: vi.fn(), find: vi.fn() } }));
 vi.mock("../../../models/ReturnRequest.js", () => ({ default: { findOne: vi.fn() } }));
 vi.mock("../../../models/OrderScans.js", () => ({
-  default: { findOne: vi.fn(), insertMany: vi.fn() },
+  default: { findOne: vi.fn(), insertMany: vi.fn(), bulkWrite: vi.fn() },
 }));
 vi.mock("../../../models/WebhookLog.js", () => ({ default: { create: vi.fn() } }));
 vi.mock("../../../services/index.js", () => ({
@@ -60,6 +60,7 @@ beforeEach(() => {
   // OrderScans.findOne(...).lean() — mirror Mongoose's chainable query API.
   OrderScans.findOne.mockReturnValue({ lean: () => Promise.resolve(null) });
   OrderScans.insertMany.mockResolvedValue(undefined);
+  OrderScans.bulkWrite.mockResolvedValue({ upsertedCount: 0 });
   WebhookLog.create.mockResolvedValue({});
 });
 
@@ -191,8 +192,15 @@ describe("updateOrderStatus — Shiprocket forward-shipment webhook", () => {
     expect(update.$set.delivered_at).toBeInstanceOf(Date);
     expect(update.$push.timeline.status).toBe("delivered");
 
-    expect(OrderScans.insertMany).toHaveBeenCalledTimes(1);
-    expect(OrderScans.insertMany.mock.calls[0][0]).toHaveLength(11);
+    // Scans are upserted keyed on order + AWB + date + activity, and carry
+    // the order/package link (these fields used to be silently dropped).
+    expect(OrderScans.bulkWrite).toHaveBeenCalledTimes(1);
+    const ops = OrderScans.bulkWrite.mock.calls[0][0];
+    expect(ops).toHaveLength(11);
+    expect(ops[0].updateOne.filter).toMatchObject({ order_id: "order2", awb: "59629792084", activity: "SHIPMENT DELIVERED" });
+    expect(ops[0].updateOne.filter.date).toBeInstanceOf(Date);
+    expect(ops[0].updateOne.update.$setOnInsert).toMatchObject({ package_id: "pkg2", location: "PATIALA", source: "webhook" });
+    expect(ops[0].updateOne.upsert).toBe(true);
 
     expect(orderService.recomputeOrderStatus).toHaveBeenCalledWith({
       orderId: "order2",

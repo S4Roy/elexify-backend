@@ -1,6 +1,7 @@
 import { requireRecaptcha } from "../../../middleware/recaptcha.js";
 import { validateAccessToken } from "../../../middleware/accessToken.js";
 import { Router } from "express";
+import { trackOrderRateLimiter } from "../../../middleware/rateLimiter.js";
 import { inventoryController } from "../../../controllers/site/index.js";
 import { inventoryValidation } from "../../../validations/site/index.js";
 
@@ -36,5 +37,20 @@ orderRouter.post(
   inventoryController.orderController.createReturn,
 );
 orderRouter.get("/returns", validateAccessToken, inventoryController.orderController.listReturns);
+
+// Order tracking — signed-in customer's own order, and the public
+// /track-order lookup (order number + email/mobile).
+orderRouter.get(
+  "/tracking",
+  validateAccessToken,
+  inventoryValidation.orderValidation.tracking,
+  inventoryController.orderController.tracking,
+);
+orderRouter.post(
+  "/track",
+  trackOrderRateLimiter,
+  inventoryValidation.orderValidation.trackPublic,
+  inventoryController.orderController.trackPublic,
+);
 
 export { orderRouter };

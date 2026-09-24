@@ -59,6 +59,9 @@ const PackageSchema = new Schema(
     courier_name: { type: String, default: null },
     etd: { type: String, default: null },
     tracking_url: { type: String, default: null },
+    // Last on-demand courier-scan refresh (customer tracking views); throttles
+    // Shiprocket tracking API calls — see services/orderService/tracking.
+    tracking_synced_at: { type: Date, default: null },
 
     // Outcome of the Shiprocket API call itself — separate from `status`
     // (the shipment's logistics state) — exactly like ReturnRequest.pickup.

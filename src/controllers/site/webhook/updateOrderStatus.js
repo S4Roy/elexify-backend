@@ -6,9 +6,8 @@ import { applyReverseEvent } from "../../../services/returnService/pickup.js";
 import Order from "../../../models/Order.js";
 import Package from "../../../models/Package.js";
 import ReturnRequest from "../../../models/ReturnRequest.js";
-import OrderScans from "../../../models/OrderScans.js";
+import { recordScans } from "../../../services/orderService/tracking/recordScans.js";
 import WebhookLog from "../../../models/WebhookLog.js";
-import moment from "moment-timezone";
 import { normalizeOrderStatus } from "../../../helpers/order/normalizeOrderStatus.js";
 import { applyPackageShipment, applyLegacyShipment, fulfillmentBlocked } from "../../../services/orderService/packages/applyShiprocketShipment.js";
 import { orderService, notificationService } from "../../../services/index.js";
@@ -200,28 +199,8 @@ export const updateOrderStatus = async (req, res, next) => {
       });
       const updatedPackage = result.pkg;
 
-      // Persist scan records against the parent order, same dedupe logic
-      // as the legacy path below.
-      if (Array.isArray(scans) && scans.length) {
-        const scanDocs = [];
-        for (const s of scans) {
-          const scanDateRaw = s.date || s.scanned_at || s.timestamp || null;
-          const scanDate = scanDateRaw ? moment(scanDateRaw).toDate() : null;
-          const activity = (s.activity || s.activity_text || s.status || "").toString();
-          const location = s.location || s.place || "";
-          if (!activity) continue;
-          const dupQuery = { order: pkg.order_id, awb: awbStr, activity };
-          if (scanDate) dupQuery.date = scanDate;
-          const exist = await OrderScans.findOne(dupQuery).lean();
-          if (exist) continue;
-          scanDocs.push({ order: pkg.order_id, awb: awbStr, activity, location, date: scanDate, raw: s, createdAt: new Date() });
-        }
-        if (scanDocs.length) {
-          await OrderScans.insertMany(scanDocs, { ordered: false }).catch((insertErr) => {
-            console.warn("OrderScans insertMany warning:", insertErr.message || insertErr);
-          });
-        }
-      }
+      // Persist courier scans against the parent order + this package.
+      await recordScans({ orderId: pkg.order_id, packageId: pkg._id, awb: awbStr || pkg.awb, scans, source: "webhook" });
 
       const recomputedOrder = fulfillmentBlocked(parentOrder)
         ? parentOrder : (await reconcilePackageOrder(pkg.order_id)).order;
@@ -267,59 +246,8 @@ export const updateOrderStatus = async (req, res, next) => {
     if (await Package.exists({ order_id: order._id })) {
       return respond({ status: "ignored", message: "Order has packages but no exact package matched; review shipment links" });
     }
-    // ---- Persist scan records if present
-    if (Array.isArray(scans) && scans.length) {
-      // Build scan docs; avoid duplicates by checking date+activity+awb
-      const scanDocs = [];
-      for (const s of scans) {
-        const scanDateRaw = s.date || s.scanned_at || s.timestamp || null;
-        const scanDate = scanDateRaw ? moment(scanDateRaw).toDate() : null;
-        const activity = (
-          s.activity ||
-          s.activity_text ||
-          s.status ||
-          ""
-        ).toString();
-        const location = s.location || s.place || "";
-
-        if (!activity) continue;
-
-        // check existing OrderScans for duplicate (same awb + activity + date)
-        const dupQuery = {
-          order: order._id,
-          awb: awbStr,
-          activity,
-        };
-        if (scanDate) dupQuery.date = scanDate;
-
-        const exist = await OrderScans.findOne(dupQuery).lean();
-        if (exist) continue;
-
-        // prepare doc
-        scanDocs.push({
-          order: order._id,
-          awb: awbStr,
-          activity,
-          location,
-          date: scanDate,
-          raw: s,
-          createdAt: new Date(),
-        });
-      }
-
-      if (scanDocs.length) {
-        // insertMany
-        try {
-          await OrderScans.insertMany(scanDocs, { ordered: false });
-        } catch (insertErr) {
-          // ignore duplicate-key issues or log insertion error
-          console.warn(
-            "OrderScans insertMany warning:",
-            insertErr.message || insertErr
-          );
-        }
-      }
-    }
+    // ---- Persist courier scans (idempotent; see recordScans)
+    await recordScans({ orderId: order._id, awb: awbStr || order.awb, scans, source: "webhook" });
 
     const result = await applyLegacyShipment({ order,
       shipment: { id: body.shipment_id, awb: awbStr, courier_name, etd, current_status: current_status || shipment_status }, at: eventTimestamp });

@@ -107,6 +107,8 @@ const OrderSchema = new Schema(
     etd: { type: String },
     shiprocket_status: { type: String, default: null },
     shiprocket_status_updated_at: { type: Date, default: null },
+    // Legacy single-shipment orders only: last courier-scan refresh.
+    tracking_synced_at: { type: Date, default: null },
     courier_name: { type: String },
     processing_at: { type: Date, default: null },
     shipped_at: { type: Date, default: null },
