@@ -137,10 +137,16 @@ describe("Shiprocket package address", () => {
 });
 
 describe('physical package weight', () => {
+  const packageOrderItems = [{ product: { weight: 2 }, quantity: 3 }, { product: { weight: 0.5 }, quantity: 4 }];
   it('sums product weight times the selected package quantity', () => {
-    expect(resolvePackageDims({ qWeight: 99, qLength: 100, qWidth: 100, qHeight: 100,
-      packageOrderItems: [{ product: { weight: 2 }, quantity: 3 }, { product: { weight: 0.5 }, quantity: 4 }],
-    }).weight).toBe(8);
+    expect(resolvePackageDims({ qLength: 100, qWidth: 100, qHeight: 100, packageOrderItems }).weight).toBe(8);
+  });
+  it('uses the admin-entered package weight when given', () => {
+    expect(resolvePackageDims({ qWeight: 3.7, packageOrderItems }).weight).toBe(3.7);
+    expect(resolvePackageDims({ qWeight: 1.2, packageOrderItems: [{ product: {}, quantity: 1 }] }).weight).toBe(1.2);
+  });
+  it.each([-1, 'abc', 1001])('rejects an invalid admin-entered weight %s', qWeight => {
+    expect(() => resolvePackageDims({ qWeight, packageOrderItems })).toThrow('Package weight');
   });
   it('uses variation weights and recalculates reduced quantities', () => {
     const item = { product: { weight: 2 }, variation: { weight: 0.5 }, quantity: 4 };

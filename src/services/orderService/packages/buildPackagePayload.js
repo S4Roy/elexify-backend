@@ -154,7 +154,7 @@ export const buildPackagePayload = ({ order_data, shiprocketConfig, pkg, pickupL
   return payload;
 };
 
-// Physical weight is calculated from only the units in this package.
+// Default physical weight: product weights of only the units in this package.
 export const calculatePackageWeight = items => {
   return Number(items.reduce((total, item) => {
     const weight = Number(item.variation?.weight ?? item.product?.weight ?? item.weight);
@@ -172,6 +172,9 @@ export const resolvePackageDims = ({ qWeight, qLength, qWidth, qHeight, packageO
   const widthNum = qWidth ? Number(qWidth) : null;
   const heightNum = qHeight ? Number(qHeight) : null;
   const weightNum = qWeight ? Number(qWeight) : null;
+  if (weightNum !== null && !(Number.isFinite(weightNum) && weightNum > 0 && weightNum <= 1000)) {
+    throw StatusError.badRequest('Package weight must be between 0 and 1000 kg');
+  }
 
   const volumetricFromQuery = lengthNum && widthNum && heightNum ? (lengthNum * widthNum * heightNum) / 5000.0 : 0;
 
@@ -190,7 +193,9 @@ export const resolvePackageDims = ({ qWeight, qLength, qWidth, qHeight, packageO
   const DEFAULT_WEIGHT = Number(process.env.DEFAULT_WEIGHT_KG || 0.5);
   const DEFAULT_DIM = Number(process.env.DEFAULT_DIM_CM || 10);
   return {
-    weight: packageOrderItems?.length ? calculatePackageWeight(packageOrderItems) : weightNum || volumetricFromQuery || totalVolWeightFromProducts || DEFAULT_WEIGHT,
+    // The admin's weighed package wins; otherwise fall back to product weights.
+    weight: weightNum || (packageOrderItems?.length ? calculatePackageWeight(packageOrderItems)
+      : volumetricFromQuery || totalVolWeightFromProducts || DEFAULT_WEIGHT),
     length: lengthNum || DEFAULT_DIM,
     width: widthNum || DEFAULT_DIM,
     height: heightNum || DEFAULT_DIM,
