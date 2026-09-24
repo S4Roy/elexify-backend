@@ -39,7 +39,8 @@ const storedConnection = async () => {
 const endpoint = action => async (req, res, next) => {
   res.set("Cache-Control", "no-store");
   try { res.json({ status: "success", data: await action(req) }); }
-  catch (error) { next(error instanceof ZohoError ? new StatusError(error.retryable ? 503 : 409, error.code) :
+  catch (error) { next(error instanceof ZohoError ? new StatusError(error.retryable ? 503 : 409,
+    error.detail?.message ? `${error.code}: ${error.detail.message}` : error.code) :
     error instanceof StatusError ? error : StatusError.serverError("Zoho integration operation failed")); }
 };
 const audit = (req, event, extra = {}) => ZohoIntegrationLog.create({ actor_id: req.auth.user_id, event, ...extra });

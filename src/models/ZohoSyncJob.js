@@ -12,6 +12,7 @@ const schema = new mongoose.Schema({
   lease_owner: String,
   lease_until: Date,
   last_error: String,
+  last_error_detail: { type: Object, default: null },
   synced_at: Date,
 }, { timestamps: true });
 schema.index({ organization_id: 1, kind: 1, entity_id: 1 }, { unique: true });

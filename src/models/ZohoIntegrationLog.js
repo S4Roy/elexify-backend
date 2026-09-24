@@ -9,6 +9,8 @@ const schema = new mongoose.Schema({
   entity_id: mongoose.Schema.Types.ObjectId,
   attempt: Number,
   code: String,
+  message: String,
+  detail: Object,
   created_at: { type: Date, default: Date.now },
 });
 schema.index({ created_at: 1 }, { expireAfterSeconds: 90 * 86400 });

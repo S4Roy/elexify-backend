@@ -37,7 +37,16 @@ describe("Zoho Books transport", () => {
   });
   it("retains rate-limit delays without logging provider messages", async () => {
     fetch.mockResolvedValueOnce(response(429, { code: 45, message: "customer@example.com token=secret" }, { "Retry-After": "120" }));
-    await expect(booksClient(connection, "GET", "items")).rejects.toMatchObject({ code: "ZOHO_HTTP_429_CODE_45", retryable: true, retryAfter: 120000, ambiguous: false });
+    const error = await booksClient(connection, "GET", "items").catch(e => e);
+    expect(error).toMatchObject({ code: "ZOHO_HTTP_429_CODE_45", retryable: true, retryAfter: 120000, ambiguous: false });
+    expect(error.detail.message).toBe("cu***@example.com token: [REDACTED]");
+  });
+  it("keeps Zoho's reason for a rejected request", async () => {
+    fetch.mockResolvedValueOnce(response(400, { code: 118068, message: "Invalid value passed for place_of_contact" }));
+    await expect(booksClient(connection, "POST", "contacts")).rejects.toMatchObject({
+      code: "ZOHO_HTTP_400_CODE_118068",
+      detail: { http_status: 400, zoho_code: 118068, message: "Invalid value passed for place_of_contact", method: "POST", path: "contacts" },
+    });
   });
   it("marks server-side write failures as ambiguous", async () => {
     fetch.mockResolvedValueOnce(response(503, { code: 1 }));

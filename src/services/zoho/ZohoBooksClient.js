@@ -1,5 +1,6 @@
 import { getAccessToken } from "./ZohoAuthService.js";
 import { reserveRequestSlot } from "./ZohoRateLimiter.js";
+import { redactMessage } from "../../scripts/shared/redact.js";
 
 export const REGIONS = Object.freeze({
   in: ["https://accounts.zoho.in", "https://www.zohoapis.in"],
@@ -11,14 +12,22 @@ export const REGIONS = Object.freeze({
 });
 
 export class ZohoError extends Error {
-  constructor(code, { retryable = false, ambiguous = false, retryAfter = 0 } = {}) {
+  constructor(code, { retryable = false, ambiguous = false, retryAfter = 0, detail = null } = {}) {
     super(code);
     this.code = code;
     this.retryable = retryable;
     this.ambiguous = ambiguous;
     this.retryAfter = retryAfter;
+    // Zoho's own explanation ({ http_status, zoho_code, message, method, path }),
+    // stored on the sync job and integration log; `code` stays the stable key.
+    this.detail = detail;
   }
 }
+
+// Zoho messages can echo request data, so secrets and email addresses are
+// masked before the message is stored or logged.
+export const providerMessage = message => typeof message !== "string" ? null :
+  redactMessage(message).replace(/\b([^\s@]{1,2})[^\s@]*@([^\s@]+\.[^\s@]+)/g, "$1***@$2").slice(0, 1000);
 
 export const retryDelay = (attempt, retryAfter = 0, random = Math.random) =>
   Math.max(retryAfter, Math.min(3600000, 1000 * 2 ** Math.min(attempt, 12)) * (0.5 + random() * 0.5));
@@ -53,6 +62,8 @@ export const booksClient = async (connection, method, path, { data, params = {},
         retryable: response.status === 429 || response.status >= 500,
         ambiguous: method !== "GET" && response.status >= 500,
         retryAfter: Number.isFinite(retryAfter) ? retryAfter : 0,
+        detail: { http_status: response.status, zoho_code: payload.code ?? null,
+          message: providerMessage(payload.message), method, path },
       });
     }
     return payload;

@@ -10,6 +10,13 @@ import { syncItem } from "./ZohoItemService.js";
 import { syncContact } from "./ZohoContactService.js";
 import { syncSalesOrder, assertOrderEligible } from "./ZohoSalesOrderService.js";
 import { reconcileSourceChanges } from "./ZohoSourceChanges.js";
+import { logger } from "../../config/logger.js";
+
+// Zoho's reason for a failure (or the internal error's message), for the job,
+// the integration log and the server log.
+export const errorDetail = error => error instanceof ZohoError
+  ? error.detail || null
+  : { message: String(error?.message || error).slice(0, 1000) };
 
 export const enqueueSync = async (connection, kind, entityId, { sourceVersion = 0, retry = false } = {}) => {
   if (!connection?.enabled || !connection.connected) throw new ZohoError("ZOHO_SYNC_DISABLED");
@@ -24,7 +31,7 @@ export const enqueueSync = async (connection, kind, entityId, { sourceVersion = 
   if (retry || sourceVersion) {
     const filter = { ...key, ...(retry ? {} : { source_version: { $lt: sourceVersion } }) };
     await ZohoSyncJob.updateOne(filter, { $inc: { revision: 1 }, $max: { source_version: sourceVersion },
-      $set: { status: "queued", next_attempt_at: new Date(), attempts: 0, last_error: null } });
+      $set: { status: "queued", next_attempt_at: new Date(), attempts: 0, last_error: null, last_error_detail: null } });
   }
   return ZohoSyncJob.findOne(key).lean();
 };
@@ -49,7 +56,8 @@ export const reconcilePackedOrders = async connection => {
     catch (error) {
       if (!(error instanceof ZohoError)) throw error;
       await Order.updateOne({ _id: order._id }, { $set: { "zoho.sync_status": "review" }, $max: { "zoho.completed_version": order.zoho.version } });
-      await ZohoIntegrationLog.create({ organization_id: connection.organization_id, kind: "salesorder", entity_id: order._id, event: "review", code: error.code });
+      await ZohoIntegrationLog.create({ organization_id: connection.organization_id, kind: "salesorder", entity_id: order._id, event: "review", code: error.code,
+        message: error.detail?.message, detail: error.detail });
     }
   }
 };
@@ -101,6 +109,7 @@ export const processZohoQueue = async () => {
       let status = "synced";
       let code;
       let delay = 0;
+      let detail = null;
       try {
         if (job.kind === "salesorder") await syncSalesOrder(connection, job.entity_id);
         else if (job.kind === "order_contact") {
@@ -112,13 +121,16 @@ export const processZohoQueue = async () => {
         else await syncItem(connection, job.entity_id, job.kind === "variation");
       } catch (error) {
         code = error instanceof ZohoError ? error.code : "ZOHO_INTERNAL_ERROR";
+        detail = errorDetail(error);
+        logger.error("Zoho sync failed", { kind: job.kind, entity_id: String(job.entity_id), job_id: String(job._id),
+          attempt: job.attempts, code, detail, ...(error instanceof ZohoError ? {} : { stack: error?.stack }) });
         status = error.ambiguous || code.includes("REVIEW") ? "review" :
           (!(error instanceof ZohoError) || error.retryable) && job.attempts < 8 ? "retrying" : "dead_letter";
         delay = retryDelay(job.attempts, error.retryAfter || 0);
         if (code.startsWith("ZOHO_HTTP_429")) await ZohoConnection.updateOne({ _id: connection._id }, { $set: { paused_until: new Date(Date.now() + delay) } });
       }
       if (leaseLost) break;
-      const result = await ZohoSyncJob.updateOne(fence, { $set: { status, last_error: code || null,
+      const result = await ZohoSyncJob.updateOne(fence, { $set: { status, last_error: code || null, last_error_detail: detail,
         next_attempt_at: new Date(Date.now() + delay), ...(status === "synced" ? { synced_at: new Date() } : {}) },
         $unset: { lease_owner: "", lease_until: "" } });
       if (result.matchedCount) {
@@ -128,7 +140,8 @@ export const processZohoQueue = async () => {
         });
         if (status === "synced") await ZohoConnection.updateOne({ _id: connection._id }, { $set: { last_success_at: new Date() } });
         await ZohoIntegrationLog.create({ job_id: job._id, organization_id: connection.organization_id,
-          event: status, kind: job.kind, entity_id: job.entity_id, attempt: job.attempts, code });
+          event: status, kind: job.kind, entity_id: job.entity_id, attempt: job.attempts, code,
+          message: detail?.message, detail });
       }
       if (status === "retrying") break;
     }
