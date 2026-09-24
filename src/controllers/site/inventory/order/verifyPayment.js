@@ -2,6 +2,7 @@ import crypto from "crypto";
 import { StatusError } from "../../../../config/index.js";
 import { orderService, notificationService, auditService } from "../../../../services/index.js";
 import { getRazorpayClient, getRazorpayConfig } from "../../../../services/integrationCredentials/razorpay.js";
+import { buildOrderContext, paymentContext } from "../../../../services/audit/paymentFailureContext.js";
 
 export const verifyPayment = async (req, res, next) => {
   try {
@@ -15,15 +16,22 @@ export const verifyPayment = async (req, res, next) => {
       // A mismatched signature means the payment_id/order_id/signature
       // triple wasn't actually issued by Razorpay for this request — either
       // corruption or a forged client attempt to fake a successful payment.
-      await auditService.recordAudit({ userId, event: "PAYMENT_VERIFICATION_FAILED", req,
-        metadata: { order_id, reason: "signature_mismatch", razorpay_order_id, razorpay_payment_id } });
+      // No Razorpay call has happened yet, so these IDs are unverified —
+      // label them "claimed_" rather than implying they're confirmed.
+      const context = await buildOrderContext(order_id);
+      await auditService.recordAudit({ userId: userId || context.userId, event: "PAYMENT_VERIFICATION_FAILED", req,
+        metadata: { order_id, reason: "signature_mismatch",
+          claimed_razorpay_order_id: razorpay_order_id, claimed_razorpay_payment_id: razorpay_payment_id,
+          ...context.metadata } });
       throw StatusError.badRequest("Payment signature mismatch");
     }
 
     const payment = await (await getRazorpayClient()).payments.fetch(razorpay_payment_id);
     if (payment?.order_id !== razorpay_order_id) {
-      await auditService.recordAudit({ userId, event: "PAYMENT_VERIFICATION_FAILED", req,
-        metadata: { order_id, reason: "order_mismatch", razorpay_order_id, razorpay_payment_id } });
+      const context = await buildOrderContext(order_id);
+      await auditService.recordAudit({ userId: userId || context.userId, event: "PAYMENT_VERIFICATION_FAILED", req,
+        metadata: { order_id, reason: "order_mismatch", razorpay_order_id, razorpay_payment_id,
+          ...paymentContext(payment), ...context.metadata } });
       throw StatusError.badRequest("Payment does not match Razorpay order");
     }
     const result = await orderService.finalizeCapturedPayment({

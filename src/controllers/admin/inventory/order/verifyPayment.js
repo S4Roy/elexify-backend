@@ -2,6 +2,7 @@ import crypto from "crypto";
 import { StatusError } from "../../../../config/index.js";
 import { orderService, notificationService, auditService } from "../../../../services/index.js";
 import { getRazorpayClient, getRazorpayConfig } from "../../../../services/integrationCredentials/razorpay.js";
+import { buildOrderContext, paymentContext } from "../../../../services/audit/paymentFailureContext.js";
 
 export const verifyPayment = async (req, res, next) => {
   try {
@@ -13,14 +14,19 @@ export const verifyPayment = async (req, res, next) => {
     const expected = crypto.createHmac("sha256", credentials.key_secret)
       .update(`${razorpay_order_id}|${razorpay_payment_id}`).digest("hex");
     if (expected !== razorpay_signature) {
-      await auditService.recordAudit({ userId: null, actorId: req.auth.user_id, event: "PAYMENT_VERIFICATION_FAILED", req,
-        metadata: { order_id, reason: "signature_mismatch", razorpay_order_id, razorpay_payment_id, source: "admin_verification" } });
+      const context = await buildOrderContext(order_id);
+      await auditService.recordAudit({ userId: context.userId, actorId: req.auth.user_id, event: "PAYMENT_VERIFICATION_FAILED", req,
+        metadata: { order_id, reason: "signature_mismatch",
+          claimed_razorpay_order_id: razorpay_order_id, claimed_razorpay_payment_id: razorpay_payment_id,
+          source: "admin_verification", ...context.metadata } });
       throw StatusError.badRequest("Payment signature mismatch");
     }
     const payment = await (await getRazorpayClient()).payments.fetch(razorpay_payment_id);
     if (payment?.order_id !== razorpay_order_id) {
-      await auditService.recordAudit({ userId: null, actorId: req.auth.user_id, event: "PAYMENT_VERIFICATION_FAILED", req,
-        metadata: { order_id, reason: "order_mismatch", razorpay_order_id, razorpay_payment_id, source: "admin_verification" } });
+      const context = await buildOrderContext(order_id);
+      await auditService.recordAudit({ userId: context.userId, actorId: req.auth.user_id, event: "PAYMENT_VERIFICATION_FAILED", req,
+        metadata: { order_id, reason: "order_mismatch", razorpay_order_id, razorpay_payment_id,
+          source: "admin_verification", ...paymentContext(payment), ...context.metadata } });
       throw StatusError.badRequest("Payment does not match Razorpay order");
     }
     const result = await orderService.finalizeCapturedPayment({
