@@ -73,7 +73,8 @@ export const issueOtp = async ({ identifier, purpose, email, mobile, name, req }
     }
   } else {
     // Keep the internal verification purpose out of customer-facing SMS copy.
-    const purposeLabel = purpose === "change_mobile" ? "mobile number change" : purpose;
+    const purposeLabel =
+      { change_mobile: "mobile number change", delete_account: "account deletion" }[purpose] || purpose;
     const otpTemplate = await smsTemplateService.getTemplate("otp_generic");
     const otpValuesByKey = { name: name || "User", purpose: purposeLabel, otp };
     const result = otpTemplate

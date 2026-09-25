@@ -14,13 +14,19 @@ export const accessTokenIfAny = async (req, res, next) => {
 
     if (token) {
       const decodedData = await userService.verifyToken(token);
-      if (decodedData && decodedData.user_id) {
+      // A token for a deleted or blocked account falls back to guest access.
+      if (
+        decodedData?.user_id &&
+        !(await userService.isAccountClosed(decodedData.user_id, decodedData.iat))
+      ) {
         req.auth = {
           user_id: decodedData.user_id,
           email: decodedData.email,
           role: decodedData.role,
           guest_id: guest_id,
         };
+      } else if (guest_id) {
+        req.auth = { guest_id };
       }
     } else if (guest_id) {
       req.auth = { guest_id };

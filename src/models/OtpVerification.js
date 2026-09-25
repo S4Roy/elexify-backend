@@ -41,6 +41,7 @@ const OtpVerificationSchema = new Schema(
         "update_contact",
         "change_email",
         "change_mobile",
+        "delete_account",
       ],
     },
 

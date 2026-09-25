@@ -20,6 +20,11 @@ export const validateAccessToken = async (req, res, next) => {
 
     const userDetails = decodedData;
     if (!userDetails) throw StatusError.unauthorized("User  not found.");
+    // Tokens are long-lived, so a deleted or blocked account must be
+    // rejected here rather than left working until the token expires.
+    if (await userService.isAccountClosed(userDetails.user_id, userDetails.iat)) {
+      throw StatusError.unauthorized("Session expired. Please login again.");
+    }
 
     // const userRole = await userRoleService.getUserRole(userDetails.id);
     // if (!userRole) throw StatusError.unauthorized("User  role not found.");

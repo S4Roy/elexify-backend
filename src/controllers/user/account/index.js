@@ -9,6 +9,11 @@ import {
   getNotificationPreferences,
   updateNotificationPreferences,
 } from "./notificationPreferences.js";
+import {
+  deletionStatus,
+  requestAccountDeletion,
+  confirmAccountDeletion,
+} from "./deleteAccount.js";
 
 export {
   details,
@@ -20,4 +25,7 @@ export {
   resendOtp,
   getNotificationPreferences,
   updateNotificationPreferences,
+  deletionStatus,
+  requestAccountDeletion,
+  confirmAccountDeletion,
 };

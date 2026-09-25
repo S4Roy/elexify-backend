@@ -59,4 +59,19 @@ accountRouter.patch(
   userController.accountController.updateNotificationPreferences
 );
 
+accountRouter.get("/delete", userController.accountController.deletionStatus);
+
+accountRouter.post(
+  "/delete/request",
+  accountChangeRateLimiter,
+  userController.accountController.requestAccountDeletion
+);
+
+accountRouter.post(
+  "/delete/confirm",
+  accountChangeRateLimiter,
+  userValidation.accountValidation.confirmAccountDeletion,
+  userController.accountController.confirmAccountDeletion
+);
+
 export { accountRouter };

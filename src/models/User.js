@@ -170,6 +170,12 @@ const UserSchema = new Schema(
       type: Types.ObjectId,
       default: null,
     },
+    // Set when the customer deletes their own account (services/user/accountDeletion.js).
+    // Only the reason code is kept — no personal data.
+    account_deletion: {
+      type: new Schema({ reason: String, deleted_at: Date }, { _id: false }),
+      default: undefined,
+    },
     seller_details: {
       type: Types.ObjectId,
       ref: "seller_details",
