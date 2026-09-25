@@ -5,6 +5,7 @@ import Order from "../../../../models/Order.js";
 import { StatusError, envs } from "../../../../config/index.js";
 import mongoose from "mongoose";
 import OrderResource from "../../../../resources/OrderResource.js";
+import { orderItemPreviews } from "../../../../services/orderService/itemPreviews.js";
 import { getCustomerOrderCapabilities, getOrderPolicy } from "../../../../services/orderService/orderPolicy.js";
 import ReturnRequest from "../../../../models/ReturnRequest.js";
 
@@ -713,7 +714,9 @@ export const list = async (req, res, next) => {
       );
       const agg = Order.aggregate(pipeline);
       const result = await Order.aggregatePaginate(agg, options);
+      const previews = await orderItemPreviews(result.docs.map((doc) => doc._id));
       result.docs = await OrderResource.collection(result.docs);
+      for (const doc of result.docs) doc.item_previews = previews.get(String(doc._id)) || [];
 
       data = result;
     }
