@@ -3,6 +3,12 @@
 // Role.permissions from MongoDB and never authorize by these labels.
 
 export const PERMISSIONS = {
+  CUSTOMER_NOTIFICATION_CREATE: "customer.notification.create",
+  CUSTOMER_NOTIFICATION_SEND: "customer.notification.send",
+  CUSTOMER_NOTIFICATION_SCHEDULE: "customer.notification.schedule",
+  CUSTOMER_NOTIFICATION_CANCEL: "customer.notification.cancel",
+  CUSTOMER_NOTIFICATION_ANALYTICS: "customer.notification.analytics",
+
   CUSTOMER_ADDRESS_MANAGE: "customer.address.manage",
   CUSTOMER_VIEW: "customer.view",
   CUSTOMER_CONTACT_VIEW: "customer.contact.view",

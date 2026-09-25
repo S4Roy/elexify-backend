@@ -1,3 +1,4 @@
+import { enqueuePushEvent } from './push/service.js';
 import User from "../../models/User.js";
 import NotificationPreference from "../../models/NotificationPreference.js";
 import NotificationLog from "../../models/NotificationLog.js";
@@ -93,6 +94,9 @@ export const sendNotification = async ({ userId, event, data = {}, dedupeKey = n
     const user = await User.findOne({ _id: userId, deleted_at: null }).lean();
     if (!user) return { success: false, error: "user_not_found" };
 
+    // Isolate push persistence failures from the existing channels.
+    try { await enqueuePushEvent({ userId, event, data, dedupeKey, category: eventMeta.category }); }
+    catch { console.error('push_enqueue_failed', { event, user_id: String(userId) }); }
     const preferences = await getOrCreatePreferences(userId);
 
     const results = [];

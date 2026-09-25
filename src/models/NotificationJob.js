@@ -22,7 +22,7 @@ const NotificationJobSchema = new Schema(
     channel: {
       type: String,
       required: true,
-      enum: ["email", "sms", "whatsapp"],
+      enum: ["email", "sms", "whatsapp", "push"],
     },
     template_id: {
       type: String,
@@ -59,6 +59,10 @@ const NotificationJobSchema = new Schema(
       enum: ["QUEUED", "SENDING", "SENT", "FAILED", "RETRYING", "DEAD_LETTER"],
       default: "QUEUED",
     },
+    campaign_id: { type: Types.ObjectId, default: null },
+    environment: String,
+    lease_id: String,
+    lease_until: Date,
     attempts: {
       type: Number,
       default: 0,
@@ -117,6 +121,8 @@ NotificationJobSchema.index(
 // Worker poll query: due jobs by status.
 NotificationJobSchema.index({ status: 1, next_attempt_at: 1 });
 
+NotificationJobSchema.index({ campaign_id: 1, status: 1 });
+NotificationJobSchema.index({ channel: 1, environment: 1, status: 1, lease_until: 1 });
 NotificationJobSchema.plugin(mongooseAggregatePaginate);
 
 const NotificationJob = model("notification_jobs", NotificationJobSchema);

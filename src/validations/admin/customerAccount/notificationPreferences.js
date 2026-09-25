@@ -17,7 +17,8 @@ export const updateNotificationPreferences = celebrate({
       refund_sms: bool,
     }).unknown(true).optional(),
     security: Joi.object({ email: bool, sms: bool }).unknown(true).optional(),
-    marketing: Joi.object({ email: bool, sms: bool, whatsapp: bool }).unknown(true).optional(),
+    marketing: Joi.object({
+      push: Joi.boolean().strict(), email: bool, sms: bool, whatsapp: bool }).unknown(true).optional(),
     reminders: Joi.object({
       abandoned_cart_email: bool,
       abandoned_cart_whatsapp: bool,

@@ -1,3 +1,7 @@
+import { pushConfig } from './push/config.js';
+import { randomUUID } from 'node:crypto';
+import { deliverPush, repairPushOutbox } from './push/service.js';
+import { processCampaigns } from './push/campaigns.js';
 import NotificationJob from "../../models/NotificationJob.js";
 import NotificationLog from "../../models/NotificationLog.js";
 import User from "../../models/User.js";
@@ -18,6 +22,7 @@ const DEAD_LETTER_CLASSES = new Set([
 ]);
 
 const deliverByChannel = {
+  push: deliverPush,
   email: async ({ user, templateKey, data }) => {
     if (!user.email) return { success: false, error: "no_email_on_file" };
     const ok = await emailService.sendEmail(user.email, templateKey, undefined, "en", {
@@ -55,9 +60,12 @@ const deliverByChannel = {
 
 /** Claims and delivers a single due job. Returns the outcome, or null if there was nothing to claim. */
 const processOne = async () => {
+  const config = pushConfig();
+  const leaseId = randomUUID();
   const job = await NotificationJob.findOneAndUpdate(
-    { status: { $in: ["QUEUED", "RETRYING"] }, next_attempt_at: { $lte: new Date() } },
-    { $set: { status: "SENDING", updated_at: new Date() }, $inc: { attempts: 1 } },
+    { status: { $in: ["QUEUED", "RETRYING"] }, next_attempt_at: { $lte: new Date() },
+      $or: [{ channel: { $ne: 'push' } }, ...(config.enabled ? [{ channel: 'push', environment: config.environment }] : [])] },
+    { $set: { status: "SENDING", updated_at: new Date(), lease_id: leaseId, lease_until: new Date(Date.now() + 5 * 60000) }, $inc: { attempts: 1 } },
     { new: true, sort: { next_attempt_at: 1 } }
   );
   if (!job) return null;
@@ -65,7 +73,7 @@ const processOne = async () => {
   const user = await User.findOne({ _id: job.user_id, deleted_at: null }).lean();
   if (!user) {
     await NotificationJob.updateOne(
-      { _id: job._id },
+      { _id: job._id, lease_id: leaseId },
       { $set: { status: "DEAD_LETTER", error_class: "INVALID_DESTINATION", last_error_safe: "user_not_found", updated_at: new Date() } }
     );
     await syncLog(job, { status: "DEAD_LETTER", last_error_safe: "user_not_found" });
@@ -76,7 +84,7 @@ const processOne = async () => {
   let outcome;
   try {
     outcome = deliver
-      ? await deliver({ user, templateKey: job.template_id, data: job.data })
+      ? await deliver({ user, templateKey: job.template_id, data: job.data, job })
       : { success: false, error: "unsupported_channel" };
   } catch (err) {
     outcome = { success: false, error: err.message || "delivery_exception" };
@@ -84,7 +92,7 @@ const processOne = async () => {
 
   if (outcome.success) {
     await NotificationJob.updateOne(
-      { _id: job._id },
+      { _id: job._id, lease_id: leaseId },
       { $set: { status: "SENT", error_class: null, last_error_safe: null, updated_at: new Date() } }
     );
     await syncLog(job, {
@@ -95,18 +103,18 @@ const processOne = async () => {
     return { jobId: job._id, status: "SENT" };
   }
 
-  const errorClass = classifyNotificationError(job.channel, outcome.error);
+  const errorClass = job.channel === 'push' ? (outcome.error === 'push_permanent' ? 'PERMANENT' : 'TRANSIENT') : classifyNotificationError(job.channel, outcome.error);
   const exhausted = job.attempts >= job.max_attempts;
   const nextStatus = DEAD_LETTER_CLASSES.has(errorClass) || exhausted ? "DEAD_LETTER" : "RETRYING";
 
   await NotificationJob.updateOne(
-    { _id: job._id },
+    { _id: job._id, lease_id: leaseId },
     {
       $set: {
         status: nextStatus,
         error_class: errorClass,
         last_error_safe: String(outcome.error || "").slice(0, 500),
-        next_attempt_at: nextStatus === "RETRYING" ? new Date(Date.now() + backoffFor(job.attempts)) : job.next_attempt_at,
+        next_attempt_at: nextStatus === "RETRYING" ? new Date(Date.now() + Math.max(backoffFor(job.attempts), outcome.retryAfterMs || 0)) : job.next_attempt_at,
         updated_at: new Date(),
       },
     }
@@ -130,6 +138,14 @@ const syncLog = async (job, patch) => {
  * from tests/an admin manual-retry endpoint for immediate processing.
  */
 export const processNotificationQueue = async (batchSize = 25) => {
+  try { await processCampaigns(); await repairPushOutbox(); }
+  catch { console.error('push_outbox_tick_failed'); }
+  const environment = pushConfig().environment;
+  // Only push jobs have per-device idempotency records. Do not change legacy-channel recovery semantics.
+  await NotificationJob.updateMany({ channel: 'push', environment, status: 'SENDING', lease_until: { $lt: new Date() } },
+    { $set: { status: 'RETRYING', next_attempt_at: new Date(), lease_id: null } });
+  await NotificationJob.updateMany({ channel: 'push', environment, status: 'RETRYING', $expr: { $gte: ['$attempts', '$max_attempts'] } },
+    { $set: { status: 'DEAD_LETTER', error_class: 'PERMANENT', last_error_safe: 'push_attempts_exhausted' } });
   const results = [];
   for (let i = 0; i < batchSize; i++) {
     const result = await processOne();

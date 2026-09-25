@@ -18,6 +18,7 @@ export const sendOrderNotification = ({ order, event, data = {}, dedupeKey }) =>
         event,
         data: {
           order_id: order.id,
+          order_entity_id: String(order._id || ""),
           ...orderEmailData,
           ...(event === "PAYMENT_SUCCESS" ? {
             payment_amount: order.is_partial_cod ? order.advance_amount : order.grand_total,

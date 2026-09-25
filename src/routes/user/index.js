@@ -1,3 +1,4 @@
+import { deviceTokensRouter, userNotificationsRouter } from './notifications.js';
 import { Router } from "express";
 import { wishListRouter } from "./wishlist.js";
 import { cartRouter } from "./cart.js";
@@ -8,6 +9,8 @@ import { mediaRouter } from "./media.js";
 
 const v1UserRouter = Router();
 // All routes go here
+v1UserRouter.use("/device-tokens", deviceTokensRouter);
+v1UserRouter.use("/notifications", userNotificationsRouter);
 
 v1UserRouter.use("/wishlist", wishListRouter);
 v1UserRouter.use("/cart", cartRouter);

@@ -1,3 +1,4 @@
+import PushDelivery from '../../../models/PushDelivery.js';
 import NotificationJob from "../../../models/NotificationJob.js";
 import NotificationLog from "../../../models/NotificationLog.js";
 import { StatusError } from "../../../config/index.js";
@@ -31,6 +32,12 @@ export const retry = async (req, res, next) => {
     );
 
     if (!job) throw StatusError.notFound(req.__("Dead-letter notification job not found"));
+
+    if (job.channel === 'push' && job.data?.notification_id) {
+      await PushDelivery.updateMany({ notification_id: job.data.notification_id, status: 'FAILED',
+        error_code: { $in: ['UNAVAILABLE', 'INTERNAL', 'RESOURCE_EXHAUSTED', 'FCM_TRANSPORT_ERROR'] } },
+        { $set: { status: 'PENDING', attempts: 0, failed_at: null } });
+    }
 
     if (job.notification_log_id) {
       await NotificationLog.updateOne(

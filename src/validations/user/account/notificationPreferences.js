@@ -24,6 +24,7 @@ export const updateNotificationPreferences = celebrate({
       sms: bool,
     }).unknown(true).optional(),
     marketing: Joi.object({
+      push: Joi.boolean().strict(),
       email: bool,
       sms: bool,
       whatsapp: bool,

@@ -32,6 +32,7 @@ const NotificationPreferenceSchema = new Schema(
     },
 
     marketing: {
+      push: { type: Boolean, default: false },
       email: { type: Boolean, default: false },
       sms: { type: Boolean, default: false },
       whatsapp: { type: Boolean, default: false },
@@ -56,6 +57,8 @@ const NotificationPreferenceSchema = new Schema(
 );
 
 NotificationPreferenceSchema.index({ user_id: 1 }, { unique: true });
+
+NotificationPreferenceSchema.index({ 'marketing.push': 1, user_id: 1 });
 
 const NotificationPreference = model(
   "notification_preferences",

@@ -22,9 +22,15 @@ vi.mock("../sms/index.js", () => ({
   }),
 }));
 vi.mock("./whatsapp.provider.js", () => ({
+  isConfigured: vi.fn(() => false),
   sendTemplate: vi.fn(() => Promise.resolve({ success: false, error: "whatsapp_provider_not_configured" })),
   sendOtp: vi.fn(() => Promise.resolve({ success: false, error: "whatsapp_provider_not_configured" })),
   sendTransactional: vi.fn(() => Promise.resolve({ success: false, error: "whatsapp_provider_not_configured" })),
+}));
+
+// Isolate delivery from admin-managed SMS template configuration, just as SMTP/SMS providers are mocked.
+vi.mock("../smsTemplate/index.js", () => ({
+  getTemplate: vi.fn(async () => ({ dlt_message_id: "test-template", variables: ["name"] })),
 }));
 
 const { sendNotification } = await import("./sendNotification.js");
