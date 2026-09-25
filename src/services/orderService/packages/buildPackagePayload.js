@@ -113,7 +113,7 @@ export const buildPackagePayload = ({ order_data, shiprocketConfig, pkg, pickupL
   const note = order_data.note || order_data.comment || "";
   const partialCodNote =
     isCod && order_data.is_partial_cod && packageAdvance > 0
-      ? `Partial COD: Rs ${packageAdvance.toFixed(2)} paid online (shown as discount). Collect Rs ${packageTarget.toFixed(2)}.`
+      ? `Partial COD: order value Rs ${round2(packageItemsTotal + packageCharges - packageDiscount).toFixed(2)}, advance Rs ${packageAdvance.toFixed(2)} paid online (entered as discount so the courier collects only the balance). Collect Rs ${packageTarget.toFixed(2)}.`
       : "";
 
   const payload = {

@@ -39,7 +39,7 @@ describe("Shiprocket COD charges", () => {
     expect(payload.sub_total).toBe(2750);
     expect(payload.total_discount).toBeCloseTo(622.8, 2);
     expect(payable(payload)).toBeCloseTo(2491.2, 2);
-    expect(payload.comment).toContain("Partial COD: Rs 622.80 paid online");
+    expect(payload.comment).toContain("Partial COD: order value Rs 3114.00, advance Rs 622.80 paid online");
   });
 
   it("matches the ORD-000107 partial COD shipment: items total, charges and the due amount", () => {
@@ -64,7 +64,7 @@ describe("Shiprocket COD charges", () => {
     expect(payload.total_discount).toBeCloseTo(725.8, 2);
     expect(payload.payment_method).toBe("COD");
     expect(payable(payload)).toBeCloseTo(2903.2, 2);
-    expect(payload.comment).toBe("Checkout | Partial COD: Rs 725.80 paid online (shown as discount). Collect Rs 2903.20.");
+    expect(payload.comment).toBe("Checkout | Partial COD: order value Rs 3629.00, advance Rs 725.80 paid online (entered as discount so the courier collects only the balance). Collect Rs 2903.20.");
   });
 
   it("splits a partial COD order across packages with each product total matching its items", () => {
