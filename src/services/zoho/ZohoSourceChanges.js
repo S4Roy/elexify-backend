@@ -10,7 +10,7 @@ export const sourceHash = async (kind, entityId) => {
   let source;
   if (kind === "contact") {
     source = [await User.findById(entityId).select("name email mobile phone_code gstin gst_treatment status").lean(),
-      await Address.findOne({ user: entityId, deleted_at: null, is_default: true }).select("full_name email phone phone_code address_line_1 address_line_2 city_name state_name country_name postcode gstin gst_treatment").lean()];
+      await Address.findOne({ user: entityId, deleted_at: null }).sort({ is_default: -1, updated_at: -1, _id: -1 }).select("full_name email phone phone_code address_line_1 address_line_2 city_name state_name country_name postcode gstin gst_treatment").lean()];
   } else {
     const model = kind === "variation" ? ProductVariation : Product;
     const item = await model.findById(entityId).select(productFields).lean();

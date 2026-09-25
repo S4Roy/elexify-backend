@@ -33,16 +33,30 @@ export const findContact = async (connection, payload) => {
   return null;
 };
 
+export const contactAddress = (userId) =>
+  Address.findOne({ user: userId, deleted_at: null }).sort({ is_default: -1, updated_at: -1, _id: -1 }).lean();
+
 export const syncContact = async (connection, userId, order = null) => {
   const hash = userId ? await sourceHash("contact", userId) : null;
   const user = userId ? await User.findById(userId).lean() : null;
   if (!user && !order) throw new ZohoError("CUSTOMER_NOT_FOUND");
-  const address = user ? await Address.findOne({ user: user._id, deleted_at: null, is_default: true }).lean() : null;
+  // Default address first; customers who never marked one fall back to their
+  // most recently updated address, so the contact still gets a state (Zoho
+  // requires place_of_contact for Indian GST organisations).
+  const address = user ? await contactAddress(user._id) : null;
   const billing = await resolveCustomerAddress(order?.billing_address_snapshot || address || {});
   const shipping = order?.shipping_address_snapshot ? await resolveCustomerAddress(order.shipping_address_snapshot) : billing;
   if (!billing?.full_name && !user?.name) throw new ZohoError("CUSTOMER_IDENTITY_REQUIRED");
   const identity = user ? String(user._id) : `order-${order.id}`;
   const payload = customerPayload(user, { billing_address: billing || {}, shipping_address: shipping || {} }, identity);
+  const indian = billing?.country_code === "IN" || /^india$/i.test(String(billing?.country_name || billing?.country || ""));
+  if (indian && !billing?.state_code) {
+    // Sending the contact would fail with Zoho's "Please provide a valid
+    // state code"; say what's actually missing instead.
+    throw new ZohoError("CONTACT_STATE_REQUIRED", {
+      detail: { message: "The customer's address has no recognisable Indian state. Add or fix the state on their address (or the order's billing address), then retry." },
+    });
+  }
   const gstin = billing?.gstin || user?.gstin;
   if (gstin) {
     payload.gst_no = gstin;
