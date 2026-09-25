@@ -32,7 +32,7 @@ export const PERMISSIONS = {
   // list, packed-order courier check) — deliberately not granted to manager,
   // only superadmin. See services/orderService/cancelOrder.js `force` path.
   ORDER_FORCE_CANCEL: "order.force_cancel.manage",
-  // Undoes a cancellation back to "processing" — refused outright if a
+  // Undoes a cancellation back to "confirmed" — refused outright if a
   // refund already went through or is in flight. See
   // services/orderService/reopenOrder.js.
   ORDER_REOPEN_MANAGE: "order.reopen.manage",

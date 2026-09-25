@@ -13,7 +13,8 @@ import { ORDER_STATUS } from "../../constants/orderStatus.js";
 // without re-collecting payment from the customer, so it's refused outright.
 const REFUND_BLOCKS_REOPEN = ["processing", "processed"];
 
-// Admin-only undo of a cancellation, back to "processing". Mirrors
+// Admin-only undo of a cancellation, back to "confirmed" — the reinstated
+// order re-enters fulfilment from the start of the queue. Mirrors
 // cancelOrder.js's inventory bookkeeping in reverse: re-decrements stock
 // (mongoose "sale" transactions, same as order placement — see
 // finalizeCapturedPayment.js) inside a transaction so a stock shortfall on
@@ -75,14 +76,14 @@ export const reopenOrder = async ({ orderId, actorId, reason }) => {
         { _id: order._id, order_status: ORDER_STATUS.CANCELLED },
         {
           $set: {
-            order_status: ORDER_STATUS.PROCESSING,
+            order_status: ORDER_STATUS.CONFIRMED,
             inventory_reverted: false,
-            processing_at: order.processing_at || new Date(),
+            confirmed_at: order.confirmed_at || order.processing_at || new Date(),
           },
           $push: {
             manual_status_history: {
               from: ORDER_STATUS.CANCELLED,
-              to: ORDER_STATUS.PROCESSING,
+              to: ORDER_STATUS.CONFIRMED,
               reason,
               changed_by: actorId,
               changed_at: new Date(),

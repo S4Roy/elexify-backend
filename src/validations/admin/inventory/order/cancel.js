@@ -54,7 +54,7 @@ export const forceCancel = celebrate({
   }),
 });
 
-// Reopening a cancelled order back to "processing" always takes a free-text
+// Reopening a cancelled order back to "confirmed" always takes a free-text
 // reason for the same audit-trail reasons as forceCancel.
 export const reopen = celebrate({
   body: Joi.object({

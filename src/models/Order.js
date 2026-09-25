@@ -110,6 +110,10 @@ const OrderSchema = new Schema(
     // Legacy single-shipment orders only: last courier-scan refresh.
     tracking_synced_at: { type: Date, default: null },
     courier_name: { type: String },
+    // When the order was accepted (payment captured / COD placed) vs. when
+    // the merchant started preparing it. Legacy orders only carry
+    // processing_at, which then doubles as the confirmation time.
+    confirmed_at: { type: Date, default: null },
     processing_at: { type: Date, default: null },
     shipped_at: { type: Date, default: null },
     delivered_at: { type: Date, default: null },

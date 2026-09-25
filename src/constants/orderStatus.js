@@ -5,6 +5,13 @@
 // would break that integration. Instead, this module is the single source of
 // truth used by validation schemas and the cancellation service.
 
+// Lifecycle (modern commerce convention):
+//   pending    — placed, awaiting payment (prepaid / Partial COD advance)
+//   confirmed  — prepaid / Partial COD payment captured (confirmed_at).
+//   processing — being prepared (processing_at). Full COD orders start here
+//                at placement; confirmed orders reach it via an admin step,
+//                or may go straight to packed.
+//   packed → shipped → out_for_delivery → delivered
 export const ORDER_STATUS = {
   PENDING: "pending",
   CONFIRMED: "confirmed",
@@ -48,13 +55,17 @@ export const PAYMENT_STATUS_VALUES = Object.values(PAYMENT_STATUS);
 export const PAYMENT_METHOD = { COD: "cod", RAZORPAY: "razorpay" };
 export const PAYMENT_METHOD_VALUES = Object.values(PAYMENT_METHOD);
 
+// An order must be confirmed before it can be processed — pending never
+// skips straight to processing.
 const ALLOWED_TRANSITIONS = {
-  pending: ["confirmed", "processing", "cancelled", "failed"],
-  confirmed: ["processing", "packed", "cancelled"],
+  pending: ["confirmed", "cancelled", "failed"],
   // The "partially_shipped"/"partially_delivered"/"delivered" targets here
   // (beyond "packed") let a multi-package order's derived status jump more
   // than one nominal step when concurrent package webhooks race — the
   // derivation function guarantees these jumps are always forward/correct.
+  // confirmed carries the same forward set as processing because packages
+  // can be created directly from a confirmed order.
+  confirmed: ["processing", "packed", "shipped", "cancelled", "partially_shipped", "partially_delivered", "out_for_delivery", "delivered"],
   processing: ["packed", "shipped", "cancelled", "partially_shipped", "partially_delivered", "out_for_delivery", "delivered"],
   packed: ["shipped", "cancelled", "partially_shipped", "partially_delivered", "out_for_delivery", "delivered"],
   partially_shipped: ["shipped", "out_for_delivery", "partially_delivered", "delivered"],

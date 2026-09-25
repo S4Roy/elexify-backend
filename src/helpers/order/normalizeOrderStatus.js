@@ -1,6 +1,10 @@
 import { ORDER_STATUS_VALUES } from "../../constants/orderStatus.js";
 
 const EXTERNAL_STATUS_MAP = {
+  // WooCommerce "processing" = paid, awaiting fulfilment — our "confirmed".
+  // Internal "processing" (merchant is preparing it) is only ever set by an
+  // admin action, never inferred from an external system.
+  processing: "confirmed",
   completed: "delivered",
   "on-hold": "confirmed",
   "checkout-draft": "pending",

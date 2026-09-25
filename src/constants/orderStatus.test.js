@@ -5,6 +5,9 @@ import { canTransitionPayment } from "../services/orderService/transitionOrder.j
 describe("order status transitions", () => {
   it("allows the normal fulfilment path", () => {
     expect(canTransitionOrder("pending", "confirmed")).toBe(true);
+    expect(canTransitionOrder("confirmed", "processing")).toBe(true);
+    expect(canTransitionOrder("confirmed", "packed")).toBe(true);
+    expect(canTransitionOrder("confirmed", "partially_shipped")).toBe(true);
     expect(canTransitionOrder("processing", "shipped")).toBe(true);
     expect(canTransitionOrder("out_for_delivery", "delivered")).toBe(true);
   });
@@ -12,6 +15,11 @@ describe("order status transitions", () => {
   it("rejects backwards and logically invalid transitions", () => {
     expect(canTransitionOrder("delivered", "pending")).toBe(false);
     expect(canTransitionOrder("shipped", "cancelled")).toBe(false);
+    expect(canTransitionOrder("processing", "confirmed")).toBe(false);
+  });
+
+  it("requires confirmation before processing", () => {
+    expect(canTransitionOrder("pending", "processing")).toBe(false);
   });
 
   it("rejects invalid payment transitions", () => {

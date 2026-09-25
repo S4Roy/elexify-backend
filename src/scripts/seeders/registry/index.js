@@ -21,6 +21,7 @@ import coreSiteBootstrap from "./operations/core-site-bootstrap.js";
 import footerPolicies from "./operations/footer-policies.js";
 import orderTotalItemsBackfill from "./operations/order-total-items-backfill.js";
 import orderSchemaMigration from "./operations/order-schema-migration.js";
+import orderConfirmedStatusBackfill from "./operations/order-confirmed-status-backfill.js";
 import fixCartIndexes from "./operations/fix-cart-indexes.js";
 import fixUserIndexes from "./operations/fix-user-indexes.js";
 import fixWishlistIndexes from "./operations/fix-wishlist-indexes.js";
@@ -57,6 +58,7 @@ const RAW_ENTRIES = [
   footerPolicies,
   orderTotalItemsBackfill,
   orderSchemaMigration,
+  orderConfirmedStatusBackfill,
   fixCartIndexes,
   fixUserIndexes,
   fixWishlistIndexes,

@@ -442,6 +442,10 @@ const address = await Address.findOne({
     dbSession = await mongoose.startSession();
     dbSession.startTransaction();
 
+    // Full COD has nothing left to collect up front, so it's accepted and
+    // goes straight into the fulfilment queue at placement.
+    const placedAt = new Date();
+    const isFullCod = payment_method === "cod" && !advanceEnabled;
     const order = new Order({
       id: order_id,
       user: user._id,
@@ -450,7 +454,9 @@ const address = await Address.findOne({
       billing_address_snapshot: await snapshotAddress(address),
       shipping_address_snapshot: await snapshotAddress(address),
       payment_status: "pending",
-      order_status: payment_method === "cod" && !advanceEnabled ? "confirmed" : "pending",
+      order_status: isFullCod ? "processing" : "pending",
+      confirmed_at: isFullCod ? placedAt : null,
+      processing_at: isFullCod ? placedAt : null,
       total_amount: sub_total,
       discount: discountAmount,
       shipping: shippingAmount,
@@ -652,7 +658,7 @@ const address = await Address.findOne({
     dbSession = null;
     await injectPlacementFault(req, "after_commit");
 
-    // Full COD is confirmed at placement. Razorpay and advance COD are still
+    // Full COD is processing from placement. Razorpay and advance COD are still
     // pending here; their order confirmation is sent after captured payment
     // is finalized, not before the customer has paid.
     if (payment_method === "cod" && !advanceEnabled) {

@@ -19,6 +19,10 @@ describe("normalizeOrderStatus", () => {
     ["Delivered", "delivered"],
     ["Cancelled", "cancelled"],
     ["Canceled", "cancelled"],
+    // WooCommerce paid-awaiting-fulfilment and our own statuses
+    ["processing", "confirmed"],
+    ["confirmed", "confirmed"],
+    ["on-hold", "confirmed"],
   ])("maps %s to %s", (input, expected) => {
     expect(normalizeOrderStatus(input)).toBe(expected);
   });

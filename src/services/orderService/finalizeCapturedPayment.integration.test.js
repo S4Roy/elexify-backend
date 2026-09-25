@@ -69,7 +69,7 @@ suite("finalizeCapturedPayment replica-set integration", () => {
       reference: 'UTR-TEST-123', reason: 'Verified bank statement', received_at: new Date(), recorded_by: oid() };
     const result = await finalizeCapturedPayment({ orderId: String(order._id), manualPayment });
     expect(result.order.payment_status).toBe('paid');
-    expect(result.order.order_status).toBe('processing');
+    expect(result.order.order_status).toBe('confirmed');
     expect(result.order.manual_payment.reference).toBe('UTR-TEST-123');
     expect(result.order.payment_meta.razorpay_payment_id).toBeUndefined();
     expect((await Product.findById(productId)).stock_quantity).toBe(3);

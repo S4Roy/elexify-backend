@@ -2,6 +2,7 @@ import { canCorrectHistoricalDelivery } from "./historicalDelivery.js";
 import Order from "../../models/Order.js";
 import Package from "../../models/Package.js";
 import { StatusError } from "../../config/index.js";
+import { sendOrderNotification } from "../notification/sendOrderNotification.js";
 
 // Manual correction is deliberately limited to fulfillment labels. Cancel,
 // refund, return, and parcel changes have their own workflows and side
@@ -109,6 +110,7 @@ export const applyManualOrderStatusChange = async ({ order, expectedStatus = nul
         order_status: status,
         ...(status === "packed" ? { "zoho.packed_at": order.zoho?.packed_at || changedAt } : {}),
         updated_at: changedAt,
+        confirmed_at: targetRank >= 1 ? (order.confirmed_at || order.processing_at || changedAt) : null,
         processing_at: targetRank >= 2 ? (order.processing_at || changedAt) : null,
         shipped_at: targetRank >= 4 ? (order.shipped_at || changedAt) : null,
         delivered_at: targetRank >= 6 ? (order.delivered_at || changedAt) : null,
@@ -136,6 +138,12 @@ export const applyManualOrderStatusChange = async ({ order, expectedStatus = nul
         } } },
       );
     }));
+  }
+
+  // Tell the customer their order is being prepared the first time it
+  // actually enters processing (not on a backwards correction from packed+).
+  if (status === "processing" && (STATUS_RANK[fromStatus] ?? -1) < STATUS_RANK.processing) {
+    sendOrderNotification({ order: updated, event: "ORDER_PROCESSING", dedupeKey: `${updated.id}:ORDER_PROCESSING` });
   }
 
   return updated;

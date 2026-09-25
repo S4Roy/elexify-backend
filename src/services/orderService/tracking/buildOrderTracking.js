@@ -93,6 +93,13 @@ const maxDate = (dates) => {
 const byDateDesc = (a, b) => (b.at ? new Date(b.at) : 0) - (a.at ? new Date(a.at) : 0);
 const historyAt = (order, ...statuses) =>
   minDate((order.manual_status_history || []).filter((h) => h.from !== h.to && statuses.includes(h.to)).map((h) => h.changed_at));
+// When the order was accepted. confirmed_at is authoritative; older orders
+// fall back to processing_at (which used to mean "confirmed"), the payment
+// time, or the status history.
+const confirmedAtOf = (order) =>
+  order.confirmed_at || order.processing_at || order.paid_at || historyAt(order, "confirmed", "processing");
+// Only orders that record both moments get a separate "being prepared" event.
+const preparingAtOf = (order) => (order.confirmed_at && order.processing_at ? order.processing_at : null);
 // Couriers report ETAs as "2026-09-24 23:59:59", "24 Sep 2026", … (IST).
 const parseEtd = (value) => {
   if (!value) return null;
@@ -148,7 +155,7 @@ const buildMilestones = (order, packages, scans) => {
 
   const steps = [
     { key: "placed", label: "Order placed", at: placed },
-    { key: "confirmed", label: "Confirmed", at: order.processing_at || order.paid_at || historyAt(order, "confirmed", "processing") },
+    { key: "confirmed", label: "Confirmed", at: confirmedAtOf(order) },
     { key: "packed", label: "Packed", at: minDate(livePkgs.map((p) => p.created_at)) || historyAt(order, "packed") },
     {
       key: "shipped",
@@ -238,8 +245,12 @@ const buildShipment = ({ key, label, source, scans, items, publicView, adminView
 const buildActivity = (order) => {
   const events = [{ at: order.created_at, title: "Order placed" }];
   if (order.paid_at && order.payment_method !== "cod") events.push({ at: order.paid_at, title: "Payment received" });
-  if (order.processing_at) events.push({ at: order.processing_at, title: "Order confirmed" });
+  const confirmedAt = order.order_status !== "pending" && order.order_status !== "failed" ? confirmedAtOf(order) : null;
+  if (confirmedAt) events.push({ at: confirmedAt, title: "Order confirmed" });
+  const preparingAt = preparingAtOf(order);
+  if (preparingAt) events.push({ at: preparingAt, title: "Order is being prepared" });
   const seen = new Set(events.map((e) => e.title));
+  if (preparingAt) seen.add("Order processing");
   for (const h of order.manual_status_history || []) {
     if (!h.to || h.from === h.to || !ORDER_STATUS_LABELS[h.to]) continue;
     const title = `Order ${statusLabel(h.to).toLowerCase()}`;
@@ -269,7 +280,10 @@ const buildAdminActivity = async (order) => {
       detail: order.is_partial_cod && order.advance_amount ? `Advance ${order.advance_amount} ${order.currency || "INR"}` : null,
     });
   }
-  if (order.processing_at) events.push({ at: order.processing_at, title: "Order confirmed" });
+  const confirmedAt = order.order_status !== "pending" && order.order_status !== "failed" ? confirmedAtOf(order) : null;
+  if (confirmedAt) events.push({ at: confirmedAt, title: "Order confirmed" });
+  const preparingAt = preparingAtOf(order);
+  if (preparingAt) events.push({ at: preparingAt, title: "Processing started" });
   for (const h of history) {
     if (!h.to || h.from === h.to) continue;
     events.push({

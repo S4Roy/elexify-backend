@@ -156,7 +156,8 @@ export const finalizeCapturedPayment = async ({
         { _id: order._id, payment_status: { $nin: [PAYMENT_STATUS.PAID, PAYMENT_STATUS.ADVANCE_PAID] } },
         { $set: {
           payment_status: order.is_partial_cod ? PAYMENT_STATUS.ADVANCE_PAID : PAYMENT_STATUS.PAID,
-          order_status: ORDER_STATUS.PROCESSING,
+          order_status: ORDER_STATUS.CONFIRMED,
+          confirmed_at: new Date(),
           paid_at: manualPayment ? new Date(manualPayment.received_at) : new Date(),
           updated_at: new Date(),
           stock_reserved: true,

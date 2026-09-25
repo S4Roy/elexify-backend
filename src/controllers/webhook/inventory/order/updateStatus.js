@@ -50,7 +50,7 @@ export const updateStatus = async (req, res, next) => {
       );
     }
 
-    if (orderDoc.order_status === "processing") {
+    if (orderDoc.order_status === "confirmed") {
       const matchFilter = { deleted_at: null };
       matchFilter._id = new mongoose.Types.ObjectId(orderDoc?._id);
 

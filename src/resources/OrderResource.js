@@ -110,6 +110,7 @@ class OrderResource extends Resource {
       shiprocket_status: this.shiprocket_status || null,
       shiprocket_status_updated_at: this.shiprocket_status_updated_at || null,
       courier_name: this.courier_name || null,
+      confirmed_at: this.confirmed_at || null,
       processing_at: this.processing_at || null,
       shipped_at: this.shipped_at || null,
       delivered_at: this.delivered_at || null,

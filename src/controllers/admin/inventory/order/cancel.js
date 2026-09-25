@@ -44,7 +44,7 @@ export const cancel = async (req, res, next) => {
   }
 };
 
-// Undoes a cancellation back to "processing" (requirePermission(ORDER_REOPEN_MANAGE)
+// Undoes a cancellation back to "confirmed" (requirePermission(ORDER_REOPEN_MANAGE)
 // in routes/admin/inventory/order.js) via orderService.reopenOrder, which
 // itself refuses if a refund already went through and re-reserves inventory
 // inside a transaction. Always audit-logged with the admin's justification.
