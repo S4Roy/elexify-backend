@@ -39,7 +39,7 @@ const ok = (res, data) => res.json({ status: "success", data });
 const get = async (req) => {
   const campaign = await PushCampaign.findOne({
     _id: req.params.id,
-    environment: pushConfig().environment,
+    environment: (await pushConfig()).environment,
   });
   if (!campaign) throw StatusError.notFound("Campaign not found.");
   return campaign;
@@ -56,7 +56,7 @@ router.get(
   wrap(async (req, res) => {
     const limit = Number(req.query.limit || 25);
     const rows = await PushCampaign.find({
-      environment: pushConfig().environment,
+      environment: (await pushConfig()).environment,
       ...(req.query.cursor ? { _id: { $lt: req.query.cursor } } : {}),
     })
       .sort({ _id: -1 })
@@ -105,7 +105,7 @@ router.post(
     }),
   }),
   wrap(async (req, res) => {
-    const c = pushConfig();
+    const c = await pushConfig();
     if (!c.enabled)
       throw StatusError.badRequest(
         "Push is not configured for this environment."
@@ -156,7 +156,7 @@ router.post(
   wrap(async (req, res) => {
     const campaign = await get(req);
     const rows = await NotificationPreference.aggregate(
-      audiencePipeline(
+      await audiencePipeline(
         {
           ...campaign.toObject(),
           audience: "specific",
@@ -213,7 +213,7 @@ for (const action of ["send", "schedule"])
         ok(res, { campaign });
         return;
       }
-      if (!pushConfig().enabled)
+      if (!(await pushConfig()).enabled)
         throw StatusError.badRequest("Push is disabled.");
       const count = await countAudience(campaign);
       if (!count || count !== confirmed.count)

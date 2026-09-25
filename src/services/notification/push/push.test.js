@@ -1,3 +1,4 @@
+vi.mock("../../integrationCredentials/index.js", () => ({ getIntegrationConfig: vi.fn(async (_provider, fallback) => fallback) }));
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { pushConfig, eligibleEnvironmentUser } from "./config.js";
 import { classifyFcmFailure } from "./fcm.js";
@@ -5,25 +6,25 @@ import { resolvePushTemplate, validRoute } from "./templates.js";
 import { createConfirmation, verifyConfirmation } from "./campaigns.js";
 afterEach(() => vi.unstubAllEnvs());
 describe("push security and contracts", () => {
-  it("fails closed without explicit environment configuration", () => {
+  it("fails closed without explicit environment configuration", async () => {
     vi.stubEnv("PUSH_ENABLED", "true");
     vi.stubEnv("APP_ENV", "staging");
     vi.stubEnv("FCM_ENVIRONMENT", "production");
-    expect(pushConfig().enabled).toBe(false);
+    expect((await pushConfig()).enabled).toBe(false);
   });
-  it("requires isolated nonproduction projects and recipient allowlist", () => {
+  it("requires isolated nonproduction projects and recipient allowlist", async () => {
     vi.stubEnv("PUSH_ENABLED", "true");
     vi.stubEnv("APP_ENV", "staging");
     vi.stubEnv("FCM_ENVIRONMENT", "staging");
     vi.stubEnv("FCM_PROJECT_ID", "stage");
     vi.stubEnv("FCM_PRODUCTION_PROJECT_ID", "prod");
     vi.stubEnv("PUSH_TEST_USER_IDS", "alice");
-    expect(eligibleEnvironmentUser("alice")).toBe(true);
-    expect(eligibleEnvironmentUser("bob")).toBe(false);
+    expect(await eligibleEnvironmentUser("alice")).toBe(true);
+    expect(await eligibleEnvironmentUser("bob")).toBe(false);
     vi.stubEnv("FCM_PROJECT_ID", "prod");
-    expect(pushConfig().enabled).toBe(false);
+    expect((await pushConfig()).enabled).toBe(false);
   });
-  it("rejects unsafe routes and uses database order IDs without exposing order data", () => {
+  it("rejects unsafe routes and uses database order IDs without exposing order data", async () => {
     for (const route of [
       "https://evil.com",
       "//evil.com",
@@ -45,7 +46,7 @@ describe("push security and contracts", () => {
     ).toBe("/orders");
     expect(resolvePushTemplate("INVENTED_STATE")).toBeNull();
   });
-  it("only deactivates explicit unregistered tokens, retries transient FCM errors", () => {
+  it("only deactivates explicit unregistered tokens, retries transient FCM errors", async () => {
     expect(
       classifyFcmFailure(400, { error: { status: "INVALID_ARGUMENT" } })
     ).toMatchObject({ invalid: false, retry: false });
@@ -64,7 +65,7 @@ describe("push security and contracts", () => {
     expect(classifyFcmFailure(429, {})).toMatchObject({ retry: true });
     expect(classifyFcmFailure(503, {})).toMatchObject({ retry: true });
   });
-  it("binds preview confirmation to campaign, actor, count and expiry", () => {
+  it("binds preview confirmation to campaign, actor, count and expiry", async () => {
     vi.stubEnv("PUSH_CONFIRMATION_SECRET", "x".repeat(32));
     const token = createConfirmation("campaign", "admin", 120);
     expect(verifyConfirmation(token, "campaign", "admin").count).toBe(120);

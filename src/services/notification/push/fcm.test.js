@@ -1,11 +1,12 @@
+vi.mock("../../integrationCredentials/index.js", () => ({ getIntegrationConfig: vi.fn(async (_provider, fallback) => fallback) }));
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 vi.mock("google-auth-library", () => ({
-  GoogleAuth: class {
-    async getClient() {
-      return { getAccessToken: async () => ({ token: "server-only-secret" }) };
-    }
-  },
+  GoogleAuth: vi.fn(function () {
+    this.getClient = async () => ({ getAccessToken: async () => ({ token: "server-only-secret" }) });
+  }),
 }));
+import { GoogleAuth } from "google-auth-library";
+import { getIntegrationConfig } from "../../integrationCredentials/index.js";
 import { sendFcm } from "./fcm.js";
 const fetchMock = vi.fn();
 const device = {
@@ -80,4 +81,13 @@ it("returns only safe error categories when transport errors contain secrets", a
     code: "FCM_TRANSPORT_ERROR",
     retry: true,
   });
+});
+
+it("uses rotated admin credentials on subsequent submissions", async () => {
+  fetchMock.mockResolvedValue({ ok: true, json: async () => ({ name: "mock" }) });
+  for (const private_key of ["first-key", "rotated-key"]) {
+    getIntegrationConfig.mockResolvedValueOnce({ enabled: true, project_id: "stage", environment: "staging", test_user_ids: "test-user", client_email: "sender@stage.iam.gserviceaccount.com", private_key });
+    expect((await sendFcm(device, notification)).success).toBe(true);
+    expect(GoogleAuth).toHaveBeenLastCalledWith(expect.objectContaining({ credentials: { client_email: "sender@stage.iam.gserviceaccount.com", private_key } }));
+  }
 });

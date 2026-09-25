@@ -4,7 +4,6 @@ import rateLimit from "express-rate-limit";
 import { StatusError } from "../../config/StatusErrors.js";
 import DeviceToken from "../../models/DeviceToken.js";
 import PushNotification from "../../models/PushNotification.js";
-import { pushConfig } from "../../services/notification/push/config.js";
 import { registerDevice } from "../../services/notification/push/service.js";
 const id = Joi.string().hex().length(24).required();
 const wrap = (fn) => async (req, res, next) => {
@@ -19,7 +18,7 @@ const wrap = (fn) => async (req, res, next) => {
 const ok = (res, data) => res.json({ status: "success", data });
 const owner = (req) => ({
   user_id: req.auth.user_id,
-  environment: pushConfig().environment,
+  environment: process.env.APP_ENV,
 });
 const visible = (req) => ({ ...owner(req), expires_at: { $gt: new Date() } });
 export const deviceTokensRouter = Router();

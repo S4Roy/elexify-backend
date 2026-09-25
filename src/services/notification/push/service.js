@@ -11,7 +11,7 @@ import { resolvePushTemplate } from "./templates.js";
 import { sendFcm } from "./fcm.js";
 
 export async function registerDevice(userId, input) {
-  const c = pushConfig();
+  const c = await pushConfig();
   if (
     !c.enabled ||
     input.environment !== c.environment ||
@@ -57,8 +57,8 @@ export async function persistPush(
   content,
   { dedupeKey, campaignId, expiresAt } = {}
 ) {
-  const c = pushConfig();
-  if (!eligibleEnvironmentUser(userId)) return null;
+  const c = await pushConfig();
+  if (!(await eligibleEnvironmentUser(userId, c))) return null;
   const values = {
     user_id: userId,
     ...content,
@@ -86,7 +86,7 @@ export async function enqueuePushEvent({
   category,
 }) {
   const template = resolvePushTemplate(event, data);
-  if (!template || !eligibleEnvironmentUser(userId)) return;
+  if (!template || !(await eligibleEnvironmentUser(userId))) return;
   await persistPush(
     userId,
     {
@@ -99,7 +99,7 @@ export async function enqueuePushEvent({
 }
 // Inbox is the durable outbox. Mark queued only after the uniquely indexed job exists.
 export async function repairPushOutbox(batchSize = 100) {
-  const c = pushConfig();
+  const c = await pushConfig();
   if (!c.enabled) return;
   const rows = await PushNotification.find({
     environment: c.environment,
@@ -158,7 +158,7 @@ export async function repairPushOutbox(batchSize = 100) {
   }
 }
 export async function deliverPush({ user, data, job }) {
-  const c = pushConfig();
+  const c = await pushConfig();
   if (!c.enabled) return { success: false, error: "push_disabled" };
   const n = await PushNotification.findOne({
     _id: data.notification_id,

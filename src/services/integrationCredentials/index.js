@@ -8,5 +8,5 @@ export const getIntegrationConfig = async (provider, fallback = {}) => {
   const managed = Object.fromEntries(
     [...(doc.credentials || new Map()).entries()].map(([key, value]) => [key, decryptCredential(value)]),
   );
-  return { ...fallback, ...managed };
+  return { ...fallback, ...managed, ...(provider === "firebase_push" ? { enabled: doc.enabled } : {}) };
 };

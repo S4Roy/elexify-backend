@@ -1,3 +1,4 @@
+import { customerPushRouter } from "./customerPush.js";
 import { pushCampaignsRouter } from './pushCampaigns.js';
 import { Router } from "express";
 import { notificationController } from "../../controllers/admin/index.js";
@@ -6,6 +7,7 @@ import { PERMISSIONS } from "../../constants/adminPermissions.js";
 
 const notificationsRouter = Router();
 notificationsRouter.use("/campaigns", pushCampaignsRouter);
+notificationsRouter.use("/customers", customerPushRouter);
 
 notificationsRouter.get(
   "/history",

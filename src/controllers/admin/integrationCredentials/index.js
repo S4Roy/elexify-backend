@@ -1,3 +1,4 @@
+import { pushEnvironmentDefaults, validateManagedPush, pushConfig, normalizePrivateKey } from "../../../services/notification/push/config.js";
 import { RECAPTCHA_DEFAULTS, RECAPTCHA_ACTIONS, validateRecaptchaConfig } from "../../../services/recaptcha/config.js";
 import nodemailer from "nodemailer";
 import IntegrationCredential from "../../../models/IntegrationCredential.js";
@@ -14,6 +15,7 @@ import { getRazorpayClient } from "../../../services/integrationCredentials/razo
 import { getIntegrationConfig } from "../../../services/integrationCredentials/index.js";
 
 const PROVIDERS = {
+  firebase_push: { label: "Firebase Push Notifications", fields: ["project_id", "environment", "test_user_ids", "client_email", "private_key"], secret: ["private_key"], plain: ["project_id", "environment", "test_user_ids", "client_email"] },
   recaptcha: { label: "reCAPTCHA v3", fields: ["site_key", "secret_key", "allowed_hostnames", "mode", "score_threshold", "checkout_attempts", ...RECAPTCHA_ACTIONS.map(action => `protect_${action}`)], secret: ["secret_key"], plain: ["site_key", "allowed_hostnames", ...Object.keys(RECAPTCHA_DEFAULTS)] },
   shiprocket: { label: "Shiprocket", fields: ["email", "password", "channel_id", "pickup_location"], secret: ["password"], plain: ["channel_id", "pickup_location"] },
   zoho: { label: "Zoho Books", fields: ["org_id", "client_id", "client_secret", "refresh_token", "base_url"], secret: ["client_secret", "refresh_token"] },
@@ -38,13 +40,13 @@ const descriptor = async (provider) => {
     const exposePlain = definition.plain?.includes(field);
     return [field, {
       configured,
-      masked: configured ? maskCredential(plainValue) : null,
+      masked: configured ? (provider === "firebase_push" && field === "private_key" ? "••••••••" : maskCredential(plainValue)) : null,
       value: exposePlain ? plainValue : undefined,
       secret: definition.secret.includes(field),
     }];
   }));
   return {
-    provider, label: definition.label, enabled: doc?.enabled ?? (provider !== "recaptcha"),
+    provider, label: definition.label, enabled: doc?.enabled ?? (provider === "firebase_push" ? process.env.PUSH_ENABLED === "true" : provider !== "recaptcha"),
     configured: definition.fields.some((field) => stored.has(field)), fields,
     ...(provider === "razorpay" ? {
       mode: razorpayKeyId.startsWith("rzp_live_")
@@ -80,15 +82,24 @@ export const update = async (req, res, next) => {
     if (unknown.length) throw StatusError.badRequest(`Unsupported credential field: ${unknown[0]}`);
 
     let doc = await IntegrationCredential.findOne({ provider }).select("+credentials");
-    if (!doc) doc = new IntegrationCredential({ provider, enabled: provider !== "recaptcha", created_by: req.auth.user_id });
+    if (!doc) doc = new IntegrationCredential({ provider, enabled: !["recaptcha", "firebase_push"].includes(provider), created_by: req.auth.user_id });
+    if (provider === "firebase_push" && !supplied.client_email && String(supplied.private_key || "").trim().startsWith("{")) {
+      try { supplied.client_email = JSON.parse(supplied.private_key).client_email || ""; } catch { /* validated below */ }
+    }
     for (const [key, value] of Object.entries(supplied)) {
       if (value === "" || value == null) continue; // blank means preserve the write-only value
-      doc.credentials.set(key, encryptCredential(String(value).trim()));
+      const clean = provider === "firebase_push" && key === "private_key" ? normalizePrivateKey(value) : String(value).trim();
+      doc.credentials.set(key, encryptCredential(clean));
     }
     if (typeof req.body.enabled === "boolean") doc.enabled = req.body.enabled;
     if (provider === "recaptcha" && doc.enabled) {
       const values = Object.fromEntries([...doc.credentials.entries()].map(([key, value]) => [key, decryptCredential(value)]));
       try { validateRecaptchaConfig({ ...RECAPTCHA_DEFAULTS, ...values }); }
+      catch (error) { throw StatusError.badRequest(error.message); }
+    }
+    if (provider === "firebase_push" && doc.enabled) {
+      const values = Object.fromEntries([...doc.credentials.entries()].map(([key, value]) => [key, decryptCredential(value)]));
+      try { validateManagedPush({ ...pushEnvironmentDefaults(), ...values }); }
       catch (error) { throw StatusError.badRequest(error.message); }
     }
     doc.updated_by = req.auth.user_id;
@@ -177,7 +188,12 @@ export const test = async (req, res, next) => {
     if (!doc.enabled) throw StatusError.badRequest("Enable the integration before testing.");
     await Token.updateOne({ provider }, { $set: { access_token: null, expires_at: new Date(0) } });
     let message = "Connection verified";
-    if (provider === "recaptcha") {
+    if (provider === "firebase_push") {
+      validateManagedPush(await getIntegrationConfig("firebase_push", pushEnvironmentDefaults()));
+      if (!(await pushConfig()).enabled) throw StatusError.badRequest("Push is blocked by the server emergency stop or environment guard.");
+      message = "Configuration validated. No notification was sent; use a customer test push to verify credentials and delivery.";
+    }
+    else if (provider === "recaptcha") {
       validateRecaptchaConfig({ ...RECAPTCHA_DEFAULTS, ...await getIntegrationConfig("recaptcha") });
       message = "Configuration format validated. Verify the key pair and domain with a storefront submission in monitor mode; this check does not verify a live token.";
     }

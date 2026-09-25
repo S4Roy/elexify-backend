@@ -60,7 +60,7 @@ const deliverByChannel = {
 
 /** Claims and delivers a single due job. Returns the outcome, or null if there was nothing to claim. */
 const processOne = async () => {
-  const config = pushConfig();
+  const config = await pushConfig();
   const leaseId = randomUUID();
   const job = await NotificationJob.findOneAndUpdate(
     { status: { $in: ["QUEUED", "RETRYING"] }, next_attempt_at: { $lte: new Date() },
@@ -140,7 +140,7 @@ const syncLog = async (job, patch) => {
 export const processNotificationQueue = async (batchSize = 25) => {
   try { await processCampaigns(); await repairPushOutbox(); }
   catch { console.error('push_outbox_tick_failed'); }
-  const environment = pushConfig().environment;
+  const environment = (await pushConfig()).environment;
   // Only push jobs have per-device idempotency records. Do not change legacy-channel recovery semantics.
   await NotificationJob.updateMany({ channel: 'push', environment, status: 'SENDING', lease_until: { $lt: new Date() } },
     { $set: { status: 'RETRYING', next_attempt_at: new Date(), lease_id: null } });

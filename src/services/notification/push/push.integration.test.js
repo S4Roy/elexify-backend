@@ -1,3 +1,10 @@
+import { generateKeyPairSync } from "node:crypto";
+import { envs } from "../../../config/index.js";
+import IntegrationCredential from "../../../models/IntegrationCredential.js";
+import { integrationCredentialsRouter } from "../../../routes/admin/integrationCredentials.js";
+import { pushConfig } from "./config.js";
+const originalEncryptionKey = envs.integrationCredentials.encryptionKey;
+import { customerPushRouter } from "../../../routes/admin/customerPush.js";
 import mongoose from "mongoose";
 import express from "express";
 import request from "supertest";
@@ -45,6 +52,7 @@ import { pushCampaignsRouter } from "../../../routes/admin/pushCampaigns.js";
 const uri = process.env.PUSH_TEST_MONGODB_URI;
 const suite = uri ? describe : describe.skip;
 const models = [
+  IntegrationCredential,
   DeviceToken,
   PushNotification,
   PushDelivery,
@@ -63,7 +71,9 @@ app.use((req, res, next) => {
 });
 app.use("/devices", deviceTokensRouter);
 app.use("/inbox", userNotificationsRouter);
+app.use("/integrations", integrationCredentialsRouter);
 app.use("/campaigns", pushCampaignsRouter);
+app.use("/customer-push", customerPushRouter);
 app.use(errors());
 app.use((e, req, res, next) =>
   res.status(e.statusCode || 500).json({ message: e.message })
@@ -96,6 +106,7 @@ suite("push platform (isolated MongoDB, mocked FCM)", () => {
   beforeAll(async () => {
     if (!/^mongodb:\/\/127\.0\.0\.1:27129\/elexify_push_test$/.test(uri))
       throw new Error("Use the dedicated isolated test database.");
+    envs.integrationCredentials.encryptionKey = "isolated-push-test-encryption";
     await mongoose.connect(uri, { autoIndex: false });
     for (const m of models) await m.createIndexes();
   });
@@ -115,6 +126,7 @@ suite("push platform (isolated MongoDB, mocked FCM)", () => {
       .mockResolvedValue({ success: true, messageId: "mock-accepted" });
   });
   afterAll(async () => {
+    envs.integrationCredentials.encryptionKey = originalEncryptionKey;
     vi.unstubAllEnvs();
     await mongoose.disconnect();
   });
@@ -458,6 +470,61 @@ suite("push platform (isolated MongoDB, mocked FCM)", () => {
     expect(
       (await PushCampaign.findById(campaign._id)).cancelled_by.toString()
     ).toBe(user._id.toString());
+  });
+  it("shows safe device metadata and queues an authorized idempotent customer test", async () => {
+    await registerDevice(user._id, input());
+    const endpoint = `/customer-push/${user._id}`;
+    await request(app).get(`${endpoint}/devices`).set("x-user", String(user._id)).expect(403);
+    const get = () => request(app).get(`${endpoint}/devices`).set("x-user", String(user._id)).set("x-permissions", permissions);
+    let response = await get().expect(200);
+    expect(response.body.data.devices).toHaveLength(1);
+    expect(response.body.data.devices[0].platform).toBe("android");
+    expect(JSON.stringify(response.body)).not.toContain(input().token);
+    expect(JSON.stringify(response.body)).not.toContain("token_hash");
+    expect(response.body.data.can_test).toBe(false);
+    const body = { request_id: "f36f2c4a-6a43-4e5f-94fb-f1b8cfc0a401" };
+    const send = (permission = permissions) => request(app).post(`${endpoint}/test`).set("x-user", String(user._id)).set("x-permissions", permission).send(body);
+    await send("customer.notification.view").expect(403);
+    await send().expect(400);
+    await NotificationPreference.create({ user_id: user._id, marketing: { push: true } });
+    response = await get().expect(200);
+    expect(response.body.data.can_test).toBe(true);
+    const first = await send().expect(200);
+    const second = await send().expect(200);
+    expect(first.body.data.notification_id).toBe(second.body.data.notification_id);
+    expect(await PushNotification.countDocuments()).toBe(1);
+    expect(sendFcm).not.toHaveBeenCalled();
+    vi.stubEnv("PUSH_ENABLED", "false");
+    await send().expect(400);
+    vi.stubEnv("PUSH_ENABLED", "true");
+    vi.stubEnv("PUSH_TEST_USER_IDS", String(other._id));
+    await send().expect(400);
+  });
+  it("manages encrypted Firebase settings with permission, validation and immediate disable", async () => {
+    delete process.env.PUSH_ENABLED;
+    const credentials = { project_id: "elexify-test-project", environment: "staging", test_user_ids: String(user._id) };
+    const update = (body, permission = "integration_credential.manage") => request(app)
+      .put("/integrations/firebase_push").set("x-user", String(user._id)).set("x-permissions", permission).send(body);
+    await update({ enabled: true, credentials }, "customer.notification.send").expect(403);
+    await update({ enabled: true, credentials: { ...credentials, environment: "production" } }).expect(400);
+    await update({ enabled: true, credentials: { ...credentials, test_user_ids: "invalid" } }).expect(400);
+    const { privateKey } = generateKeyPairSync("rsa", { modulusLength: 2048, privateKeyEncoding: { type: "pkcs8", format: "pem" }, publicKeyEncoding: { type: "spki", format: "pem" } });
+    const saved = await update({ enabled: true, credentials: { ...credentials, client_email: "sender@elexify-test-project.iam.gserviceaccount.com", private_key: privateKey } }).expect(200);
+    expect(saved.body.data.fields.private_key.value).toBeUndefined();
+    expect(saved.body.data.fields.private_key.masked).toBe("••••••••");
+    expect(JSON.stringify(saved.body)).not.toContain("BEGIN PRIVATE KEY");
+    const stored = await IntegrationCredential.findOne({ provider: "firebase_push" }).select("+credentials");
+    expect(stored.credentials.get("private_key")).toMatch(/^enc:v1:/);
+    expect(await pushConfig()).toMatchObject({ enabled: true, projectId: credentials.project_id, privateKey: privateKey.trim() });
+    await update({ enabled: false }).expect(200);
+    expect((await pushConfig()).enabled).toBe(false);
+    await update({ enabled: true, credentials: { private_key: "" } }).expect(200);
+    expect((await pushConfig()).privateKey).toBe(privateKey.trim());
+    vi.stubEnv("PUSH_ENABLED", "false");
+    expect((await pushConfig()).enabled).toBe(false);
+    vi.stubEnv("PUSH_ENABLED", "true");
+    vi.stubEnv("FCM_PRODUCTION_PROJECT_ID", credentials.project_id);
+    expect((await pushConfig()).enabled).toBe(false);
   });
   it("environment-disabled workers leave pending push jobs untouched", async () => {
     await registerDevice(user._id, input());

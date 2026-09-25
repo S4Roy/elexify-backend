@@ -7,11 +7,11 @@ import PushDelivery from "../../../models/PushDelivery.js";
 import NotificationPreference from "../../../models/NotificationPreference.js";
 import { pushConfig } from "./config.js";
 
-export function audiencePipeline(
+export async function audiencePipeline(
   campaign,
   { cursor, limit, count = false } = {}
 ) {
-  const c = pushConfig();
+  const c = await pushConfig();
   const match = { "marketing.push": true };
   const ids =
     campaign.audience === "specific" ? campaign.customer_ids.map(String) : null;
@@ -71,7 +71,7 @@ export function audiencePipeline(
 }
 export async function countAudience(campaign) {
   const rows = await NotificationPreference.aggregate(
-    audiencePipeline(campaign, { count: true })
+    await audiencePipeline(campaign, { count: true })
   );
   return rows[0]?.count || 0;
 }
@@ -151,7 +151,7 @@ export async function campaignStats(id) {
   };
 }
 export async function processCampaigns() {
-  const c = pushConfig();
+  const c = await pushConfig();
   if (!c.enabled) return;
   const leaseId = randomUUID();
   const campaign = await PushCampaign.findOneAndUpdate(
@@ -181,7 +181,7 @@ export async function processCampaigns() {
     }
     if (!campaign.expanded) {
       const recipients = await NotificationPreference.aggregate(
-        audiencePipeline(campaign, { cursor: campaign.cursor, limit: 100 })
+        await audiencePipeline(campaign, { cursor: campaign.cursor, limit: 100 })
       );
       // Bulk upsert avoids one database round trip per recipient. Durable keys permit safe restart.
       if (recipients.length && (await PushCampaign.exists(lock))) {
