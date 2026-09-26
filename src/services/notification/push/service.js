@@ -109,7 +109,27 @@ export async function repairPushOutbox(batchSize = 100) {
     .sort({ _id: 1 })
     .limit(batchSize)
     .lean();
+  // A customer with no active device (never granted permission, revoked it,
+  // or signed out) can't receive a push. Keep the inbox row, but mark it
+  // queued without creating a job that could only dead-letter.
+  const reachable = new Set(
+    (
+      await DeviceToken.distinct("user_id", {
+        user_id: { $in: [...new Set(rows.map((row) => row.user_id))] },
+        environment: c.environment,
+        project_id: c.projectId,
+        is_active: true,
+      })
+    ).map(String)
+  );
   for (const row of rows) {
+    if (!reachable.has(String(row.user_id))) {
+      await PushNotification.updateOne(
+        { _id: row._id },
+        { $set: { queued: true } }
+      );
+      continue;
+    }
     const filter = {
       user_id: row.user_id,
       channel: "push",

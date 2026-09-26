@@ -172,12 +172,25 @@ suite("push platform (isolated MongoDB, mocked FCM)", () => {
       dedupeKey: "ORD-1:placed",
       category: "transactional",
     };
+    await registerDevice(user._id, input());
     await Promise.all([enqueuePushEvent(event), enqueuePushEvent(event)]);
     expect(await PushNotification.countDocuments()).toBe(1);
     await repairPushOutbox();
     await repairPushOutbox();
     expect(await NotificationJob.countDocuments()).toBe(1);
     expect(await NotificationLog.countDocuments()).toBe(1);
+  });
+  it("keeps the inbox row but queues no push job for a customer without an active device", async () => {
+    await registerDevice(user._id, input());
+    await DeviceToken.updateOne({}, { $set: { is_active: false } });
+    await persistPush(user._id, { ...content, category: "transactional" });
+    await persistPush(other._id, { ...content, category: "transactional" });
+    await repairPushOutbox();
+    expect(await NotificationJob.countDocuments()).toBe(0);
+    expect(await NotificationLog.countDocuments()).toBe(0);
+    expect(await PushNotification.countDocuments({ queued: true })).toBe(2);
+    await processNotificationQueue(10);
+    expect(sendFcm).not.toHaveBeenCalled();
   });
   it("inbox pagination and reads never expose another customer record", async () => {
     const n = await persistPush(user._id, {
