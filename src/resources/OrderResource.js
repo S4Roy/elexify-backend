@@ -7,6 +7,7 @@ import CategoryResourceMinimal from "./CategoryResourceMinimal.js"; // make sure
 
 class OrderResource extends Resource {
   toArray() {
+    const shippingAddress = this.shipping_address_snapshot || this.shipping_address;
     return {
       imported_from_backup: this.imported_from_backup === true || this.legacy_import?.source === 'eqstoxco_wp434',
       _id: this._id || null,
@@ -60,8 +61,8 @@ class OrderResource extends Resource {
       billing_address: this.billing_address
         ? new AddressResource(this.billing_address).exec()
         : null,
-      shipping_address: this.shipping_address
-        ? new AddressResource(this.shipping_address).exec()
+      shipping_address: shippingAddress
+        ? new AddressResource(shippingAddress).exec()
         : null,
       order_items: (this.order_items || []).map((item) => {
         return {

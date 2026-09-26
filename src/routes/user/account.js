@@ -21,6 +21,12 @@ accountRouter.post(
 );
 
 accountRouter.post(
+  "/email/cancel-change",
+  accountChangeRateLimiter,
+  userController.accountController.cancelEmailChange
+);
+
+accountRouter.post(
   "/email/verify",
   accountChangeRateLimiter,
   userValidation.accountValidation.verifyEmailChange,
