@@ -1,8 +1,10 @@
 import { Router } from 'express';
 import rateLimit from 'express-rate-limit';
 import jwt from 'jsonwebtoken';
+import { celebrate, Joi } from 'celebrate';
 import { envs } from '../../config/index.js';
 import User from '../../models/User.js';
+import DeviceToken from '../../models/DeviceToken.js';
 import UserResource from '../../resources/UserResource.js';
 import { validateAccessToken } from '../../middleware/accessToken.js';
 import * as sessions from '../../services/customerSession/index.js';
@@ -40,7 +42,12 @@ router.post('/migrate-session', sessionRequestGuard, validateAccessToken, custom
   catch (error) { if (error.code === 11000) throw sessions.authError('SESSION_REVOKED'); throw error; }
   ok(res, { token, user: new UserResource(user).exec() });
 }));
-router.post('/logout', sessionRequestGuard, run(async (req, res) => {
+router.post('/logout', sessionRequestGuard, celebrate({
+  body: Joi.object({
+    refresh_token: Joi.string().max(4096).optional(),
+    device_id: Joi.string().pattern(/^[A-Za-z0-9_-]{16,100}$/).optional(),
+  }),
+}), run(async (req, res) => {
   const raw = sessions.readRefresh(req);
   let claims;
   try { claims = sessions.verifyRefresh(raw); } catch { /* repeated logout / expired cookie */ }
@@ -55,12 +62,26 @@ router.post('/logout', sessionRequestGuard, run(async (req, res) => {
   if (claims) {
     try { await sessions.revokeSession(claims.sub, claims.sid, req, 'LOGOUT'); }
     catch (error) { if (error.statusCode !== 404) throw error; }
+    if (req.body?.device_id) {
+      try {
+        await DeviceToken.updateOne(
+          { user_id: claims.sub, environment: process.env.APP_ENV, device_id: req.body.device_id },
+          { $set: { is_active: false } }
+        );
+      } catch { /* Session logout still succeeds if push cleanup is unavailable. */ }
+    }
   }
   sessions.clearRefresh(res);
   res.json({ status: 'success', success: true, message: 'Logged out successfully' });
 }));
 router.post('/logout-all', sessionRequestGuard, validateAccessToken, customerOnly, run(async (req, res) => {
   await sessions.revokeAll(req.auth.user_id, req);
+  try {
+    await DeviceToken.updateMany(
+      { user_id: req.auth.user_id, environment: process.env.APP_ENV },
+      { $set: { is_active: false } }
+    );
+  } catch { /* Session revocation still succeeds if push cleanup is unavailable. */ }
   sessions.clearRefresh(res); ok(res);
 }));
 router.get('/sessions', validateAccessToken, customerOnly, run(async (req, res) => ok(res, await sessions.sessionSummary(req.auth.user_id, req.auth.sid))));
