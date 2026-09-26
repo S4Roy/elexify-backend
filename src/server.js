@@ -1,3 +1,4 @@
+import { getMobileUpdatePolicy } from './services/mobileUpdatePolicy.js';
 import path, { resolve, dirname } from "path";
 import express from "express";
 import cors from "cors";
@@ -142,6 +143,9 @@ app.use(
 app.use(express.static("public"));
 app.use(bearerToken());
 app.use(StatusSuccess);
+// Public bootstrap endpoint: available before login/session restoration.
+app.get(`${envs.basePath}/api/v1/mobile/update-policy`, getMobileUpdatePolicy);
+
 // Define API Routes
 // NOTE: the legacy `GET ${basePath}/debug/db-seeding` route (zero auth,
 // controllers/DbSeedingController.js) has been removed — its seeding logic
