@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import mongooseAggregatePaginate from 'mongoose-aggregate-paginate-v2';
 const schema = new mongoose.Schema({
   customerId: { type: mongoose.Schema.Types.ObjectId, ref: 'users', required: true },
   refreshTokenHash: { type: String, required: true, select: false },
@@ -19,4 +20,5 @@ schema.index({ legacyTokenHash: 1 }, { unique: true, sparse: true });
 schema.index({ customerId: 1, lastActivityAt: -1 });
 schema.index({ lastActivityAt: 1 });
 schema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
+schema.plugin(mongooseAggregatePaginate);
 export default mongoose.model('CustomerSession', schema);

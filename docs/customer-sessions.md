@@ -46,8 +46,8 @@ Base prefix: `/api/v1`. Session paths work under both `/auth` and `/auth/user` t
 | DELETE /auth/sessions/:sessionId | Ownership-scoped revocation; clears cookie for current device |
 | GET /auth/presence | Current customer's activity-based presence |
 | GET /customers/me/presence | Presence alias using existing API-key/auth middleware |
-| GET /admin/customers/:id/sessions | Session list/presence, requires `customer.view` |
-| GET /admin/customers/:id/auth-events?page=1 | Latest 50 events/page, requires `audit_log.view` |
+| GET /admin/customers/:id/sessions?page=1 | 5 sessions/page with aggregate pagination metadata and global presence, requires `customer.view` |
+| GET /admin/customers/:id/auth-events?page=1 | Latest 10 events/page with aggregate pagination metadata, requires `audit_log.view` |
 | POST /admin/customers/:id/logout-all | Requires `customers.update` and `{ "reason": "At least 10 characters" }` |
 | DELETE /admin/customers/:id/sessions/:sessionId | Same permission/reason, customer-scoped device revocation |
 
@@ -64,6 +64,8 @@ Example device response (`data` inside the standard success envelope):
 ```
 
 Authentication failures return HTTP 401 with `status:error`, `success:false`, `code` and `message`. Session error codes include `ACCESS_TOKEN_EXPIRED`, `INVALID_ACCESS_TOKEN`, `REFRESH_TOKEN_EXPIRED`, `REFRESH_TOKEN_REVOKED`, `SESSION_REVOKED`, `ACCOUNT_INACTIVE`, `TOKEN_REUSE_DETECTED`. Logout returns `{"status":"success","success":true,"message":"Logged out successfully"}`. Legacy business/validation errors retain their existing format.
+
+Admin list responses use `mongoose-aggregate-paginate-v2`: `docs`, `totalDocs`, `limit`, `page`, `totalPages`, `hasPrevPage`, `hasNextPage`, `prevPage`, and `nextPage`. Customer session responses retain their existing `sessions` shape.
 
 Admin UI: Customers → customer details → Customer sessions. View online/offline state, last seen and active devices; revoke one/all devices with an audit reason; users with audit permission can view recent security events. Customer storefront/mobile: Account → Security → Your devices.
 

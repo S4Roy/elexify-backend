@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import mongooseAggregatePaginate from 'mongoose-aggregate-paginate-v2';
 const schema = new mongoose.Schema({
   customerId: mongoose.Schema.Types.ObjectId,
   sessionId: mongoose.Schema.Types.ObjectId,
@@ -9,4 +10,5 @@ const schema = new mongoose.Schema({
 });
 schema.index({ customerId: 1, createdAt: -1 });
 schema.index({ createdAt: 1 }, { expireAfterSeconds: 90 * 86400 });
+schema.plugin(mongooseAggregatePaginate);
 export default mongoose.model('AuthEvent', schema);

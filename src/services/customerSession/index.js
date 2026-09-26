@@ -127,12 +127,19 @@ export async function revokeSession(customerId, sessionId, req, reason = 'SESSIO
   if (!session) throw Object.assign(new Error('Session not found'), { statusCode: 404 });
   if (!session.revokedAt) await audit(reason, customerId, sessionId, req);
 }
-export async function sessionSummary(customerId, currentSid) {
-  const sessions = await CustomerSession.find({ customerId, ...activeFilter() })
-    .select('deviceName deviceType browser os lastActivityAt createdAt expiresAt').sort({ lastActivityAt: -1 }).limit(100).lean();
+export async function sessionSummary(customerId, currentSid, pagination) {
+  const filter = { customerId: new mongoose.Types.ObjectId(customerId), ...activeFilter() };
+  const projection = { deviceName: 1, deviceType: 1, browser: 1, os: 1, lastActivityAt: 1, createdAt: 1, expiresAt: 1 };
+  const result = pagination ? await CustomerSession.aggregatePaginate(CustomerSession.aggregate([
+    { $match: filter }, { $sort: { lastActivityAt: -1, _id: -1 } }, { $project: projection },
+  ]), pagination) : null;
+  const sessions = result ? result.docs : await CustomerSession.find(filter)
+    .select(projection).sort({ lastActivityAt: -1, _id: -1 }).limit(100).lean();
+  const latestActive = pagination ? await CustomerSession.findOne(filter).sort({ lastActivityAt: -1 }).select('lastActivityAt').lean() : sessions[0];
   const latest = await CustomerSession.findOne({ customerId }).sort({ lastActivityAt: -1 }).select('lastActivityAt').lean();
-  return { sessions: sessions.map(s => ({ ...s, id: String(s._id), isCurrent: String(s._id) === String(currentSid) })),
-    online: sessions.some(s => +s.lastActivityAt > Date.now() - policy.onlineSeconds * 1000),
+  const docs = sessions.map(s => ({ ...s, id: String(s._id), isCurrent: String(s._id) === String(currentSid) }));
+  return { ...(result ? { ...result, docs } : { sessions: docs }),
+    online: !!latestActive && +latestActive.lastActivityAt > Date.now() - policy.onlineSeconds * 1000,
     lastActivityAt: latest?.lastActivityAt || null };
 }
 

@@ -12,13 +12,16 @@ const handler = fn => async (req, res, next) => {
 };
 export const listSessions = handler(async (req, res) => {
   res.setHeader('Cache-Control', 'no-store');
-  res.json({ status: 'success', data: await sessions.sessionSummary(req.params.id) });
+  res.json({ status: 'success', data: await sessions.sessionSummary(req.params.id, undefined, { page: Math.max(1, Math.min(10000, Math.floor(Number(req.query.page) || 1))), limit: 5 }) });
 });
 export const securityEvents = handler(async (req, res) => {
-  const page = Math.max(1, Math.min(10000, Number(req.query.page) || 1));
-  const events = await AuthEvent.find({ customerId: req.params.id }).sort({ createdAt: -1 }).skip((page - 1) * 50).limit(50).lean();
+  const page = Math.max(1, Math.min(10000, Math.floor(Number(req.query.page) || 1)));
+  const data = await AuthEvent.aggregatePaginate(AuthEvent.aggregate([
+    { $match: { customerId: new mongoose.Types.ObjectId(req.params.id) } },
+    { $sort: { createdAt: -1, _id: -1 } },
+  ]), { page, limit: 10 });
   res.setHeader('Cache-Control', 'no-store');
-  res.json({ status: 'success', data: { events, page } });
+  res.json({ status: 'success', data });
 });
 export const revoke = handler(async (req, res) => {
   if (typeof req.body.reason !== 'string' || req.body.reason.trim().length < 10 || req.body.reason.length > 500) return res.status(400).json({ status: 'error', message: 'Provide a reason (10–500 characters)' });

@@ -24,6 +24,37 @@ suite('MongoDB customer session integration', () => {
     await service.revokeAll(customer._id, req);
     await expect(service.refreshSession({ ...req, body: { refresh_token: b.refresh_token } }, response)).rejects.toMatchObject({ code: 'SESSION_REVOKED' });
   });
+  it('paginates admin devices and events without losing global presence or customer isolation', async () => {
+    const customer = await user();
+    const other = await user();
+    for (let i = 0; i < 6; i++) await service.createSession(customer, req, response);
+    await service.createSession(other, req, response);
+    const records = await CustomerSession.find({ customerId: customer._id }).sort({ _id: -1 });
+    await CustomerSession.updateMany({ customerId: customer._id }, { lastActivityAt: new Date(Date.now() - 600000) });
+    await CustomerSession.updateOne({ _id: records[0]._id }, { lastActivityAt: new Date() });
+    const { listSessions, securityEvents } = await import('../../controllers/admin/customerAccount/sessions.js');
+    async function invoke(handler, page) {
+      let body;
+      await handler({ params: { id: String(customer._id) }, query: { page } }, { setHeader() {}, json(value) { body = value; } }, error => { throw error; });
+      return body.data;
+    }
+    const first = await invoke(listSessions, '1');
+    const second = await invoke(listSessions, '2');
+    expect(first).toMatchObject({ totalDocs: 6, page: 1, limit: 5, totalPages: 2, hasNextPage: true, online: true });
+    expect(first.docs).toHaveLength(5);
+    expect(first.docs[0]).not.toHaveProperty('refreshTokenHash');
+    expect(first.docs[0]).not.toHaveProperty('legacyTokenHash');
+    expect(second.docs).toHaveLength(1);
+    expect(second.online).toBe(true);
+    expect(first.docs.map(s => s.id)).not.toContain(second.docs[0].id);
+    for (let i = 0; i < 6; i++) await service.audit('TEST_EVENT', customer._id, null, req);
+    const eventsFirst = await invoke(securityEvents, '1');
+    const eventsSecond = await invoke(securityEvents, '2');
+    expect(eventsFirst).toMatchObject({ totalDocs: 12, page: 1, limit: 10, totalPages: 2, hasNextPage: true });
+    expect(eventsFirst.docs).toHaveLength(10);
+    expect(eventsSecond.docs).toHaveLength(2);
+    expect(eventsFirst.docs.map(e => String(e._id))).not.toContain(String(eventsSecond.docs[0]._id));
+  });
   it('allows one atomic rotation and treats concurrent reuse as compromise', async () => {
     const customer = await user(); const token = await service.createSession(customer, req, response);
     const results = await Promise.allSettled([1, 2].map(() => service.refreshSession({ ...req, body: { refresh_token: token.refresh_token } }, response)));
