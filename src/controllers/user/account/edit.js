@@ -1,3 +1,4 @@
+import { revokeAll } from '../../../services/customerSession/index.js';
 import User from "../../../models/User.js";
 import { StatusError } from "../../../config/index.js";
 import { generalHelper } from "../../../helpers/index.js";
@@ -54,6 +55,7 @@ export const edit = async (req, res, next) => {
         throw StatusError.badRequest(req.__("Current password is incorrect"));
       }
       user.password = await generalHelper.bcryptMake(password);
+      user.password_changed_at = new Date();
     }
 
     user.updated_by = user_id;
@@ -62,6 +64,7 @@ export const edit = async (req, res, next) => {
     await user.save();
 
     if (password) {
+      await revokeAll(user_id, req, "PASSWORD_CHANGED");
       notificationService
         .sendNotification({ userId: user_id, event: "PASSWORD_CHANGED", data: {} })
         .catch(() => {});

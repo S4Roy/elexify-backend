@@ -1,3 +1,4 @@
+import { sessionSummary, cleanupSessions } from './services/customerSession/index.js';
 import { getMobileUpdatePolicy } from './services/mobileUpdatePolicy.js';
 import path, { resolve, dirname } from "path";
 import express from "express";
@@ -15,6 +16,8 @@ import * as middleware from "./middleware/index.js";
 import i18n from "i18n";
 import cron from "node-cron";
 import { processZohoQueue } from "./services/zoho/ZohoSyncQueue.js";
+
+cron.schedule("0 * * * *", () => { cleanupSessions().catch(() => console.error("Customer session cleanup failed")); });
 
 cron.schedule("* * * * *", () => {
   processZohoQueue().catch(() => console.error("Zoho worker failed; durable jobs retained for retry"));
@@ -241,6 +244,14 @@ app.use(
   v1AuthRouter,
 );
 app.use(`${envs.basePath}/api/v1/payments/razorpay`, razorpayWebhookRouter);
+app.get(`${envs.basePath}/api/v1/customers/me/presence`, middleware.validateApiKey, middleware.validateAccessToken, async (req, res, next) => {
+  try {
+    const { online, lastActivityAt } = await sessionSummary(req.auth.user_id, req.auth.sid);
+    res.setHeader('Cache-Control', 'no-store');
+    res.json({ status: 'success', data: { online, lastActivityAt } });
+  } catch (error) { next(error); }
+});
+
 
 app.use(
   `${envs.basePath}/api/v1/admin`,

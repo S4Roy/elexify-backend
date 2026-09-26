@@ -1,3 +1,4 @@
+import { batchPresence } from '../../../services/customerSession/index.js';
 import DeviceToken from "../../../models/DeviceToken.js";
 import { pushConfig } from "../../../services/notification/push/config.js";
 import Order from "../../../models/Order.js";
@@ -90,7 +91,9 @@ export const list = async (req, res, next) => {
         ]) : [];
     const devicesByUser = new Map(deviceCounts.map(row => [String(row._id), row.count]));
     const activityByUser = new Map(activity.map(row => [String(row._id), row]));
+    const presence = await batchPresence(data.docs.map(doc => doc._id));
     data.docs = (await UserResource.collection(data.docs)).map(doc => ({
+      presence: presence.get(String(doc._id)) || { online: false, activeDevices: 0, lastActivityAt: null },
       ...doc,
       push_device_count: devicesByUser.get(String(doc._id)) ?? 0,
       order_count: activityByUser.get(String(doc._id))?.order_count ?? 0,

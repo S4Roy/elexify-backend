@@ -1,3 +1,4 @@
+import { revokeAll } from '../../../services/customerSession/index.js';
 import User from "../../../models/User.js";
 import UserResource from "../../../resources/UserResource.js";
 import { StatusError } from "../../../config/index.js";
@@ -88,12 +89,16 @@ export const edit = async (req, res, next) => {
       updateData.password = await generalHelper.bcryptMake(password);
     }
 
+    if (password || (status !== undefined && status !== "active")) updateData.password_changed_at = new Date();
+
     // ── Apply update ──────────────────────────────────────────────────────────
     const updatedCustomer = await User.findByIdAndUpdate(
       _id,
       { $set: updateData },
       { new: true },
     );
+
+    if (password || (status !== undefined && status !== "active")) await revokeAll(_id, req, password ? "PASSWORD_CHANGED" : "ACCOUNT_LOCKED");
 
     return res.status(200).json({
       status: "success",

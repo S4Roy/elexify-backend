@@ -1,3 +1,4 @@
+import { revokeAll } from '../../services/customerSession/index.js';
 import User from "../../models/User.js";
 import UserResource from "../../resources/UserResource.js";
 import { StatusError } from "../../config/index.js";
@@ -21,7 +22,7 @@ export const resetPassword = async (req, res, next) => {
 
     // Hash New Password
     const hashedPassword = await generalHelper.bcryptMake(new_password);
-    await User.findByIdAndUpdate(userId, {
+    const changed = await User.findOneAndUpdate({ _id: userId, reset_token: token, deleted_at: null, status: "active" }, {
       password: hashedPassword,
       // One-time use — this also stops the emailed link being replayed
       // within its 1h window after it's already been used once.
@@ -33,6 +34,9 @@ export const resetPassword = async (req, res, next) => {
       failed_login_attempts: 0,
       login_locked_until: null,
     });
+
+    if (!changed) throw StatusError.unauthorized("Invalid or expired token");
+    await revokeAll(userId, req, "PASSWORD_CHANGED");
 
     // Mandatory security event, same as the self-service change-password path.
     notificationService

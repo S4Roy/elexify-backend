@@ -1,3 +1,4 @@
+import { createSession, audit } from '../../services/customerSession/index.js';
 import User from "../../models/User.js";
 import UserResource from "../../resources/UserResource.js";
 import { StatusError } from "../../config/index.js";
@@ -28,6 +29,7 @@ export const userLogin = async (req, res, next) => {
     }).exec();
 
     if (!user) {
+      await audit("LOGIN_FAILED", null, null, req);
       // No matching account — still record the attempt (user_id: null,
       // the attempted email in metadata), same as the admin login path, so
       // credential-stuffing/enumeration against unknown customer emails
@@ -35,7 +37,7 @@ export const userLogin = async (req, res, next) => {
       await auditService.recordAudit({ userId: null, event: "CUSTOMER_LOGIN_FAILED", req,
         metadata: { reason: "unknown_email", attempted_email: email } });
       throw StatusError.unauthorized(
-        req.__("The email you entered is invalid")
+        req.__("Invalid email or password")
       );
     }
 
@@ -49,10 +51,11 @@ export const userLogin = async (req, res, next) => {
       user.password
     );
     if (!isPasswordValid) {
+      await audit("LOGIN_FAILED", user._id, null, req);
       await auditService.recordAudit({ userId: user._id, event: "CUSTOMER_LOGIN_FAILED", req,
         metadata: { reason: "wrong_password" } });
       throw StatusError.unauthorized(
-        req.__("The password you entered is incorrect")
+        req.__("Invalid email or password")
       );
     }
     if (guest_id) {
@@ -70,11 +73,7 @@ export const userLogin = async (req, res, next) => {
       );
     }
     // Generate JWT Token
-    const token = await userService.generateTokens({
-      user_id: user._id,
-      email: user.email,
-      role: user.role,
-    });
+    const token = await createSession(user, req, res);
 
     // Success Response
     res.status(200).json({

@@ -9,9 +9,11 @@ import { envs } from "../../config/index.js";
  */
 export const verifyToken = (token) => {
   try {
-    const decodeData = jwt.verify(token, envs.jwt.accessToken.secret);
+    const decodeData = jwt.verify(token, envs.jwt.accessToken.secret, { algorithms: ["HS256"] });
     return decodeData;
   } catch (error) {
-    throw StatusError.forbidden(error);
+    const failure = StatusError.forbidden("Invalid access token");
+    failure.cause = error;
+    throw failure;
   }
 };

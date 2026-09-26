@@ -1,3 +1,4 @@
+import { listSessions, securityEvents, revoke } from '../../controllers/admin/customerAccount/sessions.js';
 import { listAddresses, editAddress, createAddress, addressOptions } from "../../controllers/admin/customerAccount/address.js";
 import { validateAddressList, validateAddressEdit, validateAddressCreate, validateAddressOptions } from "../../validations/admin/customerAccount/address.js";
 import { Router } from "express";
@@ -43,4 +44,8 @@ customersRouter.post(
   customerAccountController.verificationOverride
 );
 
+customersRouter.get('/:id/sessions', requirePermission(PERMISSIONS.CUSTOMER_VIEW), listSessions);
+customersRouter.get('/:id/auth-events', requirePermission(PERMISSIONS.AUDIT_LOG_VIEW), securityEvents);
+customersRouter.post('/:id/logout-all', requirePermission('customers.update'), revoke);
+customersRouter.delete('/:id/sessions/:sessionId', requirePermission('customers.update'), revoke);
 export { customersRouter };

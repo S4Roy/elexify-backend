@@ -15,6 +15,7 @@ const { getNotificationPreferences, updateNotificationPreferences } = await impo
 const { requirePermission } = await import("../../../middleware/requirePermission.js");
 const { PERMISSIONS } = await import("../../../constants/adminPermissions.js");
 const User = (await import("../../../models/User.js")).default;
+const Role = (await import("../../../models/Role.js")).default;
 const AuditLog = (await import("../../../models/AuditLog.js")).default;
 const NotificationPreference = (await import("../../../models/NotificationPreference.js")).default;
 
@@ -43,8 +44,10 @@ const createCustomer = async (overrides = {}) =>
     ...overrides,
   });
 
-const createAdmin = async (role = "superadmin") =>
-  User.create({ role, name: `Admin (${role})`, email: `${role}@example.com`, status: "active" });
+const createAdmin = async (role = "superadmin") => {
+  const assigned = await Role.create({ name: role, key: role, permissions: role === 'superadmin' ? [PERMISSIONS.CUSTOMER_VERIFICATION_OVERRIDE] : [] });
+  return User.create({ role, admin_role_id: assigned._id, name: `Admin (${role})`, email: `${role}@example.com`, status: "active" });
+};
 
 suite("admin customer account API", () => {
   beforeAll(async () => {
@@ -80,11 +83,12 @@ suite("admin customer account API", () => {
   });
 
   it("requirePermission blocks a role without the permission (403)", async () => {
-    const req = mockReq({ auth: { role: "staff" } });
+    const admin = await createAdmin("staff");
+    const req = mockReq({ auth: { role: "staff", user_id: admin._id } });
     const res = mockRes();
     let caught;
     const middleware = requirePermission(PERMISSIONS.CUSTOMER_VERIFICATION_OVERRIDE);
-    middleware(req, res, (err) => {
+    await middleware(req, res, (err) => {
       caught = err;
     });
 
@@ -93,12 +97,13 @@ suite("admin customer account API", () => {
   });
 
   it("requirePermission allows a role with the permission", async () => {
-    const req = mockReq({ auth: { role: "superadmin" } });
+    const admin = await createAdmin();
+    const req = mockReq({ auth: { role: "superadmin", user_id: admin._id } });
     const res = mockRes();
     let caught;
     let nextCalledCleanly = false;
     const middleware = requirePermission(PERMISSIONS.CUSTOMER_VERIFICATION_OVERRIDE);
-    middleware(req, res, (err) => {
+    await middleware(req, res, (err) => {
       if (err) caught = err;
       else nextCalledCleanly = true;
     });

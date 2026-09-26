@@ -4,6 +4,8 @@ import { envs } from "../config/index.js";
 import { userService } from "../services/index.js";
 import { accessTokenIfAny } from "./accessTokenIfAny.js";
 
+vi.mock("../services/customerSession/index.js", () => ({ validateLegacyToken: vi.fn(), validateSession: vi.fn() }));
+
 vi.mock("../services/index.js", () => ({ userService: { isAccountClosed: vi.fn() } }));
 
 const sign = (payload, options = {}) =>
@@ -64,4 +66,13 @@ describe("accessTokenIfAny", () => {
     expect(req.auth).toBeUndefined();
     expect(res.setHeader).toHaveBeenCalledWith("X-Session-Expired", "1");
   });
+});
+
+it('rejects an expired authenticated write before any guest mutation runs', async () => {
+  const req = { method: 'POST', originalUrl: '/api/v1/site/inventory/product/cart-manage', headers: { authorization: `Bearer ${sign({ user_id: 'u1' }, { expiresIn: -10 })}`, 'x-guest-id': 'guest' } };
+  const res = { setHeader: vi.fn(), status: vi.fn().mockReturnThis(), json: vi.fn() };
+  const next = vi.fn();
+  await accessTokenIfAny(req, res, next);
+  expect(res.status).toHaveBeenCalledWith(401);
+  expect(next).not.toHaveBeenCalled();
 });

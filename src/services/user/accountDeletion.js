@@ -1,3 +1,4 @@
+import { revokeAll } from '../customerSession/index.js';
 import User from "../../models/User.js";
 import Order from "../../models/Order.js";
 import ReturnRequest from "../../models/ReturnRequest.js";
@@ -138,6 +139,7 @@ export async function deleteCustomerAccount({ userId, reason = null }) {
     { new: false, lean: true },
   );
   if (!before) return false;
+  await revokeAll(userId, undefined, "ACCOUNT_DELETED");
 
   const identifiers = [
     before.email,
@@ -194,6 +196,6 @@ export async function isAccountClosed(userId, iat) {
   // Same rule as resolveAuthorization().
   return Boolean(
     user.password_changed_at &&
-      iat < Math.floor(new Date(user.password_changed_at).getTime() / 1000),
+      iat <= Math.floor(new Date(user.password_changed_at).getTime() / 1000),
   );
 }

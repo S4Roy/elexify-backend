@@ -1,3 +1,4 @@
+import { createSession } from '../../services/customerSession/index.js';
 import User from "../../models/User.js";
 import UserResource from "../../resources/UserResource.js";
 import { StatusError } from "../../config/index.js";
@@ -40,12 +41,7 @@ export const userSignup = async (req, res, next) => {
     });
 
     // Generate token
-    const token = await userService.generateTokens({
-      user_id: newUser._id,
-      email: newUser.email,
-      phone:newUser.email,
-      role: newUser.role,
-    });
+    const token = await createSession(newUser, req, res);
 
     // Success response
     return res.status(201).json({

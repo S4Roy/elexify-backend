@@ -1,47 +1,13 @@
-import Category from "../../../models/Category.js";
-import { StatusError } from "../../../config/index.js";
-import CategoryResource from "../../../resources/CategoryResource.js";
-
-/**
- * Edit Category
- * @param req
- * @param res
- * @param next
- */
+import User from '../../../models/User.js';
+import { StatusError } from '../../../config/index.js';
+import { revokeAll } from '../../../services/customerSession/index.js';
 export const remove = async (req, res, next) => {
   try {
-    const { _id } = req.body;
-
-    if (!_id) {
-      throw StatusError.badRequest(req.__("Category ID is required"));
-    }
-
-    // Find the existing category
-    const category = await Category.findById(_id).exec();
-    if (!category) {
-      throw StatusError.notFound(req.__("Category not found"));
-    }
-
-    // Prepare update data
-    const updateData = {
-      deleted_by: req.auth.user_id,
-      deleted_at: new Date(),
-    };
-
-    // Update the category
-    const updatedCategory = await Category.findByIdAndUpdate(
-      _id,
-      { $set: updateData },
-      { new: true }
-    );
-
-    // Success Response
-    res.status(200).json({
-      status: "success",
-      message: req.__("Category Deleted successfully"),
-      data: new CategoryResource(updatedCategory).exec(),
-    });
-  } catch (error) {
-    next(error);
-  }
+    const id = req.params.id || req.body._id;
+    const customer = await User.findOneAndUpdate({ _id: id, role: { $in: ['customer', 'user'] }, deleted_at: null },
+      { $set: { deleted_at: new Date(), deleted_by: req.auth.user_id, status: 'inactive', password_changed_at: new Date() } });
+    if (!customer) throw StatusError.notFound('Customer not found');
+    await revokeAll(id, req, 'ACCOUNT_DELETED');
+    res.json({ status: 'success', message: 'Customer deleted successfully', data: {} });
+  } catch (error) { next(error); }
 };

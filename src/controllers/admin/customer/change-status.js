@@ -1,3 +1,4 @@
+import { revokeAll } from '../../../services/customerSession/index.js';
 import User from "../../../models/User.js";
 import { StatusError } from "../../../config/index.js";
 
@@ -23,9 +24,12 @@ export const changeStatus = async (req, res, next) => {
 
     await customer.updateOne({
       status,
+      ...(status !== "active" ? { password_changed_at: new Date() } : {}),
       updated_by: req.auth.user_id,
       updated_at: new Date(),
     });
+
+    if (status !== "active") await revokeAll(_id, req, "ACCOUNT_LOCKED");
 
     return res.status(200).json({
       status: "success",

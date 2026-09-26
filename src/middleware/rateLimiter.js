@@ -4,6 +4,7 @@ import rateLimit from "express-rate-limit";
  * Limits brute-force attempts against login, OTP, and password-reset endpoints.
  */
 export const authRateLimiter = rateLimit({
+  skip: req => /\/(refresh|logout|logout-all|sessions|presence)(\/|$)/.test(req.path),
   windowMs: 15 * 60 * 1000,
   // Browser E2E repeatedly authenticates freshly reseeded users from one
   // loopback IP. Keep production brute-force protection unchanged while

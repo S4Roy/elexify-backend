@@ -1,3 +1,4 @@
+import { createSession } from '../../services/customerSession/index.js';
 import { OAuth2Client } from "google-auth-library";
 import User from "../../models/User.js";
 import UserResource from "../../resources/UserResource.js";
@@ -24,7 +25,7 @@ export const googleLogin = async (req, res, next) => {
       throw StatusError.unauthorized(req.__("Invalid Google credential"));
     }
 
-    if (!payload?.email) {
+    if (!payload?.email || payload.email_verified !== true) {
       throw StatusError.badRequest(
         req.__("Google account has no email address"),
       );
@@ -82,11 +83,7 @@ export const googleLogin = async (req, res, next) => {
       );
     }
 
-    const token = await userService.generateTokens({
-      user_id: user._id,
-      email: user.email,
-      role: user.role,
-    });
+    const token = await createSession(user, req, res);
 
     return res.status(200).json({
       status: "success",

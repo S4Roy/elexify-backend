@@ -1,3 +1,4 @@
+import { createSession } from '../../services/customerSession/index.js';
 import moment from "moment";
 import User from "../../models/User.js";
 import OtpVerification from "../../models/OtpVerification.js";
@@ -162,11 +163,7 @@ export const verifyUserOtp = async (req, res, next) => {
     let data = {};
 
     if (purpose === "auth") {
-      const token = await userService.generateTokens({
-        user_id: user._id,
-        email: user.email,
-        role: user.role,
-      });
+      const token = await createSession(user, req, res);
       data = {
         is_new_user: isNewUser,
         user: new UserResource(user).exec(),

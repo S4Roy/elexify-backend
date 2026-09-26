@@ -10,6 +10,10 @@ import { authValidation } from "../../validations/index.js";
 // import { customFileHelper } from "../../helpers/index.js";
 
 const userAuthRouter = Router();
+userAuthRouter.use((req, res, next) => {
+  if (req.method === 'POST' && !req.is('application/json')) return res.status(415).json({ status: 'error', message: 'JSON request required' });
+  next();
+});
 
 userAuthRouter.post(
   "/signup", requireRecaptcha("registration"),

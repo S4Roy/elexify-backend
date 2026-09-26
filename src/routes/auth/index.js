@@ -1,3 +1,4 @@
+import { customerSessionsRouter } from './sessions.js';
 import { Router } from "express";
 import { adminAuthRouter } from "./admin.js";
 import { userAuthRouter } from "./user.js";
@@ -5,6 +6,8 @@ import { userAuthRouter } from "./user.js";
 const v1AuthRouter = Router();
 // All routes go here
 
+v1AuthRouter.use("/user", customerSessionsRouter);
+v1AuthRouter.use("/", customerSessionsRouter);
 v1AuthRouter.use("/admin", adminAuthRouter);
 v1AuthRouter.use("/user", userAuthRouter);
 
