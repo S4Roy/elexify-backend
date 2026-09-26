@@ -37,6 +37,7 @@ import e2eCleanup from "./operations/e2e-cleanup.js";
 import e2eSeed from "./operations/e2e-seed.js";
 import e2eSeedAdmin from "./operations/e2e-seed-admin.js";
 import integrationCredentials from "./operations/integration-credentials.js";
+import adminRoles from "./operations/admin-roles.js";
 
 import wooCommerceMissingData from "./operations/woocommerce-missing-data.js";
 
@@ -74,6 +75,7 @@ const RAW_ENTRIES = [
   e2eSeed,
   e2eSeedAdmin,
   integrationCredentials,
+  adminRoles,
 ];
 
 const VALID_TYPES = new Set(["SEEDER", "MIGRATION", "BACKFILL", "REPAIR"]);
