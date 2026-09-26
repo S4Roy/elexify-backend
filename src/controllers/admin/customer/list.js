@@ -1,9 +1,13 @@
-import { batchPresence } from '../../../services/customerSession/index.js';
+import { customerDirectoryFilters, customerDirectorySort } from "../../../helpers/customerDirectoryFilters.js";
+import { batchPresence } from "../../../services/customerSession/index.js";
 import DeviceToken from "../../../models/DeviceToken.js";
 import { pushConfig } from "../../../services/notification/push/config.js";
 import Order from "../../../models/Order.js";
 import { customerActivityPipeline } from "../../../helpers/order/customerActivity.js";
-import { sourceCondition, sourceExpression } from '../../../services/legacyImport/filter.js';
+import {
+  sourceCondition,
+  sourceExpression,
+} from "../../../services/legacyImport/filter.js";
 import User from "../../../models/User.js";
 import { StatusError } from "../../../config/index.js";
 import { envs } from "../../../config/index.js";
@@ -37,18 +41,19 @@ export const list = async (req, res, next) => {
     const slug = paramSlug;
 
     const importSource = req.query.import_source;
-    if (importSource && !['backup', 'other'].includes(importSource)) throw StatusError.badRequest('Invalid import source filter');
+    if (importSource && !["backup", "other"].includes(importSource))
+      throw StatusError.badRequest("Invalid import source filter");
     let importedReviewIds = [];
     const options = {
-      page: page,
-      limit: limit,
-      sort: { [sort_by]: sort_order },
+      page: Math.max(1, Math.floor(Number(page) || 1)),
+      limit: Math.max(1, Math.min(100, Math.floor(Number(limit) || 25))),
     };
     let matchFilter = { deleted_at: null, role: "customer" };
 
-    if (importSource) matchFilter.$and = [sourceCondition(importSource, importedReviewIds)];
+    if (importSource)
+      matchFilter.$and = [sourceCondition(importSource, importedReviewIds)];
     if (search_key) {
-      const escapedSearch = search_key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const escapedSearch = search_key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
       matchFilter.$or = [
         { name: { $regex: escapedSearch, $options: "i" } },
         { email: { $regex: escapedSearch, $options: "i" } },
@@ -75,25 +80,49 @@ export const list = async (req, res, next) => {
       matchFilter.mobile_verified_at =
         mobile_verified === "yes" ? { $ne: null } : null;
     }
-    const pipeline = [{ $match: matchFilter }, { $addFields: { imported_from_backup: sourceExpression() } }];
+    const pipeline = [
+      { $match: matchFilter },
+      ...customerDirectoryFilters(req.query),
+      { $addFields: { imported_from_backup: sourceExpression() } },
+      ...customerDirectorySort(sort_by, sort_order),
+    ];
     let data;
 
     data = await User.aggregatePaginate(User.aggregate(pipeline), options);
 
     const activity = data.docs.length
-      ? await Order.aggregate(customerActivityPipeline(data.docs.map(doc => doc._id)))
+      ? await Order.aggregate(
+          customerActivityPipeline(data.docs.map((doc) => doc._id)),
+        )
       : [];
     const push = await pushConfig();
-    const deviceCounts = data.docs.length && push.environment && push.projectId
-      ? await DeviceToken.aggregate([
-          { $match: { user_id: { $in: data.docs.map(doc => doc._id) }, environment: push.environment, project_id: push.projectId, is_active: true } },
-          { $group: { _id: "$user_id", count: { $sum: 1 } } },
-        ]) : [];
-    const devicesByUser = new Map(deviceCounts.map(row => [String(row._id), row.count]));
-    const activityByUser = new Map(activity.map(row => [String(row._id), row]));
-    const presence = await batchPresence(data.docs.map(doc => doc._id));
-    data.docs = (await UserResource.collection(data.docs)).map(doc => ({
-      presence: presence.get(String(doc._id)) || { online: false, activeDevices: 0, lastActivityAt: null },
+    const deviceCounts =
+      data.docs.length && push.environment && push.projectId
+        ? await DeviceToken.aggregate([
+            {
+              $match: {
+                user_id: { $in: data.docs.map((doc) => doc._id) },
+                environment: push.environment,
+                project_id: push.projectId,
+                is_active: true,
+              },
+            },
+            { $group: { _id: "$user_id", count: { $sum: 1 } } },
+          ])
+        : [];
+    const devicesByUser = new Map(
+      deviceCounts.map((row) => [String(row._id), row.count]),
+    );
+    const activityByUser = new Map(
+      activity.map((row) => [String(row._id), row]),
+    );
+    const presence = await batchPresence(data.docs.map((doc) => doc._id));
+    data.docs = (await UserResource.collection(data.docs)).map((doc) => ({
+      presence: presence.get(String(doc._id)) || {
+        online: false,
+        activeDevices: 0,
+        lastActivityAt: null,
+      },
       ...doc,
       push_device_count: devicesByUser.get(String(doc._id)) ?? 0,
       order_count: activityByUser.get(String(doc._id))?.order_count ?? 0,

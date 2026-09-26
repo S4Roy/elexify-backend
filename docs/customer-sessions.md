@@ -105,3 +105,7 @@ Mobile: `npm run typecheck`; `npm test -- --runTestsByPath tests/client.test.ts 
 Still validate in a deployed staging browser/device: Chrome/Safari cross-tab transitions, actual Secure cookie/CORS behavior, browser storage/cookie deletion, app reinstall, app suspension/laptop sleep, network handoff, and native SecureStore persistence. Automated tests simulate relevant state changes; they do not certify every browser/device lifecycle scenario or production infrastructure.
 
 Final regression note: the stale CMS test expectations were updated to include the parser's existing `shortDescription` field, with coverage for mapping `short_description` from the API. The complete mobile suite passes: 99 tests across 21 suites. Authentication-specific tests and all three client type/template checks also pass.
+
+## Customer directory filters
+
+The admin customer list supports `presence=online|offline`, `active_sessions=yes|no`, `order_activity=none|one|repeat`, `has_email=yes|no`, and `has_mobile=yes|no`, combined with existing status, source, registration date, and verification filters. Filters run before aggregate pagination. Offline includes customers with no session activity; an active session can be offline. Order history counts all linked, non-deleted orders regardless of payment status, including legacy customer records as linked by user ID. Repeat means two or more orders. Session lookups exclude revoked, expired, and idle-expired sessions.

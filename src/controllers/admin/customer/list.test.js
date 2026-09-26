@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+vi.mock('../../../services/customerSession/index.js', async importOriginal => ({ ...(await importOriginal()), batchPresence: vi.fn().mockResolvedValue(new Map()) }));
 vi.mock('../../../services/notification/push/config.js', () => ({ pushConfig: () => ({ environment: 'staging', projectId: 'test-project' }) }));
 import DeviceToken from '../../../models/DeviceToken.js';
 import User from '../../../models/User.js';
@@ -24,6 +25,21 @@ describe('customer directory', () => {
     expect(match.$and).toHaveLength(1);
     expect(orders.mock.calls[0][0][0].$match).toEqual({ user: { $in: [id] }, deleted_at: null });
     expect(res.json.mock.calls[0][0].data.docs[0]).toMatchObject({ push_device_count: 2, order_count: 2, last_order_at: new Date('2024-01-01') });
+  });
+  it.each([
+    ['order_activity', '_orderCount'], ['session_activity', '_online'],
+    ['source', 'imported_from_backup'], ['status', 'status'],
+  ])('passes %s sorting through the full controller before pagination', async (field, sortField) => {
+    for (const direction of [1, -1]) {
+      const aggregate = vi.spyOn(User, 'aggregate').mockReturnValue({});
+      const paginate = vi.spyOn(User, 'aggregatePaginate').mockResolvedValue({ docs: [], totalDocs: 0 });
+      const next = vi.fn();
+      await list({ query: { sort_by: field, sort_order: direction }, params: {}, __: value => value }, { status: vi.fn().mockReturnThis(), json: vi.fn() }, next);
+      expect(next).not.toHaveBeenCalled();
+      const pipeline = aggregate.mock.calls.at(-1)[0];
+      expect(pipeline.find(stage => stage.$sort)?.$sort).toMatchObject({ [sortField]: field === 'source' ? -direction : direction });
+      expect(paginate.mock.calls.at(-1)[1]).not.toHaveProperty('sort');
+    }
   });
   it('avoids querying orders for an empty customer page', async () => {
     vi.spyOn(User, 'aggregate').mockReturnValue({});

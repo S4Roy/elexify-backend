@@ -55,6 +55,37 @@ suite('MongoDB customer session integration', () => {
     expect(eventsSecond.docs).toHaveLength(2);
     expect(eventsFirst.docs.map(e => String(e._id))).not.toContain(String(eventsSecond.docs[0]._id));
   });
+  it('filters the entire customer directory before pagination by presence, contact and orders', async () => {
+    const { customerDirectoryFilters, customerDirectorySort } = await import('../../helpers/customerDirectoryFilters.js');
+    const Order = (await import('../../models/Order.js')).default;
+    const online = await user(); const quiet = await user(); const never = await user();
+    await User.updateOne({ _id: online._id }, { email: 'directory@example.com' });
+    await service.createSession(online, req, response);
+    const old = await service.createSession(quiet, req, response);
+    await CustomerSession.updateOne({ _id: old.session_id }, { lastActivityAt: new Date(Date.now() - 600000) });
+    const ids = [online._id, quiet._id, never._id];
+    try {
+      await Order.collection.insertMany([{ user: online._id }, { user: online._id }, { user: quiet._id }, { user: never._id, deleted_at: new Date() }].map(order => ({ ...order, id: String(new mongoose.Types.ObjectId()) })));
+      const find = query => User.aggregate([{ $match: { _id: { $in: ids } } }, ...customerDirectoryFilters(query)]);
+      expect((await find({ presence: 'online', has_email: 'yes', order_activity: 'repeat' })).map(x => String(x._id))).toEqual([String(online._id)]);
+      expect((await find({ presence: 'offline', active_sessions: 'yes', order_activity: 'one' })).map(x => String(x._id))).toEqual([String(quiet._id)]);
+      expect((await find({ active_sessions: 'no', order_activity: 'none', has_mobile: 'no' })).map(x => String(x._id))).toEqual([String(never._id)]);
+      expect(await find({ presence: 'online', active_sessions: 'no' })).toHaveLength(0);
+      const page = await User.aggregatePaginate(User.aggregate([{ $match: { _id: { $in: ids } } }, ...customerDirectoryFilters({ presence: 'offline' })]), { page: 1, limit: 1 });
+      expect(page.totalDocs).toBe(2); expect(page.docs).toHaveLength(1);
+      for (const field of ['order_activity', 'session_activity']) {
+        const sorted = direction => User.aggregatePaginate(User.aggregate([{ $match: { _id: { $in: ids } } }, ...customerDirectorySort(field, direction)]), { page: 1, limit: 1 });
+        expect(String((await sorted(-1)).docs[0]._id)).toBe(String(online._id));
+        expect(String((await sorted(1)).docs[0]._id)).toBe(String(never._id));
+      }
+      await User.updateOne({ _id: never._id }, { status: 'inactive' });
+      const statusSorted = await User.aggregate([{ $match: { _id: { $in: ids } } }, ...customerDirectorySort('status', -1)]);
+      expect(String(statusSorted[0]._id)).toBe(String(never._id));
+      const sourceSorted = await User.aggregate([{ $match: { _id: { $in: ids } } }, { $addFields: { imported_from_backup: { $eq: ['$_id', quiet._id] } } }, ...customerDirectorySort('source', 1)]);
+      expect(String(sourceSorted[0]._id)).toBe(String(quiet._id));
+      expect(() => customerDirectoryFilters({ presence: 'invalid' })).toThrow();
+    } finally { await Order.deleteMany({ user: { $in: ids } }); }
+  });
   it('allows one atomic rotation and treats concurrent reuse as compromise', async () => {
     const customer = await user(); const token = await service.createSession(customer, req, response);
     const results = await Promise.allSettled([1, 2].map(() => service.refreshSession({ ...req, body: { refresh_token: token.refresh_token } }, response)));
