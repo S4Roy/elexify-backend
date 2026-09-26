@@ -28,6 +28,7 @@ const MediaSchema = new Schema(
         "site-settings",
         "ratings",
         "return_requests",
+        "push_campaigns",
       ],
       required: true,
     },

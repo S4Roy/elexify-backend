@@ -23,12 +23,13 @@ export const add = celebrate({
         "why-choose-us",
         "header_navigation",
         "mega_menus",
-        "site-settings"
+        "site-settings",
+        "push_campaigns"
       )
       .required()
       .messages({
         "any.only":
-          "Reference type must be one of 'products', 'categories', 'attributes', 'brands', 'users', 'banners', 'blogs', 'tags', 'why-choose-us', 'header_navigation', 'mega_menus', or 'site-settings'",
+          "Reference type must be one of 'products', 'categories', 'attributes', 'brands', 'users', 'banners', 'blogs', 'tags', 'why-choose-us', 'header_navigation', 'mega_menus', 'site-settings', or 'push_campaigns'",
         "string.empty": "Reference type is required",
       }),
     status: Joi.string()
