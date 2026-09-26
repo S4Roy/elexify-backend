@@ -4,7 +4,7 @@ import mongooseAggregatePaginate from "mongoose-aggregate-paginate-v2";
 
 const SubscriberSchema = new Schema(
   {
-    email: { type: String, required: false, trim: true, lowercase: true },
+    email: { type: String, required: true, trim: true, lowercase: true, maxlength: 254 },
 
     // submission metadata
     source: {
@@ -34,7 +34,7 @@ const SubscriberSchema = new Schema(
 );
 
 // Indexes: useful for lookups and admin lists
-SubscriberSchema.index({ email: 1 });
+SubscriberSchema.index({ email: 1 }, { unique: true });
 SubscriberSchema.index({ created_at: -1 });
 SubscriberSchema.index({ ip: 1 });
 
