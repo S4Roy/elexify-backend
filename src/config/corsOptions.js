@@ -24,4 +24,7 @@ export const buildCorsOptions = (allowedOrigins) => ({
     callback(error);
   },
   credentials: true,
+  // Readable by the storefront so it can clear a stale session (see
+  // middleware/accessTokenIfAny.js).
+  exposedHeaders: ["X-Session-Expired"],
 });

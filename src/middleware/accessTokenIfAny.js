@@ -1,41 +1,67 @@
+import jwt from "jsonwebtoken";
+import { envs } from "../config/index.js";
 import { userService } from "../services/index.js";
+
+// Tells the storefront and app that the token they sent no longer works, so
+// they can clear the stale session. The request itself still succeeds as a
+// guest — these routes don't require sign-in. Exposed to browsers via CORS.
+export const SESSION_EXPIRED_HEADER = "X-Session-Expired";
 
 /**
  * Middleware to optionally validate the Authorization header and decode user token
  * If no token is provided, it allows guest access via `x-guest-id`.
  */
 export const accessTokenIfAny = async (req, res, next) => {
+  const authHeader = req.headers.authorization;
+  const token = authHeader?.startsWith("Bearer ")
+    ? authHeader.split(" ")[1]
+    : null;
+  const guest_id = req.headers["x-guest-id"] || null;
+  const asGuest = () => {
+    if (guest_id) req.auth = { guest_id };
+  };
+
+  if (!token) {
+    asGuest();
+    return next();
+  }
+
+  let decodedData;
   try {
-    const authHeader = req.headers.authorization;
-    const token = authHeader?.startsWith("Bearer ")
-      ? authHeader.split(" ")[1]
-      : null;
-    const guest_id = req.headers["x-guest-id"] || null;
-
-    if (token) {
-      const decodedData = await userService.verifyToken(token);
-      // A token for a deleted or blocked account falls back to guest access.
-      if (
-        decodedData?.user_id &&
-        !(await userService.isAccountClosed(decodedData.user_id, decodedData.iat))
-      ) {
-        req.auth = {
-          user_id: decodedData.user_id,
-          email: decodedData.email,
-          role: decodedData.role,
-          guest_id: guest_id,
-        };
-      } else if (guest_id) {
-        req.auth = { guest_id };
-      }
-    } else if (guest_id) {
-      req.auth = { guest_id };
+    decodedData = jwt.verify(token, envs.jwt.accessToken.secret);
+  } catch (error) {
+    // An expired session is routine (customer tokens last 7 days), so it's
+    // not logged. Anything else — malformed or wrongly signed — is worth a
+    // warning, without echoing the token.
+    if (error?.name !== "TokenExpiredError") {
+      console.warn("Optional auth: rejected token", {
+        reason: error?.name || "Error",
+        path: req.originalUrl?.split("?")[0],
+      });
     }
+    res.setHeader(SESSION_EXPIRED_HEADER, "1");
+    asGuest();
+    return next();
+  }
 
+  try {
+    // A token for a deleted or blocked account falls back to guest access.
+    if (
+      decodedData?.user_id &&
+      !(await userService.isAccountClosed(decodedData.user_id, decodedData.iat))
+    ) {
+      req.auth = {
+        user_id: decodedData.user_id,
+        email: decodedData.email,
+        role: decodedData.role,
+        guest_id: guest_id,
+      };
+    } else {
+      res.setHeader(SESSION_EXPIRED_HEADER, "1");
+      asGuest();
+    }
     next();
   } catch (error) {
-    // Log and continue as guest (optional) or block request
-    console.error("Token verification failed:", error.message);
-    next(); // Allow guest access even if token is invalid
+    next(error);
   }
 };
