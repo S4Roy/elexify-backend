@@ -167,6 +167,9 @@ export const renderInvoicePdf = (invoice) =>
         ["Order Date", fmtDate(invoice.order_date)],
         ["Payment Method", paymentMethodLabel(invoice)],
         ["Payment Status", paymentStatusLabel(invoice)],
+        ...(invoice.revision > 0
+          ? [["Revised", fmtDate(invoice.revisions?.at(-1)?.revised_at)]]
+          : []),
       ];
       let metaY = infoTop;
       metaRows.forEach(([label, value]) => {

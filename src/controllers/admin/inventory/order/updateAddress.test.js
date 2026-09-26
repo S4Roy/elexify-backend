@@ -4,11 +4,14 @@ import Order from '../../../../models/Order.js';
 import Address from '../../../../models/Address.js';
 import Invoice from '../../../../models/Invoice.js';
 import AuditLog from '../../../../models/AuditLog.js';
-import { assertOrderAddressEditable, updateAddress } from './updateAddress.js';
+import OrderItem from '../../../../models/OrderItem.js';
+import { assertOrderAddressEditable, assertInvoiceRevisable, splitTax, updateAddress } from './updateAddress.js';
+import { getCompanySettings } from '../../../../services/invoiceService/getCompanySettings.js';
 import { resolveAddressFields } from '../../customerAccount/address.js';
 import { roleHasPermission, PERMISSIONS } from '../../../../constants/adminPermissions.js';
 
 vi.mock('../../customerAccount/address.js', () => ({ resolveAddressFields: vi.fn() }));
+vi.mock('../../../../services/invoiceService/getCompanySettings.js', () => ({ getCompanySettings: vi.fn() }));
 const oid = () => new mongoose.Types.ObjectId();
 
 describe('order address eligibility', () => {
@@ -18,10 +21,22 @@ describe('order address eligibility', () => {
   it.each([
     { order_status: 'shipped' }, { order_status: 'cancelled' }, { order_status: 'delivered' },
     { order_status: 'packed' }, { order_status: 'returned' }, { inventory_reverted: true },
-    { invoice: { generated: true } }, { order_status: 'partially_shipped' }, { order_status: 'partially_delivered' }, { awb: 'AWB' },
+    { order_status: 'partially_shipped' }, { order_status: 'partially_delivered' }, { awb: 'AWB' },
     { shiprocket_order_id: 'shipment' }, { refund: { status: 'processing' } },
   ])('blocks unsafe corrections %j', change => {
     expect(() => assertOrderAddressEditable({ order_status: 'processing', ...change })).toThrow();
+  });
+  it('allows revising a local invoice but not one synced to Zoho Books', () => {
+    expect(() => assertInvoiceRevisable(null)).not.toThrow();
+    expect(() => assertInvoiceRevisable({ zoho: { sync_status: 'not_synced' } })).not.toThrow();
+    expect(() => assertInvoiceRevisable({ zoho: { sync_status: 'failed' } })).not.toThrow();
+    for (const zoho of [{ sync_status: 'syncing' }, { sync_status: 'synced' }, { invoice_id: 'Z1' }]) {
+      expect(() => assertInvoiceRevisable({ zoho })).toThrow();
+    }
+  });
+  it('re-splits the same tax between CGST+SGST and IGST', () => {
+    expect(splitTax({ tax_amount: 18.01 }, true)).toEqual({ cgst: 9.01, sgst: 9, igst: 0 });
+    expect(splitTax({ tax_amount: 18.01 }, false)).toEqual({ cgst: 0, sgst: 0, igst: 18.01 });
   });
   it('grants managers and superadmins the dedicated permission', () => {
     for (const role of ['manager', 'superadmin']) expect(roleHasPermission(role, PERMISSIONS.ORDER_ADDRESS_MANAGE)).toBe(true);
@@ -41,7 +56,10 @@ describe('order address updates', () => {
     vi.spyOn(mongoose, 'startSession').mockResolvedValue(session);
     vi.spyOn(Order, 'findOne').mockReturnValue({ session: async () => order });
     vi.spyOn(Address, 'findById').mockReturnValue({ session: () => ({ lean: async () => original }) });
-    vi.spyOn(Invoice, 'exists').mockReturnValue({ session: async () => null });
+    vi.spyOn(Invoice, 'findOne').mockReturnValue({ session: async () => null });
+    vi.spyOn(OrderItem, 'find').mockReturnValue({ session: () => ({ lean: async () => [] }) });
+    vi.spyOn(OrderItem, 'bulkWrite').mockResolvedValue({});
+    getCompanySettings.mockResolvedValue({ state: 'Karnataka' });
     vi.spyOn(Address, 'create').mockImplementation(async records => [{ ...records[0], _id: oid() }]);
     vi.spyOn(Order, 'updateOne').mockResolvedValue({ modifiedCount: 1 });
     vi.spyOn(AuditLog, 'create').mockResolvedValue([]);
@@ -82,8 +100,51 @@ describe('order address updates', () => {
     expect(next.mock.calls[0][0].statusCode).toBe(409);
     expect(Address.create).not.toHaveBeenCalled();
   });
-  it('blocks an existing invoice even when the order flags are stale', async () => {
-    Invoice.exists.mockReturnValue({ session: async () => ({ _id: oid() }) });
+  const invoiceDoc = (overrides = {}) => ({
+    invoice_number: 'INV/2026-27/0007', revision: 0, revisions: [],
+    company: { state: 'Karnataka' }, zoho: { sync_status: 'not_synced' },
+    items: [{ tax_amount: 18, cgst: 0, sgst: 0, igst: 18 }],
+    save: vi.fn().mockResolvedValue(undefined), ...overrides,
+  });
+  it('revises an existing invoice in place with the new address', async () => {
+    const invoice = invoiceDoc();
+    order.invoice = { generated: true };
+    Invoice.findOne.mockReturnValue({ session: async () => invoice });
+    await updateAddress(req, res, next);
+    expect(next).not.toHaveBeenCalled();
+    expect(invoice.invoice_number).toBe('INV/2026-27/0007');
+    expect(invoice.shipping_address.address_line_1).toBe('New Street');
+    expect(invoice.revision).toBe(1);
+    expect(invoice.revisions[0]).toMatchObject({ address_kind: 'shipping', reason: 'Customer requested correction', revised_by: req.auth.user_id });
+    expect(invoice.save).toHaveBeenCalledWith({ session });
+    expect(res.json.mock.calls[0][0].message).toContain('invoice INV/2026-27/0007 revised');
+    expect(AuditLog.create.mock.calls[0][0][0].metadata).toMatchObject({ invoice_number: 'INV/2026-27/0007', invoice_revision: 1 });
+  });
+  it('re-splits line taxes when the delivery state moves into the company state', async () => {
+    const invoice = invoiceDoc({ company: { state: 'West Bengal' } });
+    Invoice.findOne.mockReturnValue({ session: async () => invoice });
+    OrderItem.find.mockReturnValue({ session: () => ({ lean: async () => [{ _id: 'i1', tax_amount: 18 }] }) });
+    await updateAddress(req, res, next);
+    expect(next).not.toHaveBeenCalled();
+    expect(OrderItem.bulkWrite.mock.calls[0][0][0].updateOne.update.$set).toEqual({ cgst: 9, sgst: 9, igst: 0 });
+    expect(invoice.items[0]).toMatchObject({ cgst: 9, sgst: 9, igst: 0 });
+    expect(AuditLog.create.mock.calls[0][0][0].metadata.tax_resplit).toBe(true);
+  });
+  it('leaves taxes alone for a billing correction', async () => {
+    req.body.address_kind = 'billing';
+    getCompanySettings.mockResolvedValue({ state: 'West Bengal' });
+    await updateAddress(req, res, next);
+    expect(next).not.toHaveBeenCalled();
+    expect(OrderItem.bulkWrite).not.toHaveBeenCalled();
+  });
+  it('blocks an invoice already synced to Zoho Books', async () => {
+    Invoice.findOne.mockReturnValue({ session: async () => invoiceDoc({ zoho: { sync_status: 'synced', invoice_id: 'Z1' } }) });
+    await updateAddress(req, res, next);
+    expect(next.mock.calls[0][0].statusCode).toBe(409);
+    expect(Address.create).not.toHaveBeenCalled();
+  });
+  it('waits while an invoice is still being generated', async () => {
+    order.invoice = { generated: true };
     await updateAddress(req, res, next);
     expect(next.mock.calls[0][0].statusCode).toBe(409);
     expect(Address.create).not.toHaveBeenCalled();

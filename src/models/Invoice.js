@@ -74,6 +74,21 @@ const InvoiceSchema = new Schema(
 
     is_gst_applicable: { type: Boolean, default: false },
 
+    // Address corrections made before dispatch revise this invoice in place
+    // (same number and date). Each change is kept here and in the audit log.
+    revision: { type: Number, default: 0 },
+    revisions: [
+      {
+        _id: false,
+        revised_at: { type: Date, required: true },
+        revised_by: { type: Schema.Types.ObjectId, ref: "users", default: null },
+        address_kind: { type: String, enum: ["shipping", "billing"], required: true },
+        reason: { type: String, default: null },
+        before: { type: Object, default: null },
+        after: { type: Object, default: null },
+      },
+    ],
+
     // Operational projection of the external accounting copy. The local
     // immutable invoice remains the legal/source snapshot; Zoho is a
     // synchronized downstream record with an independently visible state.
