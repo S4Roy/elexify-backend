@@ -2,6 +2,8 @@ import { celebrate, Joi } from "celebrate";
 
 export const list = celebrate({
   query: Joi.object({
+    product_id: Joi.string().hex().length(24).optional(),
+    verified_purchase: Joi.boolean().optional(),
     import_source: Joi.string().valid("backup", "other").optional().allow("", null),
     page: Joi.number().integer().min(1).max(1000000).optional(),
     limit: Joi.number().integer().min(1).max(100).optional(),

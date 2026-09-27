@@ -1,5 +1,7 @@
 import { beforeEach, afterEach, describe, it, expect, vi } from 'vitest';
 import mongoose from 'mongoose';
+vi.mock('../rating/summary.js', () => ({ refreshRatingSummary: vi.fn(async () => {}) }));
+import { refreshRatingSummary } from '../rating/summary.js';
 vi.mock('./source.js', () => ({ readSource: vi.fn(async () => ({ fingerprint: 'source' })) }));
 vi.mock('./plan.js', () => ({ buildPlan: vi.fn() }));
 vi.mock('../../scripts/shared/lock.js', () => ({ heartbeatLock: vi.fn(async () => {}) }));
@@ -49,4 +51,21 @@ describe('admin import execution safeguards', () => {
     expect(session.endSession).toHaveBeenCalledTimes(1);
     expect(User.create.mock.calls[0][1].session).toBe(session);
   });
+  it('locks the product and refreshes review caches inside the import transaction', async () => {
+    const id = '123456789012345678901234';
+    buildPlan.mockReturnValue({ fingerprint: 'audited-plan', groups: [{ type: 'reviews', docs: [{ model: 'Rating', doc: { user: id, product_id: id, rating: 5 } }] }], summary: { reviews: { missing: 1, existing: 0, blocked: 0 } }, issues: [], issueCounts: {} });
+    vi.spyOn(SystemOperationExecution, 'findOne').mockReturnValue({ lean: async () => ({}) });
+    mongoose.connection.db = { admin: () => ({ command: async () => ({ setName: 'test' }) }) };
+    const session = { withTransaction: vi.fn(async fn => fn()), endSession: vi.fn(async () => {}) };
+    vi.spyOn(mongoose, 'startSession').mockResolvedValue(session);
+    for (const model of [User, Product]) vi.spyOn(model, 'exists').mockReturnValue({ session: async () => true });
+    const lock = vi.spyOn(Product, 'updateOne').mockResolvedValue({ modifiedCount: 1 });
+    const create = vi.spyOn(Rating, 'create').mockResolvedValue([]);
+    await handler(context(false));
+    expect(lock).toHaveBeenCalledWith({ _id: id }, { $inc: { rating_revision: 1 } }, { session });
+    expect(create).toHaveBeenCalledWith([expect.objectContaining({ rating: 5 })], { session });
+    expect(refreshRatingSummary).toHaveBeenCalledWith(id, undefined, session);
+    expect(lock.mock.invocationCallOrder[0]).toBeLessThan(create.mock.invocationCallOrder[0]);
+  });
+
 });

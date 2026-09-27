@@ -30,12 +30,16 @@ export const list = async (req, res, next) => {
     };
     let matchFilter = {
       deleted_at: null,
+      user: new mongoose.Types.ObjectId(user_id),
     };
 
+    if (req.query.product_id) matchFilter.product_id = new mongoose.Types.ObjectId(req.query.product_id);
+    if (req.query.variation_id) matchFilter.variation_id = new mongoose.Types.ObjectId(req.query.variation_id);
+    else if (req.query.product_id) matchFilter.variation_id = null;
+
     if (search_key) {
-      matchFilter.$or = [
-        { name: { $regex: ".*" + search_key + ".*", $options: "i" } },
-      ];
+      const escaped = String(search_key).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      matchFilter.description = { $regex: escaped, $options: 'i' };
     }
     const pipeline = [
       { $match: matchFilter },
@@ -86,6 +90,9 @@ export const list = async (req, res, next) => {
       // Optional: project only necessary fields
       {
         $project: {
+          title: 1,
+          verified_purchase: 1,
+          updated_at: 1,
           rating: 1,
           description: 1,
           status: 1,

@@ -1,4 +1,5 @@
 import { sourceCondition, sourceExpression, legacyReviewIds } from '../../../services/legacyImport/filter.js';
+import mongoose from "mongoose";
 import Rating from "../../../models/Rating.js";
 import { StatusError } from "../../../config/index.js";
 import { envs } from "../../../config/index.js";
@@ -38,6 +39,8 @@ export const list = async (req, res, next) => {
     const sort = { [sortField]: Number(sort_order) === 1 ? 1 : -1, _id: Number(sort_order) === 1 ? 1 : -1 };
     let matchFilter = { deleted_at: null };
 
+    if (req.query.product_id) matchFilter.product_id = new mongoose.Types.ObjectId(req.query.product_id);
+    if (req.query.verified_purchase !== undefined) matchFilter.verified_purchase = req.query.verified_purchase === true || req.query.verified_purchase === "true" ? true : { $ne: true };
     if (importSource) matchFilter.$and = [sourceCondition(importSource, importedReviewIds)];
     if (search_key) {
       const escapedSearch = String(search_key).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -117,6 +120,9 @@ export const list = async (req, res, next) => {
       {
         $project: {
           imported_from_backup: 1,
+          title: 1,
+          verified_purchase: 1,
+          updated_at: 1,
           rating: 1,
           description: 1,
           status: 1,

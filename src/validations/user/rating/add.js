@@ -3,13 +3,13 @@ import { celebrate, Joi } from "celebrate";
 export const add = celebrate({
   body: Joi.object({
     // Required: Product being reviewed
-    product_id: Joi.string().required().messages({
+    product_id: Joi.string().hex().length(24).required().messages({
       "string.base": "Product ID must be a string",
       "any.required": "Product ID is required",
     }),
 
     // Optional: Variation
-    variation_id: Joi.string().optional().allow(null, "").messages({
+    variation_id: Joi.string().hex().length(24).optional().allow(null, "").messages({
       "string.base": "Variation ID must be a string",
     }),
 
@@ -31,7 +31,7 @@ export const add = celebrate({
     }),
 
     // Media array (ObjectIds)
-    media: Joi.array().items(Joi.string()).optional().messages({
+    media: Joi.array().max(5).unique().items(Joi.string().hex().length(24)).optional().messages({
       "array.base": "Media must be an array of IDs",
       "string.base": "Each media item must be a string",
     }),

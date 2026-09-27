@@ -46,7 +46,7 @@ export const generateStructuredData = (product, seo, { baseUrl } = {}) => {
     data.aggregateRating = {
       "@type": "AggregateRating",
       ratingValue: String(product.avg_rating),
-      reviewCount: String(product.total_reviews),
+      ratingCount: String(product.total_reviews),
     };
   }
 

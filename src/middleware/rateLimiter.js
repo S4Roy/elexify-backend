@@ -39,3 +39,13 @@ export const trackOrderRateLimiter = rateLimit({
   legacyHeaders: false,
   message: { message: "Too many tracking attempts. Please try again in a few minutes." },
 });
+
+/** Review writes and uploads share one authenticated-customer budget. */
+export const reviewRateLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: process.env.NODE_ENV === 'test' ? 1000 : 30,
+  keyGenerator: req => String(req.auth.user_id),
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { message: 'Too many review requests. Please try again later.' },
+});

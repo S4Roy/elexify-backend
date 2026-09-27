@@ -12,8 +12,7 @@ export const edit = celebrate({
 
     status: Joi.string()
       .valid("approved", "rejected")
-      .optional()
-      .allow("", null)
+      .required()
       .messages({
         "any.only": "Status must be either 'approved' or 'rejected'",
       }),

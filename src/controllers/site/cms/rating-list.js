@@ -1,3 +1,4 @@
+import { ratingSummary } from "../../../services/rating/summary.js";
 import Rating from "../../../models/Rating.js";
 import { StatusError } from "../../../config/index.js";
 import { envs } from "../../../config/index.js";
@@ -22,29 +23,26 @@ export const ratingList = async (req, res, next) => {
       variation_id = null,
     } = req.query;
 
-    const options = {
-      page: page,
-      limit: limit,
-      sort: { [sort_by]: sort_order },
-    };
-    let matchFilter = { deleted_at: null, status: "approved" };
-
-    if (product_id) {
-      matchFilter.product_id = new mongoose.Types.ObjectId(product_id);
-    }
-    if (variation_id) {
-      matchFilter.variation_id = new mongoose.Types.ObjectId(variation_id);
-    }
-
+    const pageNumber = Math.max(1, Number(page) || 1);
+    const pageSize = Math.min(100, Math.max(1, Number(limit) || 20));
+    const sortField = sort_by === "rating" ? "rating" : "created_at";
+    const direction = Number(sort_order) === 1 ? 1 : -1;
+    const scope = {};
+    if (product_id) scope.product_id = new mongoose.Types.ObjectId(product_id);
+    if (variation_id) scope.variation_id = new mongoose.Types.ObjectId(variation_id);
+    const matchFilter = { ...scope, deleted_at: null, status: "approved" };
+    if (req.query.rating) matchFilter.rating = Number(req.query.rating);
+    if (req.query.verified_purchase === true || req.query.verified_purchase === 'true') matchFilter.verified_purchase = true;
+    if (req.query.with_media === true || req.query.with_media === 'true') matchFilter['media.0'] = { $exists: true };
     if (search_key) {
-      matchFilter.$or = [
-        { name: { $regex: ".*" + search_key + ".*", $options: "i" } },
-
-        { status: { $regex: ".*" + search_key + ".*", $options: "i" } },
-      ];
+      const escaped = String(search_key).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      matchFilter.$or = [{ description: { $regex: escaped, $options: 'i' } }, { title: { $regex: escaped, $options: 'i' } }];
     }
     const pipeline = [
       { $match: matchFilter },
+      { $sort: { [sortField]: direction, _id: direction } },
+      { $skip: (pageNumber - 1) * pageSize },
+      { $limit: pageSize },
 
       // 🔹 Join with users
       {
@@ -101,6 +99,9 @@ export const ratingList = async (req, res, next) => {
       // Optional: project only necessary fields
       {
         $project: {
+          title: 1,
+          verified_purchase: 1,
+          updated_at: 1,
           rating: 1,
           description: 1,
           status: 1,
@@ -108,7 +109,7 @@ export const ratingList = async (req, res, next) => {
 
           "user._id": 1,
           "user.name": 1,
-          "user.email": 1,
+
 
           "product._id": 1,
           "product.name": 1,
@@ -121,17 +122,15 @@ export const ratingList = async (req, res, next) => {
         },
       },
     ];
-    let data;
-
-    // data = await Rating.aggregatePaginate(Rating.aggregate(pipeline), options);
-    // data.docs = await RatingResource.collection(data.docs);
-    data = await Rating.aggregate(pipeline).sort({ [sort_by]: sort_order });
-    data = await RatingResource.collection(data);
-
+    const [rows, totalDocs, summary] = await Promise.all([
+      Rating.aggregate(pipeline), Rating.countDocuments(matchFilter), product_id || variation_id ? ratingSummary(scope) : Promise.resolve(null),
+    ]);
+    const docs = await RatingResource.collection(rows);
+    const totalPages = Math.ceil(totalDocs / pageSize) || 1;
     res.status(201).json({
-      status: "success",
-      message: req.__(`Data fetched successfully`),
-      data: { docs: data },
+      status: "success", message: req.__("Data fetched successfully"),
+      data: { docs, summary, totalDocs, page: pageNumber, limit: pageSize, totalPages,
+        hasNextPage: pageNumber < totalPages, hasPrevPage: pageNumber > 1 },
     });
   } catch (error) {
     next(error);

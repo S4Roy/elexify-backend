@@ -33,10 +33,16 @@ const RatingSchema = new Schema(
     // Rating (1–5 stars)
     rating: {
       type: Number,
+      validate: { validator: Number.isInteger, message: "Rating must be an integer" },
       min: 1,
       max: 5,
       required: true,
     },
+
+    title: { type: String, trim: true, maxlength: 200 },
+    verified_purchase: { type: Boolean, default: false },
+    order_id: { type: Types.ObjectId, ref: "orders", default: null },
+    order_item_id: { type: Types.ObjectId, ref: "order_items", default: null },
 
     // Rating text
     description: {
@@ -82,7 +88,7 @@ RatingSchema.index(
   { user: 1, product_id: 1, variation_id: 1 },
   {
     unique: true,
-    partialFilterExpression: { variation_id: { $exists: true, $ne: null } },
+    partialFilterExpression: { variation_id: { $type: "objectId" } },
   }
 );
 
@@ -90,6 +96,8 @@ RatingSchema.index(
   { user: 1, product_id: 1 },
   { unique: true, partialFilterExpression: { variation_id: null } }
 );
+
+RatingSchema.index({ product_id: 1, status: 1, deleted_at: 1, created_at: -1, _id: -1 });
 
 // Pagination support
 RatingSchema.plugin(mongooseAggregatePaginate);

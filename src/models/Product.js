@@ -142,6 +142,7 @@ const ProductSchema = new Schema(
         discount_percent: { type: Number, min: 0, max: 100, required: true },
       },
     ],
+    rating_revision: { type: Number, default: 0, select: false },
     avg_rating: {
       type: Number,
       min: 0,

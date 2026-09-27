@@ -11,6 +11,7 @@ class RatingResource extends Resource {
       product: this.product || null,
       product_images: MediaResource.collection(this.product_images || []),
       variation_id: this.variation_id || null,
+      verified_purchase: this.verified_purchase === true,
       rating: this.rating || null,
       title: this.title || null,
       description: this.description || null,

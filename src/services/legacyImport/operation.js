@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import { refreshRatingSummary } from '../rating/summary.js';
 import { fileURLToPath } from 'node:url';
 import { readSource } from './source.js';
 import { buildPlan } from './plan.js';
@@ -60,12 +61,14 @@ export async function handler(context) {
           if (doc.user && !await User.exists({ _id: doc.user, deleted_at: null }).session(session)) throw Error('Customer changed during import');
           if (doc.product_id && !await Product.exists({ _id: doc.product_id, deleted_at: null }).session(session)) throw Error('Product changed during import');
           if (model === 'Order' && doc.transaction_id && await Order.exists({ transaction_id: doc.transaction_id }).session(session)) throw Error('Payment reference changed during import');
+          if (model === 'Rating') await Product.updateOne({ _id: doc.product_id }, { $inc: { rating_revision: 1 } }, { session });
           await models[model].create([doc], { session });
+          if (model === 'Rating') await refreshRatingSummary(doc.product_id, doc.variation_id, session);
         }
       });
       inserted++;
     }
-    context.logger.info(`Imported ${inserted} missing records. Existing records were not changed.`);
+    context.logger.info(`Imported ${inserted} missing records. Existing imported records were not changed; rating caches were refreshed.`);
     return { ...report, inserted, updated: 0, deleted: 0, skipped: report.wouldSkip, warnings: report.blocked };
   } catch {
     throw new PartialExecutionError('Import stopped because a record changed or could not be saved. Completed records are retained; run a new audit before retrying.', { ...report, inserted, updated: 0, deleted: 0, skipped: report.wouldSkip });

@@ -56,5 +56,7 @@ const OrderItemSchema = new Schema(
   }
 );
 
+OrderItemSchema.index({ order_id: 1, product_id: 1, variation_id: 1 });
+
 const OrderItem = model("order_items", OrderItemSchema);
 export default OrderItem;

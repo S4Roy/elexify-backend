@@ -41,7 +41,10 @@ import adminRoles from "./operations/admin-roles.js";
 
 import wooCommerceMissingData from "./operations/woocommerce-missing-data.js";
 
+import repairRatingData from "./operations/repair-rating-data.js";
+
 const RAW_ENTRIES = [
+  repairRatingData,
   wooCommerceMissingData,
   emailTemplates,
   emailTemplatesUpgrade,
