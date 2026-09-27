@@ -64,6 +64,7 @@ const OrderSchema = new Schema(
     // every downstream consumer (Shiprocket payload, invoice, email, admin/
     // storefront display) branches on; advance_amount + cod_due_amount
     // always sum to grand_total for these orders and are otherwise 0.
+    partial_cod_consent: { type: Schema.Types.Mixed, default: null },
     is_partial_cod: { type: Boolean, default: false },
     advance_amount: { type: Number, default: 0 },
     cod_due_amount: { type: Number, default: 0 },

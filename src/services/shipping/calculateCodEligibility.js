@@ -1,4 +1,5 @@
 import ShippingSettings from "../../models/ShippingSettings.js";
+import { getPartialCodTerms } from "./partialCodConsent.js";
 import Pincode from "../../models/Pincode.js";
 
 const ids = (values = []) => new Set(values.map(String));
@@ -101,6 +102,8 @@ export const calculateCodEligibility = async ({
     reason: null,
     code: "ELIGIBLE",
     ...limits,
+    consent: settings.cod_advance_enabled && settings.cod_consent_required
+      ? await getPartialCodTerms(settings) : null,
     advance_enabled: Boolean(settings.cod_advance_enabled),
     advance_percent: Number(settings.cod_advance_percent || 0),
   };

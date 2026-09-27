@@ -23,6 +23,7 @@ class OrderResource extends Resource {
       cod_fee: this.cod_fee || 0,
       discount: this.discount || 0,
       grand_total: this.grand_total || 0,
+      partial_cod_consent: this.partial_cod_consent || null,
       is_partial_cod: this.is_partial_cod || false,
       advance_amount: this.advance_amount || 0,
       cod_due_amount: this.cod_due_amount || 0,

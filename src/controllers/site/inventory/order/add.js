@@ -1,3 +1,4 @@
+import { validatePartialCodConsent } from "../../../../services/shipping/partialCodConsent.js";
 import mongoose from "mongoose";
 import crypto from "crypto";
 import Cart from "../../../../models/Cart.js";
@@ -339,6 +340,11 @@ const address = await Address.findOne({
       return res.status(200).json({ status: "success", data: { subtotal: sub_total, discount: discountAmount, shipping: shippingAmount, cod_fee: codFee, grand_total: grandTotal, advance_amount: advanceAmount, currency, payment_required: payment_method === "razorpay" || advanceEnabled } });
     }
 
+    // Staff-created orders must never be recorded as customer acceptance.
+    const consentRecord = !adminContext && advanceEnabled
+      ? await validatePartialCodConsent(req.body.partial_cod_consent, cod.consent, { grandTotal, advanceAmount, currency, userId: user._id })
+      : null;
+
     // ── Create order ─────────────────────────────────────────────────────────
     const existingOrder = await Order.findOne({ user: user._id, idempotency_key });
     if (existingOrder) {
@@ -462,6 +468,7 @@ const address = await Address.findOne({
       shipping: shippingAmount,
       cod_fee: codFee,
       grand_total: grandTotal,
+      partial_cod_consent: consentRecord,
       is_partial_cod: advanceEnabled,
       advance_amount: advanceAmount,
       cod_due_amount: codDueAmount,

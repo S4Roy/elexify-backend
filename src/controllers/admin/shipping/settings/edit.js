@@ -22,6 +22,7 @@ export const edit = async (req, res, next) => {
       cod_max_order,
       cod_charge_enabled,
       cod_charge,
+      cod_consent_required,
       cod_advance_enabled,
       cod_advance_percent,
       cod_allowed_pincodes,
@@ -74,6 +75,7 @@ export const edit = async (req, res, next) => {
       ...(cod_max_order !== undefined && { cod_max_order: cod_max_order || null }),
       ...(cod_charge_enabled !== undefined && { cod_charge_enabled }),
       ...(cod_charge !== undefined && { cod_charge }),
+      ...(cod_consent_required !== undefined && { cod_consent_required }),
       ...(cod_advance_enabled !== undefined && { cod_advance_enabled }),
       ...(cod_advance_percent !== undefined && { cod_advance_percent }),
       ...(cod_allowed_pincodes !== undefined && { cod_allowed_pincodes }),
@@ -113,6 +115,7 @@ export const edit = async (req, res, next) => {
 
         customer_cancellation_enabled: settings.customer_cancellation_enabled,
         admin_cancellation_enabled: settings.admin_cancellation_enabled,
+        cod_consent_required: settings.cod_consent_required,
         returns_enabled: settings.returns_enabled,
         return_window_days: settings.return_window_days,
       },

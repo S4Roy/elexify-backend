@@ -2,8 +2,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   settings: vi.fn(),
+  terms: vi.fn(),
   pincodeLean: vi.fn(),
 }));
+
+vi.mock("./partialCodConsent.js", () => ({ getPartialCodTerms: mocks.terms }));
 
 vi.mock("../../models/ShippingSettings.js", () => ({
   default: { getSingleton: mocks.settings },
@@ -33,6 +36,8 @@ const baseSettings = {
 
 describe("calculateCodEligibility", () => {
   beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.terms.mockResolvedValue({ required: true, available: true, version: "policy-version" });
     mocks.settings.mockResolvedValue({ ...baseSettings });
     mocks.pincodeLean.mockResolvedValue({ status: "active", cod_status: "use_global" });
   });
@@ -45,6 +50,15 @@ describe("calculateCodEligibility", () => {
       user: { role: "customer" },
     });
     expect(result).toMatchObject({ eligible: true, fee: 49, reason: null, code: "ELIGIBLE" });
+  });
+
+  it.each([
+    [true, true, true], [true, false, false], [false, true, false], [false, false, false],
+  ])("exposes acceptance only for enabled Partial COD (%s / %s)", async (advance, consent, required) => {
+    mocks.settings.mockResolvedValue({ ...baseSettings, cod_advance_enabled: advance, cod_consent_required: consent });
+    const result = await calculateCodEligibility({ items: [], address: { postcode: "700160" }, orderAmount: 1000, user: { role: "customer" } });
+    expect(result.consent).toEqual(required ? { required: true, available: true, version: "policy-version" } : null);
+    expect(mocks.terms).toHaveBeenCalledTimes(required ? 1 : 0);
   });
 
   it("blocks an order above the maximum", async () => {

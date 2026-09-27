@@ -187,6 +187,12 @@ export const place = celebrate({
     isDirectCheckout: Joi.boolean().optional().default(false),
     coupon_code: Joi.string().optional().allow("", null),
     idempotency_key: Joi.string().trim().min(16).max(128).required(),
+    partial_cod_consent: Joi.object({
+      accepted: Joi.boolean().strict().valid(true).required(),
+      version: Joi.string().hex().length(64).required(),
+      advance_amount: Joi.number().min(0).precision(2).required(),
+      grand_total: Joi.number().min(0).precision(2).required(),
+    }).optional(),
     expected_total: Joi.number().precision(2).min(0).optional(),
   }),
 });

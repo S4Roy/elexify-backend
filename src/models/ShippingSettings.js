@@ -33,6 +33,7 @@ const ShippingSettingsSchema = new Schema(
     // to off — an admin must explicitly opt in from Settings > Shipping
     // Settings; this must never silently change checkout behavior for a
     // store that hasn't configured it.
+    cod_consent_required: { type: Boolean, default: false },
     cod_advance_enabled: { type: Boolean, default: false },
     cod_advance_percent: { type: Number, min: 0, max: 100, default: 20 },
     cod_allowed_pincodes: { type: [String], default: [] },
