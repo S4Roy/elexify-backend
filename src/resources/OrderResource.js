@@ -5,9 +5,30 @@ import AddressResource from "./AddressResource.js";
 import MediaResource from "./MediaResource.js"; // make sure this handles collections
 import CategoryResourceMinimal from "./CategoryResourceMinimal.js"; // make sure collection() method exists
 
+// The snapshot holds the address as placed (location names in city/state/
+// country) but no _id or catalog IDs. Layer it over the live ref so the
+// as-placed text is shown while _id (needed to edit the order address) and
+// the city/state/country IDs come from the referenced Address document.
+// Older snapshots hold ISO codes ("MH", "IN") instead of names; those defer
+// to the referenced Address's catalog names.
+export const mergeAddressSnapshot = (address, snapshot) => {
+  if (!snapshot) return address;
+  if (!address) return snapshot;
+  const { city, state, country, ...display } = snapshot;
+  const name = (snap, field) => (snap && !/^[A-Z]{2,3}$/.test(snap) ? snap : null) ||
+    address[`${field}_name`] || address[field]?.name || snap || null;
+  return {
+    ...(address.toObject?.() ?? address),
+    ...Object.fromEntries(Object.entries(display).filter(([, value]) => value != null)),
+    city_name: name(city, 'city'),
+    state_name: name(state, 'state'),
+    country_name: name(country, 'country'),
+  };
+};
+
 class OrderResource extends Resource {
   toArray() {
-    const shippingAddress = this.shipping_address_snapshot || this.shipping_address;
+    const shippingAddress = mergeAddressSnapshot(this.shipping_address, this.shipping_address_snapshot);
     return {
       imported_from_backup: this.imported_from_backup === true || this.legacy_import?.source === 'eqstoxco_wp434',
       _id: this._id || null,
