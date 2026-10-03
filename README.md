@@ -77,6 +77,14 @@ cp .env.example .env
 npm run dev
 ```
 
+## 🖼️ Media CDN (CloudFront)
+
+Media is stored in S3 as relative keys; the API builds absolute URLs at read time.
+
+- `AWS_CDN_URL` — CloudFront base URL (e.g. `https://d1234abcd.cloudfront.net`). When set, all media URLs use it; when empty they fall back to the S3 bucket URL.
+- `CLOUDFRONT_DISTRIBUTION_ID` — used to invalidate keys that admin edits overwrite in place (media replace, brand/tag/classification/page images). The `S3_ACCESS_KEY` IAM user needs `cloudfront:CreateInvalidation` on the distribution. Leave empty to skip invalidation.
+- Storefront (`elexify.online`): set `CDN_HOSTNAME` to the same host so `next/image` accepts it.
+
 ## 🚀 Deployment
 
 - **Cloud Deployment:** AWS EC2 / DigitalOcean / Heroku

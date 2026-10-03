@@ -2,6 +2,7 @@ import Category from "../../../models/Category.js";
 import Media from "../../../models/Media.js";
 import { StatusError } from "../../../config/index.js";
 import { s3Handler } from "../../../services/s3Handler/s3Handler.js";
+import { invalidatePaths } from "../../../services/awsService/cloudfrontInvalidate.js";
 import path from "path";
 import CategoryResource from "../../../resources/CategoryResource.js";
 import { generalHelper } from "../../../helpers/index.js";
@@ -79,6 +80,8 @@ export const edit = async (req, res, next) => {
     if (image) {
       const key = `categories/${slug}${path.extname(image.name)}`;
       const s3Upload = await s3Handler.uploadToS3(image, key);
+      // Slug-based key may already be cached by CloudFront.
+      await invalidatePaths([key]);
       if (!s3Upload) {
         throw StatusError.badRequest(req.__("Category image upload failed"));
       }

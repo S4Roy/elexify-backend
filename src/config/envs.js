@@ -10,6 +10,14 @@ config({ path: path.join(projectDirectory, ".env") });
 
 const accessTokenSecret = process.env.ACCESS_TOKEN_SECRET || "";
 
+// Media is stored as relative S3 keys and turned into absolute URLs at read
+// time. When AWS_CDN_URL (the CloudFront distribution) is set, those URLs go
+// through the CDN; unset it to fall back to the raw S3 origin.
+const S3_ORIGIN_URL = `https://${process.env.S3_BUCKET_NAME}.s3.${process.env.S3_REGION}.amazonaws.com/`;
+const MEDIA_BASE_URL = process.env.AWS_CDN_URL
+  ? `${process.env.AWS_CDN_URL.replace(/\/+$/, "")}/`
+  : S3_ORIGIN_URL;
+
 export const envs = {
   FRONTEND_URL: process.env.FRONTEND_URL || "",
   basePath: process.env.SERVER_BASEPATH || "",
@@ -72,11 +80,13 @@ export const envs = {
     secretAccessKey: process.env.S3_SECRET_KEY || "",
     region: process.env.S3_REGION || "",
     cdnUrl: process.env.AWS_CDN_URL || "",
+    cloudfrontDistributionId: process.env.CLOUDFRONT_DISTRIBUTION_ID || "",
   },
   s3: {
     BUCKET_NAME: process.env.S3_BUCKET_NAME || "",
     BUCKET_URL: process.env.S3_BUCKET_URL || "",
-    BASE_URL: `https://${process.env.S3_BUCKET_NAME}.s3.${process.env.S3_REGION}.amazonaws.com/`,
+    BASE_URL: MEDIA_BASE_URL,
+    ORIGIN_URL: S3_ORIGIN_URL,
   },
   razorpay: {
     key_id: process.env.RAZORPAY_KEY_ID,
@@ -139,7 +149,7 @@ export const envs = {
     accessToken: process.env.WHATSAPP_ACCESS_TOKEN || "",
     apiVersion: process.env.WHATSAPP_API_VERSION || "v21.0",
   },
-  NO_IMAGE: `https://${process.env.S3_BUCKET_NAME}.s3.${process.env.S3_REGION}.amazonaws.com/noimage.svg`,
+  NO_IMAGE: `${MEDIA_BASE_URL}noimage.svg`,
   DEFAULT_LANGUAGE: process.env.DEFAULT_LANGUAGE || "en",
   maxFileUploadSize: process.env.maxFileUploadSize || 20,
   siteUrl: process.env.siteUrl || "",

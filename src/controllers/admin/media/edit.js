@@ -1,6 +1,7 @@
 import Media from "../../../models/Media.js";
 import { StatusError } from "../../../config/index.js";
 import { s3Handler } from "../../../services/s3Handler/s3Handler.js";
+import { invalidatePaths } from "../../../services/awsService/cloudfrontInvalidate.js";
 import MediaResource from "../../../resources/MediaResource.js";
 import mime from "mime-types";
 import { validateMediaUpload } from "../../../helpers/validateMediaUpload.js";
@@ -57,6 +58,7 @@ export const edit = async (req, res, next) => {
       // Replace the object in place — same key as the existing media.url —
       // so every reference to this media picks up the new file for free.
       await s3Handler.uploadToS3(file, media.url);
+      await invalidatePaths([media.url]);
 
       updateData.mime_type = mimetype;
       updateData.size = file.size ?? file.data?.length ?? media.size;

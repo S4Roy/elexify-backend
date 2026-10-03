@@ -37,7 +37,7 @@ export const s3ImageResize = async ({ size, path, url, height, width }) => {
 
       await uploaded;
     }
-    return `${envs.s3.BUCKET_URL}/${newKey}`;
+    return `${envs.s3.BASE_URL}${newKey}`;
   } catch (error) {
     console.log(error);
     return "";
