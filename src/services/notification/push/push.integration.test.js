@@ -484,6 +484,39 @@ suite("push platform (isolated MongoDB, mocked FCM)", () => {
       (await PushCampaign.findById(campaign._id)).cancelled_by.toString()
     ).toBe(user._id.toString());
   });
+  it("campaign test send explains each blocker and ignores the audience cutoff", async () => {
+    const campaign = await PushCampaign.create({
+      ...content,
+      audience: "all",
+      environment: "staging",
+      created_by: user._id,
+      status: "SCHEDULED",
+      scheduled_at: new Date(Date.now() + 60000),
+      expires_at: new Date(Date.now() + 86400000),
+      audience_cutoff: new Date(0),
+    });
+    const test = (customer_id = String(user._id)) =>
+      request(app)
+        .post(`/campaigns/${campaign._id}/test`)
+        .set("x-user", String(user._id))
+        .set("x-permissions", permissions)
+        .send({ customer_id });
+    let response = await test().expect(400);
+    expect(response.body.message).toBe("No active push device registered.");
+    await registerDevice(user._id, input());
+    response = await test().expect(400);
+    expect(response.body.message).toBe(
+      "Customer has not opted in to marketing push notifications."
+    );
+    await NotificationPreference.create({ user_id: user._id, marketing: { push: true } });
+    response = await test().expect(200);
+    expect(response.body.data.notification_id).toBeTruthy();
+    vi.stubEnv("PUSH_TEST_USER_IDS", String(other._id));
+    response = await test().expect(400);
+    expect(response.body.message).toBe(
+      "Customer is not allowed in this test environment."
+    );
+  });
   it("shows safe device metadata and queues an authorized idempotent customer test", async () => {
     await registerDevice(user._id, input());
     const endpoint = `/customer-push/${user._id}`;

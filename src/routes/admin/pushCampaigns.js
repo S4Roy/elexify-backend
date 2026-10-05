@@ -10,6 +10,7 @@ import NotificationPreference from "../../models/NotificationPreference.js";
 import { validRoute } from "../../services/notification/push/templates.js";
 import { pushConfig } from "../../services/notification/push/config.js";
 import { persistPush } from "../../services/notification/push/service.js";
+import { testEligibility } from "../../services/notification/push/eligibility.js";
 import {
   audiencePipeline,
   countAudience,
@@ -155,10 +156,14 @@ router.post(
   celebrate({ ...params, body: Joi.object({ customer_id: id }) }),
   wrap(async (req, res) => {
     const campaign = await get(req);
+    const eligibility = await testEligibility(req.body.customer_id);
+    if (!eligibility.can_test) throw StatusError.badRequest(eligibility.reason);
+    // A scheduled campaign's audience_cutoff must not filter out test sends.
     const rows = await NotificationPreference.aggregate(
       await audiencePipeline(
         {
           ...campaign.toObject(),
+          audience_cutoff: undefined,
           audience: "specific",
           customer_ids: [req.body.customer_id],
         },
