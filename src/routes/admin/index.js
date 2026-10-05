@@ -33,6 +33,7 @@ import { emailTemplatesRouter } from "./emailTemplates.js";
 import { smsTemplatesRouter } from "./smsTemplates.js";
 import { dataOperationsRouter } from "./dataOperations.js";
 import { integrationCredentialsRouter } from "./integrationCredentials.js";
+import { mobileUpdatePoliciesRouter } from "./mobileUpdatePolicies.js";
 import { zohoBooksRouter } from "./zohoBooks.js";
 import { userRouter } from "./user.js";
 import { auditLogsRouter } from "./auditLogs.js";
@@ -75,6 +76,7 @@ v1AdminRouter.use("/email-templates", emailTemplatesRouter);
 v1AdminRouter.use("/sms-templates", smsTemplatesRouter);
 v1AdminRouter.use("/data-operations", dataOperationsRouter);
 v1AdminRouter.use("/integration-credentials", integrationCredentialsRouter);
+v1AdminRouter.use("/mobile-update-policies", mobileUpdatePoliciesRouter);
 v1AdminRouter.use("/integrations/zoho-books", zohoBooksRouter);
 v1AdminRouter.use("/audit-logs", auditLogsRouter);
 
