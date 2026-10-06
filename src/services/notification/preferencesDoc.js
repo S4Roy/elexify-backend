@@ -14,8 +14,23 @@ export const MANDATORY_LOCKED_PATHS = [
   ["transactional", "refund_sms"],
 ];
 
-export const getPreferencesDoc = async (userId) => {
-  let doc = await NotificationPreference.findOne({ user_id: userId });
-  if (!doc) doc = await NotificationPreference.create({ user_id: userId });
-  return doc;
+// Atomic get-or-create. Several requests right after login (account screen,
+// login/cart notifications) can reach this together; a find-then-create
+// raced into E11000 on the unique user_id index.
+export const ensurePreferences = async (userId, { lean = false } = {}) => {
+  const query = NotificationPreference.findOneAndUpdate(
+    { user_id: userId },
+    { $setOnInsert: { user_id: userId } },
+    { upsert: true, new: true, setDefaultsOnInsert: true }
+  );
+  try {
+    return await (lean ? query.lean() : query);
+  } catch (error) {
+    // Two concurrent upserts can still collide; the other one created it.
+    if (error?.code !== 11000) throw error;
+    const existing = NotificationPreference.findOne({ user_id: userId });
+    return lean ? existing.lean() : existing;
+  }
 };
+
+export const getPreferencesDoc = (userId) => ensurePreferences(userId);

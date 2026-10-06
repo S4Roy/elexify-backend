@@ -1,19 +1,14 @@
 import { enqueuePushEvent } from './push/service.js';
 import User from "../../models/User.js";
-import NotificationPreference from "../../models/NotificationPreference.js";
 import NotificationLog from "../../models/NotificationLog.js";
 import NotificationJob from "../../models/NotificationJob.js";
 import { getNotificationEvent } from "../../constants/notificationEvents.js";
 import { getPreferenceValue } from "./preferencePath.js";
+import { ensurePreferences } from "./preferencesDoc.js";
 import { generalHelper } from "../../helpers/index.js";
 import { isConfigured as whatsappConfigured } from "./whatsapp.provider.js";
 
-const getOrCreatePreferences = async (userId) => {
-  const existing = await NotificationPreference.findOne({ user_id: userId }).lean();
-  if (existing) return existing;
-  const created = await NotificationPreference.create({ user_id: userId });
-  return created.toObject();
-};
+const getOrCreatePreferences = (userId) => ensurePreferences(userId, { lean: true });
 
 const maskDestination = (channel, user) =>
   channel === "email"
