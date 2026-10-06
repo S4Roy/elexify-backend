@@ -1,5 +1,6 @@
 import { pushEnvironmentDefaults, validateManagedPush, pushConfig, normalizePrivateKey } from "../../../services/notification/push/config.js";
 import { RECAPTCHA_DEFAULTS, RECAPTCHA_ACTIONS, validateRecaptchaConfig } from "../../../services/recaptcha/config.js";
+import { GOOGLE_SIGNIN_DEFAULTS } from "../../../services/googleSignIn.js";
 import nodemailer from "nodemailer";
 import IntegrationCredential from "../../../models/IntegrationCredential.js";
 import Token from "../../../models/Token.js";
@@ -19,7 +20,7 @@ const PROVIDERS = {
   recaptcha: { label: "reCAPTCHA v3", fields: ["site_key", "secret_key", "allowed_hostnames", "mode", "score_threshold", "checkout_attempts", ...RECAPTCHA_ACTIONS.map(action => `protect_${action}`)], secret: ["secret_key"], plain: ["site_key", "allowed_hostnames", ...Object.keys(RECAPTCHA_DEFAULTS)] },
   shiprocket: { label: "Shiprocket", fields: ["email", "password", "channel_id", "pickup_location"], secret: ["password"], plain: ["channel_id", "pickup_location"] },
   zoho: { label: "Zoho Books", fields: ["org_id", "client_id", "client_secret", "refresh_token", "base_url"], secret: ["client_secret", "refresh_token"] },
-  google: { label: "Google Sign-In", fields: ["client_id"], secret: [] },
+  google: { label: "Google Sign-In", fields: ["client_id", "show_android", "show_ios", "show_web"], secret: [], plain: ["show_android", "show_ios", "show_web"] },
   razorpay: { label: "Razorpay", fields: ["key_id", "key_secret", "account_id", "webhook_secret"], secret: ["key_secret", "webhook_secret"] },
   smtp: { label: "Transactional Email (SMTP)", fields: ["host", "port", "secure", "email", "password", "fromEmail"], secret: ["password"], plain: ["host", "port", "secure", "email", "fromEmail"] },
 };
@@ -33,7 +34,7 @@ const descriptor = async (provider) => {
     : "";
   const fields = Object.fromEntries(definition.fields.map((field) => {
     const configured = stored.has(field);
-    const plainValue = configured ? decryptCredential(stored.get(field)) : provider === "recaptcha" ? RECAPTCHA_DEFAULTS[field] || null : null;
+    const plainValue = configured ? decryptCredential(stored.get(field)) : provider === "recaptcha" ? RECAPTCHA_DEFAULTS[field] || null : provider === "google" ? GOOGLE_SIGNIN_DEFAULTS[field] || null : null;
     // Non-secret operational fields (e.g. Shiprocket's pickup location
     // nickname) are shown in cleartext so the admin can pick/verify the
     // exact value instead of matching it against a masked placeholder.
@@ -80,6 +81,10 @@ export const update = async (req, res, next) => {
     }
     const unknown = Object.keys(supplied).filter((key) => !definition.fields.includes(key));
     if (unknown.length) throw StatusError.badRequest(`Unsupported credential field: ${unknown[0]}`);
+    if (provider === "google") {
+      const bad = Object.keys(GOOGLE_SIGNIN_DEFAULTS).find((key) => supplied[key] != null && supplied[key] !== "" && !["true", "false"].includes(String(supplied[key])));
+      if (bad) throw StatusError.badRequest(`${bad} must be true or false.`);
+    }
 
     let doc = await IntegrationCredential.findOne({ provider }).select("+credentials");
     if (!doc) doc = new IntegrationCredential({ provider, enabled: !["recaptcha", "firebase_push"].includes(provider), created_by: req.auth.user_id });
