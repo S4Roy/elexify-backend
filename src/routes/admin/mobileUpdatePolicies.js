@@ -28,6 +28,7 @@ const view = (platform, doc, live) => ({
   title: doc?.title ?? "",
   message: doc?.message ?? "",
   remind_after_hours: doc?.remind_after_hours ?? 24,
+  show_on_website: doc?.show_on_website ?? false,
   updated_at: doc?.updated_at ?? null,
   source: doc ? "admin" : "environment",
   live,
@@ -50,6 +51,7 @@ router.put("/:platform", requirePermission("settings.update"), celebrate({
     title: Joi.string().trim().max(80).allow(""),
     message: Joi.string().trim().max(300).allow(""),
     remind_after_hours: Joi.number().integer().min(0).max(720).required(),
+    show_on_website: Joi.boolean().default(false),
   }),
 }), wrap(async (req, res) => {
   const { platform } = req.params;
@@ -57,7 +59,7 @@ router.put("/:platform", requirePermission("settings.update"), celebrate({
   if (compareVersions(body.minimum_version, body.latest_version) > 0)
     throw StatusError.badRequest("Minimum version cannot be higher than the latest version.");
   const storeUrl = platform === "android" ? ANDROID_STORE_URL : (body.store_url || null);
-  if (body.enabled && !validStoreUrl(platform, storeUrl))
+  if ((body.enabled || body.show_on_website) && !validStoreUrl(platform, storeUrl))
     throw StatusError.badRequest("Enter the App Store link, e.g. https://apps.apple.com/in/app/elexify/id123456789");
   const before = await MobileUpdatePolicy.findOne({ platform }).lean();
   const doc = await MobileUpdatePolicy.findOneAndUpdate(
@@ -70,11 +72,12 @@ router.put("/:platform", requirePermission("settings.update"), celebrate({
       title: body.title ?? "",
       message: body.message ?? "",
       remind_after_hours: body.remind_after_hours,
+      show_on_website: body.show_on_website,
       updated_by: req.auth.user_id,
     } },
     { new: true, upsert: true, runValidators: true, setDefaultsOnInsert: true }
   ).lean();
-  const pick = d => d && { enabled: d.enabled, latest_version: d.latest_version, minimum_version: d.minimum_version, remind_after_hours: d.remind_after_hours };
+  const pick = d => d && { enabled: d.enabled, latest_version: d.latest_version, minimum_version: d.minimum_version, remind_after_hours: d.remind_after_hours, show_on_website: d.show_on_website };
   await auditService.recordAudit({
     userId: req.auth.user_id, actorId: req.auth.user_id, req,
     event: "MOBILE_UPDATE_POLICY_UPDATED",

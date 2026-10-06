@@ -1,7 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 const findOne = vi.fn();
-vi.mock('../models/MobileUpdatePolicy.js', () => ({ default: { findOne: (...args) => ({ lean: () => findOne(...args) }) } }));
-const { mobileUpdatePolicy, getMobileUpdatePolicy, resolveUpdatePolicy, compareVersions } = await import('./mobileUpdatePolicy.js');
+const find = vi.fn();
+vi.mock('../models/MobileUpdatePolicy.js', () => ({ default: {
+  findOne: (...args) => ({ lean: () => findOne(...args) }),
+  find: (...args) => ({ lean: () => find(...args) }),
+} }));
+const { mobileUpdatePolicy, getMobileUpdatePolicy, resolveUpdatePolicy, compareVersions, websiteAppLinks } = await import('./mobileUpdatePolicy.js');
 const response = () => {
   const res = { headers: {}, statusCode: 200 };
   res.set = (key, value) => { res.headers[key] = value; return res; };
@@ -54,5 +58,12 @@ describe('mobile update policy', () => {
   it('rejects unsupported platforms', async () => {
     const res = await getMobileUpdatePolicy({ query: { platform: 'web' } }, response());
     expect(res.statusCode).toBe(400);
+  });
+  it('advertises only enabled platforms with a valid store link on the website', async () => {
+    find.mockResolvedValue([
+      { platform: 'android', show_on_website: true },
+      { platform: 'ios', show_on_website: true, store_url: 'https://evil.example' },
+    ]);
+    expect(await websiteAppLinks()).toEqual({ android: 'https://play.google.com/store/apps/details?id=com.elexify', ios: null });
   });
 });

@@ -16,6 +16,8 @@ const MobileUpdatePolicySchema = new Schema(
     title: { type: String, trim: true, maxlength: 80, default: "" },
     message: { type: String, trim: true, maxlength: 300, default: "" },
     remind_after_hours: { type: Number, min: 0, max: 720, default: 24 },
+    // Storefront footer "Get the app" badge + QR for this platform.
+    show_on_website: { type: Boolean, default: false },
     updated_by: { type: Schema.Types.ObjectId, ref: "users", default: null },
   },
   { timestamps: { createdAt: "created_at", updatedAt: "updated_at" }, versionKey: false }

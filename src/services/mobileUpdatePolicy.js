@@ -50,6 +50,18 @@ export async function resolveUpdatePolicy(platform, env = process.env) {
   };
 }
 
+// Store links the storefront footer may advertise ("Get the app"), only for
+// platforms an admin has switched on and whose store link is valid.
+export async function websiteAppLinks() {
+  const docs = await MobileUpdatePolicy.find({ show_on_website: true }).lean();
+  const links = { android: null, ios: null };
+  for (const doc of docs) {
+    const url = doc.platform === "android" ? ANDROID_STORE_URL : doc.store_url;
+    if (validStoreUrl(doc.platform, url)) links[doc.platform] = url;
+  }
+  return links;
+}
+
 // Builds released before schema 2 understand only { enabled, minimumVersion }
 // as a forced update, so they keep receiving that shape.
 const toV1 = p => ({ schemaVersion: 1, platform: p.platform, enabled: p.enabled, minimumVersion: p.minimumVersion, storeUrl: p.storeUrl });
