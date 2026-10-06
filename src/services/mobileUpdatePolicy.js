@@ -1,4 +1,5 @@
 import MobileUpdatePolicy from "../models/MobileUpdatePolicy.js";
+import WebAppSettings from "../models/WebAppSettings.js";
 
 export const ANDROID_STORE_URL = "https://play.google.com/store/apps/details?id=com.elexify";
 const versionPattern = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/;
@@ -54,7 +55,8 @@ export async function resolveUpdatePolicy(platform, env = process.env) {
 // platforms an admin has switched on and whose store link is valid.
 export async function websiteAppLinks() {
   const docs = await MobileUpdatePolicy.find({ show_on_website: true }).lean();
-  const links = { android: null, ios: null };
+  const web = await WebAppSettings.getSingleton();
+  const links = { android: null, ios: null, web_install: web.install_prompt_enabled !== false };
   for (const doc of docs) {
     const url = doc.platform === "android" ? ANDROID_STORE_URL : doc.store_url;
     if (validStoreUrl(doc.platform, url)) links[doc.platform] = url;

@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 const findOne = vi.fn();
 const find = vi.fn();
+const webSettings = vi.fn();
+vi.mock('../models/WebAppSettings.js', () => ({ default: { getSingleton: () => webSettings() } }));
 vi.mock('../models/MobileUpdatePolicy.js', () => ({ default: {
   findOne: (...args) => ({ lean: () => findOne(...args) }),
   find: (...args) => ({ lean: () => find(...args) }),
@@ -17,7 +19,10 @@ const adminPolicy = {
   platform: 'android', enabled: true, latest_version: '1.6.0', minimum_version: '1.4.0',
   title: 'New version', message: 'Faster checkout', remind_after_hours: 12,
 };
-beforeEach(() => findOne.mockReset().mockResolvedValue(null));
+beforeEach(() => {
+  findOne.mockReset().mockResolvedValue(null);
+  webSettings.mockReset().mockResolvedValue({ install_prompt_enabled: true });
+});
 describe('mobile update policy', () => {
   it('defaults to disabled and rejects unsupported platforms', () => {
     expect(mobileUpdatePolicy('android', {}).enabled).toBe(false);
@@ -64,6 +69,8 @@ describe('mobile update policy', () => {
       { platform: 'android', show_on_website: true },
       { platform: 'ios', show_on_website: true, store_url: 'https://evil.example' },
     ]);
-    expect(await websiteAppLinks()).toEqual({ android: 'https://play.google.com/store/apps/details?id=com.elexify', ios: null });
+    expect(await websiteAppLinks()).toEqual({ android: 'https://play.google.com/store/apps/details?id=com.elexify', ios: null, web_install: true });
+    webSettings.mockResolvedValue({ install_prompt_enabled: false });
+    expect((await websiteAppLinks()).web_install).toBe(false);
   });
 });

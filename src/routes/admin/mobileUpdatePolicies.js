@@ -3,6 +3,7 @@ import { celebrate, Joi } from "celebrate";
 import { requirePermission } from "../../middleware/requirePermission.js";
 import { StatusError } from "../../config/StatusErrors.js";
 import MobileUpdatePolicy from "../../models/MobileUpdatePolicy.js";
+import WebAppSettings from "../../models/WebAppSettings.js";
 import { auditService } from "../../services/index.js";
 import {
   ANDROID_STORE_URL,
@@ -39,6 +40,28 @@ router.get("/", requirePermission("settings.view"), wrap(async (req, res) => {
   const data = await Promise.all(platforms.map(async platform =>
     view(platform, docs.find(d => d.platform === platform), await resolveUpdatePolicy(platform))));
   res.json({ status: "success", data });
+}));
+
+// Website (installable web app) options; declared before /:platform.
+router.get("/website", requirePermission("settings.view"), wrap(async (req, res) => {
+  const doc = await WebAppSettings.getSingleton();
+  res.json({ status: "success", data: { install_prompt_enabled: doc.install_prompt_enabled !== false, updated_at: doc.updated_at ?? null } });
+}));
+router.put("/website", requirePermission("settings.update"), celebrate({
+  body: Joi.object({ install_prompt_enabled: Joi.boolean().required() }),
+}), wrap(async (req, res) => {
+  const before = await WebAppSettings.getSingleton();
+  const doc = await WebAppSettings.findOneAndUpdate(
+    {},
+    { $set: { install_prompt_enabled: req.body.install_prompt_enabled, updated_by: req.auth.user_id } },
+    { new: true, upsert: true, setDefaultsOnInsert: true }
+  ).lean();
+  await auditService.recordAudit({
+    userId: req.auth.user_id, actorId: req.auth.user_id, req,
+    event: "MOBILE_UPDATE_POLICY_UPDATED",
+    metadata: { platform: "web", before: { install_prompt_enabled: before.install_prompt_enabled }, after: { install_prompt_enabled: doc.install_prompt_enabled } },
+  });
+  res.json({ status: "success", message: "Website settings saved.", data: { install_prompt_enabled: doc.install_prompt_enabled, updated_at: doc.updated_at } });
 }));
 
 router.put("/:platform", requirePermission("settings.update"), celebrate({
