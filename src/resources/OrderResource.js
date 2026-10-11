@@ -71,6 +71,8 @@ class OrderResource extends Resource {
         fulfillment_mode: pkg.fulfillment_mode || "shiprocket",
         delivery_agent_name: pkg.delivery_agent_name || null,
         delivery_attempt_count: pkg.delivery_attempt_count || 0,
+        received_by: pkg.received_by || null,
+        has_proof_photo: !!pkg.has_proof_photo,
         ...(pkg.items ? { items: pkg.items.map((line) => ({
           order_item_id: line.order_item_id,
           quantity: line.quantity,

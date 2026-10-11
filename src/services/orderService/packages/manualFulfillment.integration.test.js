@@ -7,6 +7,9 @@ import Order from '../../../models/Order.js';
 import OrderItem from '../../../models/OrderItem.js';
 import Package from '../../../models/Package.js';
 import ShippingSettings from '../../../models/ShippingSettings.js';
+import Role from '../../../models/Role.js';
+import User from '../../../models/User.js';
+import { listDeliveryStaff, listMyDeliveries } from './deliveryRun.js';
 
 // Same dedicated replica-set database as the return workflow suite.
 const uri = process.env.RETURN_TEST_MONGODB_URI;
@@ -23,7 +26,7 @@ suite('manual fulfillment with real MongoDB transactions', () => {
   });
   afterAll(async () => { await mongoose.connection.dropDatabase(); await mongoose.disconnect(); });
   beforeEach(async () => {
-    for (const name of ['orders', 'order_items', 'packages', 'shipping_settings']) await mongoose.connection.db.collection(name).deleteMany({});
+    for (const name of ['orders', 'order_items', 'packages', 'shipping_settings', 'roles', 'users']) await mongoose.connection.db.collection(name).deleteMany({});
     await ShippingSettings.create({ returns_enabled: true, return_window_days: 7 });
     order = await Order.create({ id: `ORDER-${new mongoose.Types.ObjectId()}`, user: new mongoose.Types.ObjectId(), total_amount: 300, grand_total: 320,
       order_status: 'processing', payment_status: 'pending', payment_method: 'cod', stock_reserved: true, created_at: new Date(Date.now() - 86_400_000) });
@@ -48,6 +51,33 @@ suite('manual fulfillment with real MongoDB transactions', () => {
     expect((await Package.findById(pkg._id)).proof_of_delivery.receiver_name).toBe('Asha');
     const eligibility = returnEligibility(delivered, { returns_enabled: true, return_window_days: 7 }, [], []);
     expect(eligibility.deadline.getTime()).toBe(handover.getTime() + 7 * 86400000);
+  });
+
+  it('assigns a staff rider who sees and completes only their own delivery', async () => {
+    const role = await Role.create({ name: 'Delivery Staff', key: 'test-delivery', permissions: ['delivery.run'], status: 'active' });
+    const clerkRole = await Role.create({ name: 'Clerk', key: 'test-clerk', permissions: ['orders.view'], status: 'active' });
+    const rider = await User.create({ name: 'Ravi', role: 'staff', mobile: '9876500001', admin_role_id: role._id });
+    const clerk = await User.create({ name: 'Clerk', role: 'staff', mobile: '9876500002', admin_role_id: clerkRole._id });
+
+    expect((await listDeliveryStaff()).map((s) => s.name)).toEqual(['Ravi']);
+    await expect(dispatchManual({ orderId: String(order._id), mode: 'self_delivery', agent: { user_id: String(clerk._id) }, reason: 'Local run', adminId: admin }))
+      .rejects.toThrow(/Delivery Staff permission/);
+
+    const { pkg } = await dispatchManual({ orderId: String(order._id), mode: 'self_delivery', agent: { user_id: String(rider._id) }, reason: 'Local run', adminId: admin });
+    expect(pkg.delivery_agent).toMatchObject({ name: 'Ravi', phone: '9876500001' });
+    expect((await listMyDeliveries(clerk._id)).open).toHaveLength(0);
+    const mine = await listMyDeliveries(rider._id);
+    expect(mine.open).toHaveLength(1);
+    expect(mine.open[0]).toMatchObject({ order_number: order.id, cod_due: 320 });
+
+    await expect(markManualDelivered({ packageId: String(pkg._id), deliveredAt: new Date(), receiverName: 'Asha',
+      codCollection: { amount: 320, method: 'cash' }, adminId: clerk._id, riderId: clerk._id })).rejects.toThrow(/not found/);
+    await markManualDelivered({ packageId: String(pkg._id), deliveredAt: new Date(), receiverName: 'Asha',
+      codCollection: { amount: 320, method: 'cash' }, adminId: rider._id, riderId: rider._id });
+    expect(await Order.findById(order._id)).toMatchObject({ order_status: 'delivered', payment_status: 'paid' });
+    const after = await listMyDeliveries(rider._id);
+    expect(after.open).toHaveLength(0);
+    expect(after.done[0]).toMatchObject({ order_number: order.id, received_by: 'Asha' });
   });
 
   it('rolls a returned pickup back to processing so it can be re-dispatched', async () => {

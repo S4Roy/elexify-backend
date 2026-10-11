@@ -2,6 +2,9 @@ import mongoose from "mongoose";
 import Order from "../../../models/Order.js";
 import OrderItem from "../../../models/OrderItem.js";
 import Package from "../../../models/Package.js";
+import User from "../../../models/User.js";
+import Role from "../../../models/Role.js";
+import { PERMISSIONS } from "../../../constants/adminPermissions.js";
 import { StatusError } from "../../../config/index.js";
 import { sendOrderNotification } from "../../notification/sendOrderNotification.js";
 import { transitionOrder } from "../transitionOrder.js";
@@ -47,12 +50,34 @@ const withTransaction = async (work) => {
   }
 };
 
-const loadManualPackage = async (packageId, session) => {
+// A rider may back-date a handover only this far (admins are not limited).
+const RIDER_BACKDATE_LIMIT_MS = 24 * 3600_000;
+
+// Active staff account whose role grants delivery.run.
+export const findDeliveryStaff = async (userId, session = null) => {
+  if (!mongoose.Types.ObjectId.isValid(userId)) return null;
+  const user = await User.findOne({ _id: userId, status: "active", deleted_at: null })
+    .select("_id name first_name last_name mobile admin_role_id").session(session).lean();
+  if (!user?.admin_role_id) return null;
+  const role = await Role.findOne({ _id: user.admin_role_id, status: "active", deleted_at: null, permissions: PERMISSIONS.DELIVERY_RUN })
+    .select("_id").session(session).lean();
+  return role ? user : null;
+};
+
+export const staffName = (user) =>
+  (user?.name || [user?.first_name, user?.last_name].filter(Boolean).join(" ")).trim() || null;
+
+const loadManualPackage = async (packageId, session, riderId = null) => {
   if (!mongoose.Types.ObjectId.isValid(packageId)) throw StatusError.notFound("Package not found");
   const pkg = await Package.findById(packageId).session(session);
   if (!pkg) throw StatusError.notFound("Package not found");
   if (!MANUAL_FULFILLMENT_MODES.includes(pkg.fulfillment_mode)) {
     throw StatusError.conflict("Courier packages are updated by Shiprocket tracking, not manually.");
+  }
+  // Riders act only on their own assignments; same 404 as a missing package
+  // so ids of other riders' deliveries are not confirmed.
+  if (riderId && String(pkg.delivery_agent?.user_id || "") !== String(riderId)) {
+    throw StatusError.notFound("Package not found");
   }
   const order = await Order.findOne({ _id: pkg.order_id, deleted_at: null }).session(session);
   if (!order) throw StatusError.notFound("Order not found");
@@ -100,6 +125,14 @@ export const dispatchManual = async ({ orderId, mode, agent, reason, adminId, di
     }
     if (!orderItems.length) throw StatusError.badRequest("This order has no items to dispatch.");
 
+    let staff = null;
+    if (agent.user_id) {
+      staff = await findDeliveryStaff(agent.user_id, session);
+      if (!staff) throw StatusError.badRequest("Choose an active staff account with the Delivery Staff permission.");
+    }
+    const agentName = agent.name?.trim() || staffName(staff);
+    if (!agentName) throw StatusError.badRequest("Enter who is delivering or handing over this order.");
+
     const packageNumber = existingPackages.reduce((max, p) => Math.max(max, p.package_number), 0) + 1;
     const status = mode === "self_delivery" ? "out_for_delivery" : "packed";
     const [pkg] = await Package.create([{
@@ -110,7 +143,7 @@ export const dispatchManual = async ({ orderId, mode, agent, reason, adminId, di
       status,
       fulfillment_mode: mode,
       integration_status: "not_applicable",
-      delivery_agent: { name: agent.name.trim(), phone: agent.phone?.trim() || null, user_id: agent.user_id || null },
+      delivery_agent: { name: agentName, phone: agent.phone?.trim() || staff?.mobile || null, user_id: staff?._id || null },
       shipped_at: status === "out_for_delivery" ? now : null,
       timeline: [{ status, occurred_at: now, raw: { source: "manual_fulfillment", mode, changed_by: String(adminId), reason: reason.trim() } }],
       created_by: adminId,
@@ -134,16 +167,20 @@ export const dispatchManual = async ({ orderId, mode, agent, reason, adminId, di
  * the door is recorded in the same transaction and settles the payment.
  */
 export const markManualDelivered = async ({
-  packageId, deliveredAt, receiverName, receiverRelation = null, photoUrl = null, notes = null,
-  codCollection = null, adminId,
+  packageId, deliveredAt, receiverName, receiverRelation = null, photoUrl = null, photoKey = null, notes = null,
+  codCollection = null, adminId, riderId = null,
 }) => {
   const handoverAt = new Date(deliveredAt);
   if (!Number.isFinite(handoverAt.getTime()) || handoverAt > new Date()) {
     throw StatusError.badRequest("Delivered time must be a valid time, not in the future");
   }
 
+  if (riderId && Date.now() - handoverAt.getTime() > RIDER_BACKDATE_LIMIT_MS) {
+    throw StatusError.badRequest("Delivered time can be at most 24 hours ago. Ask the office to record older deliveries.");
+  }
+
   const { order, previousStatus } = await withTransaction(async (session) => {
-    const { pkg, order } = await loadManualPackage(packageId, session);
+    const { pkg, order } = await loadManualPackage(packageId, session, riderId);
     if (!["packed", "out_for_delivery"].includes(pkg.status)) {
       throw StatusError.conflict(`Cannot mark delivered: package is "${pkg.status}".`);
     }
@@ -179,6 +216,7 @@ export const markManualDelivered = async ({
           receiver_relation: receiverRelation?.trim() || null,
           delivered_at: handoverAt,
           photo_url: photoUrl || null,
+          photo_key: photoKey || null,
           otp_verified: false,
           notes: notes?.trim() || null,
           recorded_by: adminId,
@@ -186,7 +224,7 @@ export const markManualDelivered = async ({
         },
       },
       $push: { timeline: { status: "delivered", occurred_at: handoverAt, raw: {
-        source: "manual_fulfillment", mode: pkg.fulfillment_mode, changed_by: String(adminId), receiver_name: receiverName.trim(),
+        source: riderId ? "delivery_staff" : "manual_fulfillment", mode: pkg.fulfillment_mode, changed_by: String(adminId), receiver_name: receiverName.trim(),
       } } },
     }, { session });
 
@@ -221,8 +259,8 @@ export const markManualDelivered = async ({
  * The package stays where it is; after repeated failures the admin cancels
  * through the normal cancellation workflow.
  */
-export const recordFailedAttempt = async ({ packageId, reason, adminId }) => withTransaction(async (session) => {
-  const { pkg } = await loadManualPackage(packageId, session);
+export const recordFailedAttempt = async ({ packageId, reason, adminId, riderId = null }) => withTransaction(async (session) => {
+  const { pkg } = await loadManualPackage(packageId, session, riderId);
   if (!["packed", "out_for_delivery"].includes(pkg.status)) {
     throw StatusError.conflict(`Cannot record an attempt: package is "${pkg.status}".`);
   }

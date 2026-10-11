@@ -65,6 +65,9 @@ const PackageSchema = new Schema(
         receiver_relation: String,
         delivered_at: Date,
         photo_url: { type: String, default: null },
+        // Private S3 key of a photo the rider took; served only through
+        // the authenticated proof-photo endpoint, never public.
+        photo_key: { type: String, default: null },
         otp_verified: { type: Boolean, default: false },
         notes: { type: String, default: null },
         recorded_by: { type: Types.ObjectId, ref: "users" },
@@ -136,6 +139,11 @@ const PackageSchema = new Schema(
 );
 
 PackageSchema.index({ order_id: 1, package_number: 1 }, { unique: true });
+// "My deliveries" for a rider (services/orderService/packages/deliveryRun.js).
+PackageSchema.index(
+  { "delivery_agent.user_id": 1, status: 1 },
+  { partialFilterExpression: { "delivery_agent.user_id": { $type: "objectId" } } },
+);
 PackageSchema.index(
   { reference_id: 1 },
   { unique: true, partialFilterExpression: { reference_id: { $type: "string" } } },

@@ -4,9 +4,9 @@ import { orderService } from "../../../../services/index.js";
 // services/orderService/packages/manualFulfillment.js for the lifecycle.
 export const manualDispatch = async (req, res, next) => {
   try {
-    const { order_id, mode, agent_name, agent_phone, reason, dispatched_at } = req.body;
+    const { order_id, mode, agent_user_id, agent_name, agent_phone, reason, dispatched_at } = req.body;
     const { pkg, order } = await orderService.dispatchManual({
-      orderId: order_id, mode, agent: { name: agent_name, phone: agent_phone }, reason, dispatchedAt: dispatched_at, adminId: req.auth.user_id,
+      orderId: order_id, mode, agent: { user_id: agent_user_id, name: agent_name, phone: agent_phone }, reason, dispatchedAt: dispatched_at, adminId: req.auth.user_id,
     });
     return res.status(201).json({ status: "success", data: { package_id: pkg._id, order_status: order.order_status } });
   } catch (error) {

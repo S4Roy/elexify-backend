@@ -7,6 +7,7 @@ import { addressEditSchema } from "../../../validations/admin/customerAccount/ad
 import { recordManualPayment } from "../../../controllers/admin/inventory/order/recordManualPayment.js";
 import { manualDispatch, manualDelivered, deliveryAttempt, returnToStore } from "../../../controllers/admin/inventory/order/manualFulfillment.js";
 import { importRemittance, remittanceSummary } from "../../../controllers/admin/inventory/order/codRemittance.js";
+import { deliveryStaff, proofPhoto } from "../../../controllers/admin/delivery/index.js";
 import { tracking } from "../../../controllers/admin/inventory/order/tracking.js";
 import { celebrate, Joi } from "celebrate";
 import { returnOperation } from "../../../controllers/admin/inventory/order/returnOperations.js";
@@ -186,11 +187,15 @@ orderRouter.post(
 // Own-rider delivery / store pickup (no courier).
 const packageIdParam = Joi.object({ id: Joi.string().hex().length(24).required() });
 const manualReason = Joi.string().trim().min(5).max(500).required();
+orderRouter.get("/delivery-staff", requirePermission(PERMISSIONS.ORDER_STATUS_MANAGE), deliveryStaff);
+orderRouter.get("/package/:id/proof-photo", requirePermission("orders.view"),
+  celebrate({ params: packageIdParam }), proofPhoto);
 orderRouter.post("/package/manual-dispatch", requirePermission(PERMISSIONS.ORDER_STATUS_MANAGE),
   celebrate({ body: Joi.object({
     order_id: Joi.string().hex().length(24).required(),
     mode: Joi.string().valid("self_delivery", "store_pickup").required(),
-    agent_name: Joi.string().trim().min(2).max(100).required(),
+    agent_user_id: Joi.string().hex().length(24).allow(null),
+    agent_name: Joi.string().trim().min(2).max(100).when("agent_user_id", { is: Joi.string().required(), then: Joi.allow("", null), otherwise: Joi.required() }),
     agent_phone: Joi.string().trim().pattern(/^[0-9+\- ]{7,20}$/).allow("", null),
     dispatched_at: Joi.date().iso().max("now").allow(null),
     reason: manualReason,

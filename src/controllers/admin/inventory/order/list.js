@@ -89,6 +89,8 @@ export const list = async (req, res, next) => {
                   fulfillment_mode: "$$pkg.fulfillment_mode",
                   delivery_agent_name: "$$pkg.delivery_agent.name",
                   delivery_attempt_count: { $size: { $ifNull: ["$$pkg.delivery_attempts", []] } },
+                  received_by: "$$pkg.proof_of_delivery.receiver_name",
+                  has_proof_photo: { $gt: [{ $ifNull: ["$$pkg.proof_of_delivery.photo_key", null] }, null] },
                   item_count: { $size: { $ifNull: ["$$pkg.items", []] } },
                   items: { $ifNull: ["$$pkg.items", []] },
                 },

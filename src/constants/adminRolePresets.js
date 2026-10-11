@@ -91,6 +91,9 @@ export const ADMIN_ROLE_PRESETS = [
   role("preset-warehouse", "Warehouse Staff",
     "Packs and ships orders, updates order status and adjusts stock. No refunds or customer contact details.",
     [...CATALOG_VIEW, "inventory.adjust", "orders.view", "orders.fulfill", P.ORDER_STATUS_MANAGE, P.RETURN_VIEW, ...SHIPPING_VIEW]),
+  role("preset-delivery-staff", "Delivery Staff",
+    "Own delivery riders: sees only the deliveries assigned to them, with the customer's name, phone and address, and marks them delivered (with COD collected) or records a failed attempt.",
+    [P.DELIVERY_RUN]),
   role("preset-customer-support", "Customer Support",
     "Looks up customers and orders, fixes delivery addresses, replies to enquiries and moderates reviews. Escalates cancellations and refunds.",
     [

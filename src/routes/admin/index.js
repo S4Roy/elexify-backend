@@ -36,12 +36,14 @@ import { integrationCredentialsRouter } from "./integrationCredentials.js";
 import { mobileUpdatePoliciesRouter } from "./mobileUpdatePolicies.js";
 import { zohoBooksRouter } from "./zohoBooks.js";
 import { userRouter } from "./user.js";
+import { deliveryRouter } from "./delivery.js";
 import { auditLogsRouter } from "./auditLogs.js";
 
 const v1AdminRouter = Router();
 // All routes go here
 v1AdminRouter.use("/role", roleRouter);
 v1AdminRouter.use("/user", userRouter);
+v1AdminRouter.use("/delivery", deliveryRouter);
 
 v1AdminRouter.use("/inventory", inventoryRouter);
 v1AdminRouter.use("/master", masterRouter);

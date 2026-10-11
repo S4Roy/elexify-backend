@@ -6,6 +6,8 @@ import Package from "../../../models/Package.js";
 import { recomputeOrderStatus } from "./recomputeOrderStatus.js";
 import { transitionOrder } from "../transitionOrder.js";
 import { sendOrderNotification } from "../../notification/sendOrderNotification.js";
+import User from "../../../models/User.js";
+import Role from "../../../models/Role.js";
 import { codAmountDue, dispatchManual, markManualDelivered, recordFailedAttempt, returnToStore } from "./manualFulfillment.js";
 
 vi.mock("../../../models/Order.js", () => ({ default: { findOne: vi.fn(), findById: vi.fn(), updateOne: vi.fn(), findOneAndUpdate: vi.fn() } }));
@@ -16,6 +18,8 @@ vi.mock("../../../models/Package.js", () => ({
 vi.mock("./recomputeOrderStatus.js", () => ({ recomputeOrderStatus: vi.fn() }));
 vi.mock("../transitionOrder.js", () => ({ transitionOrder: vi.fn() }));
 vi.mock("../../notification/sendOrderNotification.js", () => ({ sendOrderNotification: vi.fn() }));
+vi.mock("../../../models/User.js", () => ({ default: { findOne: vi.fn() } }));
+vi.mock("../../../models/Role.js", () => ({ default: { findOne: vi.fn() } }));
 vi.mock("./applyShiprocketShipment.js", () => ({
   fulfillmentBlocked: (o) => ["cancelled", "returned", "return_requested"].includes(o.order_status) || !!o.inventory_reverted,
 }));
@@ -176,5 +180,60 @@ describe("failed attempts and return to store", () => {
       expect.anything(),
     );
     expect(result.order_status).toBe("processing");
+  });
+});
+
+describe("delivery staff", () => {
+  const RIDER = "507f1f77bcf86cd799439044";
+  // findOne(...).select(...).session(...).lean()
+  const chain = (value) => ({ select: () => ({ session: () => ({ lean: () => Promise.resolve(value) }) }) });
+
+  it("assigns a staff rider and fills name and phone from their account", async () => {
+    Order.findOne.mockReturnValue(q(order()));
+    OrderItem.find.mockReturnValue(q([{ _id: "item1", quantity: 1 }]));
+    Package.find.mockReturnValue(q([]));
+    Package.create.mockImplementation(async ([doc]) => [{ _id: PKG_ID, ...doc }]);
+    User.findOne.mockReturnValue(chain({ _id: RIDER, name: "Ravi Kumar", mobile: "9876500000", admin_role_id: "role1" }));
+    Role.findOne.mockReturnValue(chain({ _id: "role1" }));
+    recomputeOrderStatus.mockResolvedValue({ order: order({ order_status: "out_for_delivery" }) });
+    await dispatchManual({ orderId: ORDER_ID, mode: "self_delivery", agent: { user_id: RIDER }, reason: "Local run", adminId: ADMIN });
+    expect(Package.create.mock.calls[0][0][0].delivery_agent).toEqual({ name: "Ravi Kumar", phone: "9876500000", user_id: RIDER });
+  });
+
+  it("refuses an account without the delivery permission", async () => {
+    Order.findOne.mockReturnValue(q(order()));
+    OrderItem.find.mockReturnValue(q([{ _id: "item1", quantity: 1 }]));
+    Package.find.mockReturnValue(q([]));
+    User.findOne.mockReturnValue(chain({ _id: RIDER, name: "Clerk", admin_role_id: "role2" }));
+    Role.findOne.mockReturnValue(chain(null));
+    await expect(dispatchManual({ orderId: ORDER_ID, mode: "self_delivery", agent: { user_id: RIDER }, reason: "Local run", adminId: ADMIN }))
+      .rejects.toThrow(/Delivery Staff permission/);
+    expect(Package.create).not.toHaveBeenCalled();
+  });
+
+  it("lets a rider complete only their own delivery", async () => {
+    const mine = manualPkg({ delivery_agent: { name: "Ravi", user_id: RIDER } });
+    Package.findById.mockReturnValue(q(mine));
+    Order.findOne.mockReturnValue(q(order({ payment_method: "razorpay", payment_status: "paid" })));
+    recomputeOrderStatus.mockResolvedValue({ order: order({ order_status: "delivered" }) });
+    Order.findById.mockReturnValue(q(order({ order_status: "delivered" })));
+    const base = { packageId: PKG_ID, deliveredAt: new Date(Date.now() - 60_000), receiverName: "Asha", adminId: RIDER };
+    await expect(markManualDelivered({ ...base, riderId: "507f1f77bcf86cd799439099" })).rejects.toThrow(/Package not found/);
+    await markManualDelivered({ ...base, riderId: RIDER, photoKey: "delivery-proof/p/1.jpg" });
+    const set = Package.updateOne.mock.calls[0][1].$set;
+    expect(set.proof_of_delivery).toMatchObject({ photo_key: "delivery-proof/p/1.jpg" });
+    expect(Package.updateOne.mock.calls[0][1].$push.timeline.raw.source).toBe("delivery_staff");
+  });
+
+  it("stops riders back-dating a handover beyond 24 hours", async () => {
+    await expect(markManualDelivered({ packageId: PKG_ID, deliveredAt: new Date(Date.now() - 25 * 3600_000), receiverName: "Asha",
+      adminId: RIDER, riderId: RIDER })).rejects.toThrow(/at most 24 hours/);
+  });
+
+  it("refuses another rider's failed attempt", async () => {
+    Package.findById.mockReturnValue(q(manualPkg({ delivery_agent: { name: "Ravi", user_id: RIDER } })));
+    Order.findOne.mockReturnValue(q(order({ order_status: "out_for_delivery" })));
+    await expect(recordFailedAttempt({ packageId: PKG_ID, reason: "Not home", adminId: ADMIN, riderId: "507f1f77bcf86cd799439099" }))
+      .rejects.toThrow(/Package not found/);
   });
 });

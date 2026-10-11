@@ -42,6 +42,9 @@ export const PERMISSIONS = {
   // refund already went through or is in flight. See
   // services/orderService/reopenOrder.js.
   ORDER_REOPEN_MANAGE: "order.reopen.manage",
+  // Delivery staff (own riders): see and complete only the deliveries
+  // assigned to them — services/orderService/packages/deliveryRun.js.
+  DELIVERY_RUN: "delivery.run",
 
   // Centralized Data Operations (seeders/migrations/backfills/repairs) —
   // see routes/admin/dataOperations.js and scripts/runner.js. View
