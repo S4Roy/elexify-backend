@@ -37,12 +37,16 @@ export const salesOrderPayload = ({ order, items, customerId, itemIds, connectio
     lineItems.push({ name: "COD handling", quantity: 1, rate: order.cod_fee, tax_id: taxId });
     total += money(order.cod_fee);
   }
+  // Whole-rupee rounding goes to Zoho's order-level Adjustment, outside tax.
+  const roundOff = Number(order.round_off || 0);
+  total += money(roundOff);
   if (total !== money(order.grand_total)) throw new ZohoError("ORDER_TOTAL_MISMATCH_REVIEW_REQUIRED");
   if (couponTotal !== money(order.discount || 0) || shippingTotal !== money(order.shipping || 0)) throw new ZohoError("ORDER_ALLOCATION_MISMATCH_REVIEW_REQUIRED");
   return { customer_id: customerId, reference_number: order.id,
     ...(order.billing_address_snapshot?.gstin ? { gst_no: order.billing_address_snapshot.gstin, gst_treatment: "business_gst" } : {}),
     date: new Date(order.created_at).toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" }),
-    line_items: lineItems, is_inclusive_tax: true, discount_type: "item_level", is_discount_before_tax: true,
+    line_items: lineItems, is_inclusive_tax: true,
+    ...(roundOff ? { adjustment: roundOff, adjustment_description: "Round Off" } : {}), discount_type: "item_level", is_discount_before_tax: true,
     notes: [`Elexify order ${order.id}`, `Payment: ${order.payment_method}; status: ${order.payment_status}`,
       `Advance: ${order.advance_amount || 0}; COD due: ${order.cod_due_amount || 0}`,
       `Coupon: ${order.coupon_code || "none"}`,

@@ -211,6 +211,7 @@ export const getOrGenerateInvoice = async ({ orderId, actorType }) => {
     advance_amount: order.advance_amount || 0,
     cod_due_amount: order.cod_due_amount || 0,
     tax_total: hasStoredFinancials ? storedTaxTotal : (gst.isGstApplicable ? gst.taxAmount : 0),
+    round_off: order.round_off || 0,
     grand_total: order.grand_total,
     amount_in_words: amountInWords(order.grand_total),
   };

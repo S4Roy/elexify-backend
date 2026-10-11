@@ -57,6 +57,10 @@ const OrderSchema = new Schema(
     discount: { type: Number, default: 0 },
     shipping: { type: Number, default: 0 },
     cod_fee: { type: Number, default: 0 },
+    // INR totals are payable in whole rupees: grand_total is rounded to the
+    // nearest rupee and the difference (±0.50 at most) kept here, outside
+    // the taxable value — see services/orderService/roundOrderTotal.js.
+    round_off: { type: Number, default: 0 },
     grand_total: { type: Number, required: true },
 
     // Partial COD: an online advance is required up front, the rest is

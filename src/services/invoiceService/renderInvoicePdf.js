@@ -286,6 +286,7 @@ export const renderInvoicePdf = (invoice) =>
       ["Shipping", totals.shipping],
       totals.cod_fee ? ["COD Fee", totals.cod_fee] : null,
       invoice.is_gst_applicable ? ["Included Charges", totals.tax_total] : null,
+      totals.round_off ? ["Round Off", totals.round_off] : null,
     ].filter(Boolean);
 
     if (cursorY + (totalsRows.length + 4) * 14 > CONTENT_BOTTOM) {

@@ -166,7 +166,11 @@ export const inspectReturnRequest = async ({ requestId, adminId, items, note }) 
       else {
         const reserved = await ReturnRequest.find({ order_id: order._id, _id: { $ne: request._id }, 'refund.status': { $in: ['pending', 'processed', 'manual_required', 'failed'] } }).session(session);
         const used = reserved.reduce((sum, r) => sum + paise(r.refund.amount), 0) + (order.refund?.status === 'processed' ? paise(order.refund.amount) : 0);
-        if (refundPaise + used > paise(order.grand_total)) throw StatusError.conflict('Refund exceeds remaining paid amount');
+        // Items can be worth up to 49 paise more than a rounded-down total;
+        // refund what was actually paid in that case.
+        const overage = refundPaise + used - paise(order.grand_total);
+        if (overage > 0 && overage <= Math.max(0, -paise(order.round_off || 0))) refundPaise -= overage;
+        else if (overage > 0) throw StatusError.conflict('Refund exceeds remaining paid amount');
         request.refund.amount = refundPaise / 100;
         request.refund.idempotency_key = `${request.request_number}-refund`;
         const online = order.payment_meta?.payment_provider !== 'manual' && order.payment_method === 'razorpay' && ['paid', 'partially_refunded', 'refund_pending'].includes(order.payment_status);

@@ -69,7 +69,9 @@ export const buildPackagePayload = ({ order_data, shiprocketConfig, pkg, pickupL
   const shippingChargesValue = Number(order_data.shipping_charges ?? order_data.shipping ?? 0)
     + Number(order_data.cod_fee || 0);
   const giftwrapChargesValue = Number(order_data.giftwrap_charges || 0);
-  const transactionChargesValue = Number(order_data.transaction_charges || 0);
+  // A positive whole-rupee round-off is collected like a charge; a negative
+  // one is already absorbed by total_discount below.
+  const transactionChargesValue = Number(order_data.transaction_charges || 0) + Math.max(0, Number(order_data.round_off || 0));
   const discountValue = Number(order_data.discount || 0);
 
   // Whole-order amounts, split proportionally across packages by item value.

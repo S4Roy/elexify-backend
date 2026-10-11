@@ -32,6 +32,13 @@ describe("Zoho Sales Order financial snapshots", () => {
     const input = fixture(); input.connection.tax_map = {};
     expect(() => salesOrderPayload(input)).toThrow("ORDER_TAX_MAPPING_REQUIRED");
   });
+  it("sends whole-rupee rounding as a Round Off adjustment outside tax", () => {
+    const input = fixture(); input.order.grand_total = 117; input.order.round_off = -1;
+    expect(() => salesOrderPayload({ ...input, order: { ...input.order, round_off: 0 } })).toThrow("ORDER_TOTAL_MISMATCH");
+    const result = salesOrderPayload(input);
+    expect(result).toMatchObject({ adjustment: -1, adjustment_description: "Round Off" });
+    expect(salesOrderPayload(fixture())).not.toHaveProperty("adjustment");
+  });
   it("rejects inconsistent order totals", () => {
     const input = fixture(); input.order.grand_total = 128;
     expect(() => salesOrderPayload(input)).toThrow("ORDER_TOTAL_MISMATCH");

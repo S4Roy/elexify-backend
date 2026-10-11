@@ -68,6 +68,7 @@ const InvoiceSchema = new Schema(
       advance_amount: { type: Number, default: 0 },
       cod_due_amount: { type: Number, default: 0 },
       tax_total: { type: Number, default: 0 },
+      round_off: { type: Number, default: 0 },
       grand_total: { type: Number, required: true },
       amount_in_words: { type: String, default: "" },
     },

@@ -42,6 +42,7 @@ class OrderResource extends Resource {
       total_amount: this.total_amount || 0,
       shipping: this.shipping || 0,
       cod_fee: this.cod_fee || 0,
+      round_off: this.round_off || 0,
       discount: this.discount || 0,
       grand_total: this.grand_total || 0,
       partial_cod_consent: this.partial_cod_consent || null,

@@ -22,6 +22,7 @@ import { validateCoupon } from "../../../../services/inventory/cart/validateCoup
 import { calculateQuantityDiscount } from "../../../../services/inventory/cart/calculateQuantityDiscount.js";
 import { calculateShippingRate } from "../../../../services/shipping/calculateShippingRate.js";
 import { roundShippingCharge } from "../../../../services/shipping/roundShippingCharge.js";
+import { roundAdvance, roundOrderTotal } from "../../../../services/orderService/roundOrderTotal.js";
 import { calculateDeliveryEstimate } from "../../../../services/shipping/calculateDeliveryEstimate.js";
 import { calculateCodEligibility } from "../../../../services/shipping/calculateCodEligibility.js";
 import { snapshotAddress } from "../../../../services/invoiceService/snapshotAddress.js";
@@ -311,7 +312,14 @@ const address = await Address.findOne({
       }
       codFee = cod.fee;
     }
-    const grandTotal = parseFloat((amountBeforePaymentFee + codFee).toFixed(2));
+    const exactTotal = parseFloat((amountBeforePaymentFee + codFee).toFixed(2));
+    const rounded = roundOrderTotal(exactTotal, currency);
+    // App builds released before rounding still send the exact paise total;
+    // honour what that customer was shown instead of failing their checkout.
+    const legacyUnrounded = expected_total != null && rounded.round_off !== 0 &&
+      Math.abs(Number(expected_total) - exactTotal) <= 0.009;
+    const grandTotal = legacyUnrounded ? exactTotal : rounded.total;
+    const roundOff = legacyUnrounded ? 0 : rounded.round_off;
     if (
       expected_total != null &&
       Math.abs(Number(expected_total) - grandTotal) > 0.009
@@ -330,14 +338,14 @@ const address = await Address.findOne({
     // grandTotal (see finalizeCapturedPayment.js and cancelOrder.js).
     const advanceEnabled = payment_method === "cod" && Boolean(cod?.advance_enabled);
     const advanceAmount = advanceEnabled
-      ? parseFloat((grandTotal * (cod.advance_percent / 100)).toFixed(2))
+      ? (legacyUnrounded ? parseFloat((grandTotal * (cod.advance_percent / 100)).toFixed(2)) : roundAdvance(grandTotal, cod.advance_percent, currency))
       : 0;
     const codDueAmount = advanceEnabled
       ? parseFloat((grandTotal - advanceAmount).toFixed(2))
       : 0;
 
     if (adminContext?.quote) {
-      return res.status(200).json({ status: "success", data: { subtotal: sub_total, discount: discountAmount, shipping: shippingAmount, cod_fee: codFee, grand_total: grandTotal, advance_amount: advanceAmount, currency, payment_required: payment_method === "razorpay" || advanceEnabled } });
+      return res.status(200).json({ status: "success", data: { subtotal: sub_total, discount: discountAmount, shipping: shippingAmount, cod_fee: codFee, round_off: roundOff, grand_total: grandTotal, advance_amount: advanceAmount, currency, payment_required: payment_method === "razorpay" || advanceEnabled } });
     }
 
     // Staff-created orders must never be recorded as customer acceptance.
@@ -467,6 +475,7 @@ const address = await Address.findOne({
       discount: discountAmount,
       shipping: shippingAmount,
       cod_fee: codFee,
+      round_off: roundOff,
       grand_total: grandTotal,
       partial_cod_consent: consentRecord,
       is_partial_cod: advanceEnabled,

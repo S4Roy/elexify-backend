@@ -31,6 +31,15 @@ describe("Shiprocket COD charges", () => {
     expect(payable(payload)).toBe(3114);
   });
 
+  it("collects the rounded total whichever way the rupee rounding goes", () => {
+    const up = build({ ...order, grand_total: 3114.5, round_off: 0.5 });
+    expect(up.sub_total).toBe(2750);
+    expect(payable(up)).toBe(3114.5);
+    const down = build({ ...order, grand_total: 3113.6, round_off: -0.4 });
+    expect(down.sub_total).toBe(2750);
+    expect(payable(down)).toBeCloseTo(3113.6, 2);
+  });
+
   it("preserves the remaining balance for partial COD without collecting the advance twice", () => {
     const payload = build({ ...order, is_partial_cod: true, advance_amount: 622.8, cod_due_amount: 2491.2 });
     expect(payload.shipping_charges).toBe(364);

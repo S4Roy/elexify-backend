@@ -221,6 +221,31 @@ suite("real HTTP checkout concurrency and recovery", () => {
     });
   });
 
+  it("charges whole rupees, keeping the round off, and honours old clients' exact totals", async () => {
+    // 99.45 − 10% coupon = 89.505 → item/discount stay in paise, payable rounds.
+    await Cart.updateMany({}, { price: 99.45 });
+    await Product.updateOne({ _id: product._id }, { regular_price: 99.45 });
+    const rounded = await post(body(key("round")));
+    expect(rounded.status).toBe(200);
+    const order = await Order.findOne({ idempotency_key: key("round") }).lean();
+    const exact = Math.round((order.total_amount - order.discount + order.shipping + order.cod_fee) * 100) / 100;
+    expect(Number.isInteger(order.grand_total)).toBe(true);
+    expect(order.round_off).toBeCloseTo(order.grand_total - exact, 2);
+    expect(Math.abs(order.round_off)).toBeLessThanOrEqual(0.5);
+    expect(order.round_off).not.toBe(0);
+
+    // A build that predates rounding sends the exact total; it is charged that.
+    const legacy = await post(body(key("legacy"), { address_id: String(secondUserAddress._id), expected_total: exact }), "api", secondUser);
+    expect(legacy.status).toBe(200);
+    expect(await Order.findOne({ idempotency_key: key("legacy") }).lean()).toMatchObject({ grand_total: exact, round_off: 0 });
+
+    // Any other figure is still a changed total.
+    await Cart.create({ user: user._id, product: product._id, quantity: 1, price: 99.45 });
+    const stale = await post(body(key("stale"), { expected_total: exact + 1 }));
+    expect(stale.status).toBe(409);
+    expect(stale.body.message).toContain(`to ${order.grand_total.toFixed(2)}`);
+  });
+
   it("rejects reuse of an idempotency key with a different payload", async () => {
     const idempotencyKey = key("mismatch");
     expect((await post(body(idempotencyKey))).status).toBe(200);
