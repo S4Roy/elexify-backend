@@ -13,24 +13,35 @@ export const transferGuestTempCartToUser = async (guest_id, user_id) => {
   });
 
   for (const guestCart of guestCarts) {
+    // Match soft-deleted rows too: the unique user+product+variation index
+    // ignores deleted_at, so moving the guest row onto it would hit E11000.
     const existingUserCart = await TempCart.findOne({
       user: new mongoose.Types.ObjectId(user_id),
       product: guestCart.product,
       variation: guestCart.variation ?? null,
-      deleted_at: null,
     });
 
     if (existingUserCart) {
       // 🔥 MERGE QUANTITY
       await TempCart.updateOne(
         { _id: existingUserCart._id },
-        {
-          $inc: { quantity: guestCart.quantity },
-          $set: {
-            price: guestCart.price,
-            discounted_price: guestCart.discounted_price,
-          },
-        }
+        existingUserCart.deleted_at
+          ? {
+              // Revive a removed item with only the guest quantity
+              $set: {
+                quantity: guestCart.quantity,
+                price: guestCart.price,
+                discounted_price: guestCart.discounted_price,
+                deleted_at: null,
+              },
+            }
+          : {
+              $inc: { quantity: guestCart.quantity },
+              $set: {
+                price: guestCart.price,
+                discounted_price: guestCart.discounted_price,
+              },
+            }
       );
 
       // 🧹 REMOVE GUEST CART ROW

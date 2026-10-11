@@ -39,10 +39,21 @@ describe.each([
     model.findOne.mockResolvedValue({ _id: "account-row", quantity: 3 });
     await transfer("guest-id", user);
     expect(model.findOne).toHaveBeenCalledWith(expect.objectContaining({
-      product: "product", variation: "variant", deleted_at: null,
+      product: "product", variation: "variant",
     }));
     expect(model.updateOne).toHaveBeenCalledWith({ _id: "account-row" }, {
       $inc: { quantity: 2 }, $set: { price: 100, discounted_price: 90 },
+    });
+    expect(model.deleteOne).toHaveBeenCalledWith({ _id: "guest-row" });
+  });
+
+  it("revives a removed account row instead of colliding on the unique index", async () => {
+    model.find.mockResolvedValue([guestItem]);
+    model.findOne.mockResolvedValue({ _id: "account-row", quantity: 5, deleted_at: new Date() });
+    await transfer("guest-id", user);
+    expect(model.findOne.mock.calls[0][0]).not.toHaveProperty("deleted_at");
+    expect(model.updateOne).toHaveBeenCalledWith({ _id: "account-row" }, {
+      $set: { quantity: 2, price: 100, discounted_price: 90, deleted_at: null },
     });
     expect(model.deleteOne).toHaveBeenCalledWith({ _id: "guest-row" });
   });
