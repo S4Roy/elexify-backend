@@ -83,7 +83,7 @@ export const applyManualOrderStatusChange = async ({ order, expectedStatus = nul
   // instead; one that already has packages hits the cascade path above.
   if (PACKAGE_CASCADE_STATUSES.includes(status) && !hasPackagesOrTracking) {
     throw StatusError.badRequest(
-      "Provide a Shiprocket reference to advance this order's fulfillment status — use the package registration action, not a plain status correction.",
+      "This order has no shipment. Use \"Fulfil manually\" for own-rider delivery or store pickup, or link a Shiprocket order — not a plain status correction.",
     );
   }
   if ((order.payment_method === "razorpay" || order.is_partial_cod) && !["paid", "advance_paid"].includes(order.payment_status) &&

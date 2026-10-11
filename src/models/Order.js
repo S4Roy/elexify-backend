@@ -88,6 +88,17 @@ const OrderSchema = new Schema(
       }, { _id: false }),
       default: undefined,
     },
+    // Cash/UPI collected at the door or counter for a manually fulfilled
+    // COD order (services/orderService/packages/manualFulfillment.js).
+    cod_collection: {
+      type: new Schema({
+        amount: Number, method: String, reference: String,
+        collected_by: String, collected_at: Date,
+        recorded_by: { type: Schema.Types.ObjectId, ref: "users" },
+        recorded_at: Date,
+      }, { _id: false }),
+      default: undefined,
+    },
     manual_status_history: [{
       from: String,
       to: String,

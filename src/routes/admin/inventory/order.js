@@ -5,6 +5,7 @@ import { updateAddress } from "../../../controllers/admin/inventory/order/update
 import { addressOptions } from "../../../controllers/admin/customerAccount/address.js";
 import { addressEditSchema } from "../../../validations/admin/customerAccount/address.js";
 import { recordManualPayment } from "../../../controllers/admin/inventory/order/recordManualPayment.js";
+import { manualDispatch, manualDelivered, deliveryAttempt, returnToStore } from "../../../controllers/admin/inventory/order/manualFulfillment.js";
 import { tracking } from "../../../controllers/admin/inventory/order/tracking.js";
 import { celebrate, Joi } from "celebrate";
 import { returnOperation } from "../../../controllers/admin/inventory/order/returnOperations.js";
@@ -181,6 +182,36 @@ orderRouter.post(
   }) }),
   inventoryController.orderController.registerExternalPackage,
 );
+// Own-rider delivery / store pickup (no courier).
+const packageIdParam = Joi.object({ id: Joi.string().hex().length(24).required() });
+const manualReason = Joi.string().trim().min(5).max(500).required();
+orderRouter.post("/package/manual-dispatch", requirePermission(PERMISSIONS.ORDER_STATUS_MANAGE),
+  celebrate({ body: Joi.object({
+    order_id: Joi.string().hex().length(24).required(),
+    mode: Joi.string().valid("self_delivery", "store_pickup").required(),
+    agent_name: Joi.string().trim().min(2).max(100).required(),
+    agent_phone: Joi.string().trim().pattern(/^[0-9+\- ]{7,20}$/).allow("", null),
+    dispatched_at: Joi.date().iso().max("now").allow(null),
+    reason: manualReason,
+  }) }), manualDispatch);
+orderRouter.post("/package/:id/manual-delivered", requirePermission(PERMISSIONS.ORDER_STATUS_MANAGE),
+  celebrate({ params: packageIdParam, body: Joi.object({
+    delivered_at: Joi.date().iso().max("now").required(),
+    receiver_name: Joi.string().trim().min(2).max(100).required(),
+    receiver_relation: Joi.string().trim().max(50).allow("", null),
+    photo_url: Joi.string().uri({ scheme: ["https", "http"] }).max(1000).allow("", null),
+    notes: Joi.string().trim().max(500).allow("", null),
+    cod_collection: Joi.object({
+      amount: Joi.number().positive().precision(2).required(),
+      method: Joi.string().valid("cash", "upi").required(),
+      reference: Joi.string().trim().max(100).allow("", null),
+    }).allow(null),
+  }) }), manualDelivered);
+orderRouter.post("/package/:id/delivery-attempt", requirePermission(PERMISSIONS.ORDER_STATUS_MANAGE),
+  celebrate({ params: packageIdParam, body: Joi.object({ reason: manualReason }) }), deliveryAttempt);
+orderRouter.post("/package/:id/return-to-store", requirePermission(PERMISSIONS.ORDER_STATUS_MANAGE),
+  celebrate({ params: packageIdParam, body: Joi.object({ reason: manualReason }) }), returnToStore);
+
 orderRouter.post(
   "/sync-shiprocket-status",
   requirePermission(PERMISSIONS.ORDER_STATUS_MANAGE),

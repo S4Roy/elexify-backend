@@ -36,6 +36,43 @@ const PackageSchema = new Schema(
       default: "packed",
     },
 
+    // How this package reaches the customer. Only "shiprocket" packages are
+    // driven by the courier webhook; self_delivery (own rider) and
+    // store_pickup are advanced by admins through
+    // services/orderService/packages/manualFulfillment.js.
+    fulfillment_mode: {
+      type: String,
+      enum: ["shiprocket", "self_delivery", "store_pickup"],
+      default: "shiprocket",
+    },
+    // Rider (self_delivery) or counter staff (store_pickup).
+    delivery_agent: {
+      type: new Schema({
+        name: String, phone: String,
+        user_id: { type: Types.ObjectId, ref: "users", default: null },
+      }, { _id: false }),
+      default: undefined,
+    },
+    // Failed handover attempts (customer unavailable, refused, etc.).
+    delivery_attempts: [{
+      at: { type: Date, default: Date.now },
+      reason: String,
+      recorded_by: { type: Types.ObjectId, ref: "users" },
+    }],
+    proof_of_delivery: {
+      type: new Schema({
+        receiver_name: String,
+        receiver_relation: String,
+        delivered_at: Date,
+        photo_url: { type: String, default: null },
+        otp_verified: { type: Boolean, default: false },
+        notes: { type: String, default: null },
+        recorded_by: { type: Types.ObjectId, ref: "users" },
+        recorded_at: Date,
+      }, { _id: false }),
+      default: undefined,
+    },
+
     items: [
       {
         order_item_id: { type: Types.ObjectId, ref: "order_items", required: true },
@@ -70,7 +107,8 @@ const PackageSchema = new Schema(
     // which is what prevents duplicate shipments/AWBs.
     integration_status: {
       type: String,
-      enum: ["pending", "created", "failed", "unknown"],
+      // "not_applicable": manual (non-courier) packages make no API call.
+      enum: ["pending", "created", "failed", "unknown", "not_applicable"],
       default: "pending",
     },
     operation_token: { type: String, default: null },

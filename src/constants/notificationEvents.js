@@ -72,6 +72,16 @@ export const NOTIFICATION_EVENTS = {
     templateKey: "order_out_for_delivery",
     messagingVariables: ["name", "order_id"],
   },
+  // Store pickup (services/orderService/packages/manualFulfillment.js).
+  // Email + push only until SMS (DLT) / WhatsApp copy is approved.
+  ORDER_READY_FOR_PICKUP: {
+    category: "transactional",
+    preferenceKey: "order",
+    mandatory: false,
+    channels: ["email"],
+    templateKey: "order_ready_for_pickup",
+    messagingVariables: ["name", "order_id"],
+  },
   ORDER_DELIVERED: {
     category: "transactional",
     preferenceKey: "order",

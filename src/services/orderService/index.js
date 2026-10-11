@@ -9,6 +9,7 @@ import { retryPackageShipment } from "./packages/retryPackageShipment.js";
 import { cancelPackage } from "./packages/cancelPackage.js";
 import { recomputeOrderStatus } from "./packages/recomputeOrderStatus.js";
 import { registerExternalPackage } from "./packages/registerExternalPackage.js";
+import { dispatchManual, markManualDelivered, recordFailedAttempt, returnToStore } from "./packages/manualFulfillment.js";
 import { syncShiprocketStatus } from "./packages/syncShiprocketStatus.js";
 import { fetchShiprocketDetailsForOrder } from "./fetchShiprocketDetails.js";
 import { applyManualOrderStatusChange, MANUAL_ORDER_STATUSES, PACKAGE_CASCADE_STATUSES } from "./manualOrderStatus.js";
@@ -23,6 +24,7 @@ export {
   updateReturnPickup,
   createAndShipPackage, retryPackageShipment, cancelPackage, recomputeOrderStatus,
   registerExternalPackage,
+  dispatchManual, markManualDelivered, recordFailedAttempt, returnToStore,
   syncShiprocketStatus,
   fetchShiprocketDetailsForOrder,
   applyManualOrderStatusChange, MANUAL_ORDER_STATUSES, PACKAGE_CASCADE_STATUSES,

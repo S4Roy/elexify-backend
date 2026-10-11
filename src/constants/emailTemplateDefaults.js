@@ -147,6 +147,17 @@ ${small("If you didn't request this, you can safely ignore this email.")}
     required_variables: ["name", "order_id", "order_number"],
     is_marketing: false,
   },
+  order_ready_for_pickup: {
+    subject: "Ready for Pickup — {{order_id}}",
+    preheader: "Your order {{order_id}} is ready to collect.",
+    body: orderShell({
+      heading: "Ready for Pickup",
+      badgeLabel: "Ready for Pickup",
+      message: "Your order is packed and ready to collect from our store. Please bring your order number.",
+    }),
+    required_variables: ["name", "order_id", "order_number"],
+    is_marketing: false,
+  },
   order_delivered: {
     subject: "Order Delivered — {{order_id}}",
     preheader: "Your order {{order_id}} has been delivered.",

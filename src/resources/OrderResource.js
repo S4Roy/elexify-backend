@@ -57,6 +57,7 @@ class OrderResource extends Resource {
       package_count: this.package_count || 0,
       fully_packed: this.fully_packed || false,
       packages: (this.packages || []).map((pkg) => ({
+        _id: pkg._id || null,
         reference_id: pkg.reference_id || null,
         package_number: pkg.package_number,
         status: pkg.status,
@@ -67,6 +68,9 @@ class OrderResource extends Resource {
         etd: pkg.etd || null,
         tracking_url: pkg.tracking_url || null,
         item_count: pkg.item_count || 0,
+        fulfillment_mode: pkg.fulfillment_mode || "shiprocket",
+        delivery_agent_name: pkg.delivery_agent_name || null,
+        delivery_attempt_count: pkg.delivery_attempt_count || 0,
         ...(pkg.items ? { items: pkg.items.map((line) => ({
           order_item_id: line.order_item_id,
           quantity: line.quantity,

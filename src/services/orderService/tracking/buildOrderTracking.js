@@ -56,7 +56,16 @@ const PACKAGE_EVENT_TITLES = {
   return_requested: "Return initiated",
   returned: "Returned to seller",
   failed: "Delivery attempt failed",
+  delivery_attempt_failed: "Delivery attempt failed",
+  returned_to_store: "Returned to store",
 };
+
+// Own-rider / store-pickup packages read differently from courier ones.
+const MANUAL_EVENT_TITLES = {
+  self_delivery: { out_for_delivery: "Out for delivery with our delivery partner", delivered: "Delivered by our delivery partner" },
+  store_pickup: { packed: "Ready for pickup at our store", delivered: "Collected from our store" },
+};
+const MANUAL_STATUS_LABELS = { store_pickup: { packed: "Ready for pickup", delivered: "Collected" } };
 
 // Rank of each order status on the milestone bar.
 const STEP_RANK = {
@@ -201,9 +210,10 @@ const buildShipment = ({ key, label, source, scans, items, publicView, adminView
     kind: "courier",
     ...(adminView ? { source: s.source || null } : {}),
   }));
+  const mode = source.fulfillment_mode && source.fulfillment_mode !== "shiprocket" ? source.fulfillment_mode : null;
   const updates = (source.timeline || []).map((e) => ({
     at: e.occurred_at,
-    title: PACKAGE_EVENT_TITLES[e.status] || humanize(e.status),
+    title: MANUAL_EVENT_TITLES[mode]?.[e.status] || PACKAGE_EVENT_TITLES[e.status] || humanize(e.status),
     location: null,
     status_label: null,
     kind: "update",
@@ -215,7 +225,14 @@ const buildShipment = ({ key, label, source, scans, items, publicView, adminView
     label,
     package_number: source.package_number ?? null,
     status,
-    status_label: PACKAGE_STATUS_LABELS[status] || statusLabel(status),
+    status_label: MANUAL_STATUS_LABELS[mode]?.[status] || PACKAGE_STATUS_LABELS[status] || statusLabel(status),
+    fulfillment_mode: mode || "courier",
+    // Rider/counter name for manual packages; contact and proof stay private.
+    delivery_agent_name: mode ? source.delivery_agent?.name || null : null,
+    ...(mode && !publicView ? {
+      delivery_agent_phone: mode === "self_delivery" && status === "out_for_delivery" ? source.delivery_agent?.phone || null : null,
+      received_by: source.proof_of_delivery?.receiver_name || null,
+    } : {}),
     // Latest courier wording (e.g. "IN TRANSIT", "RTO INITIATED") — shown
     // alongside our own status since carriers report exceptions we don't map.
     courier_status: source.shiprocket_status || null,
@@ -237,6 +254,9 @@ const buildShipment = ({ key, label, source, scans, items, publicView, adminView
           integration_status: source.integration_status || null,
           courier_status_at: source.shiprocket_status_updated_at || null,
           tracking_synced_at: source.tracking_synced_at || null,
+          delivery_agent: source.delivery_agent || null,
+          delivery_attempts: source.delivery_attempts || [],
+          proof_of_delivery: source.proof_of_delivery || null,
         }
       : {}),
   };
