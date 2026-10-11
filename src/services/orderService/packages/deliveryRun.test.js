@@ -19,16 +19,17 @@ vi.mock("./manualFulfillment.js", () => ({
 }));
 
 const RIDER = "507f1f77bcf86cd799439044";
-const sortLean = (v) => ({ sort: () => ({ lean: () => Promise.resolve(v) }) });
+const selectSortLean = (v) => ({ select: () => ({ sort: () => ({ lean: () => Promise.resolve(v) }) }) });
 const selectLean = (v) => ({ select: () => ({ lean: () => Promise.resolve(v) }) });
 
 beforeEach(() => vi.resetAllMocks());
 
 describe("listMyDeliveries", () => {
   it("returns only the rider's packages with the handover essentials", async () => {
-    Package.find.mockReturnValue(sortLean([{
+    Package.find.mockReturnValue(selectSortLean([{
       _id: "p1", order_id: "o1", status: "out_for_delivery", shipped_at: new Date(), items: [{ order_item_id: "i1", quantity: 2 }],
       delivery_attempts: [{ at: new Date(), reason: "Not home" }],
+      delivery_otp: { hash: "abc", sent_count: 1, failed_attempts: 5 },
     }]));
     Order.find.mockReturnValue(selectLean([{ _id: "o1", id: "ORD-1", shipping_address: "a1", payment_method: "cod",
       payment_status: "pending", grand_total: 750, currency: "INR" }]));
@@ -44,8 +45,10 @@ describe("listMyDeliveries", () => {
       address: { name: "Asha", phone: "+91 98765", line1: "12 Park St", city: "Kolkata", postcode: "700016" },
       items: [{ name: "Kettle · Red", quantity: 2 }],
       attempts: [{ reason: "Not home" }],
+      otp: { sent: true, locked: true, can_resend: true },
     });
     expect(open[0]).not.toHaveProperty("grand_total");
+    expect(JSON.stringify(open[0])).not.toContain("abc");
   });
 });
 

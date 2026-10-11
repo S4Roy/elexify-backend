@@ -11,6 +11,7 @@ import { PERMISSIONS } from "../../../constants/adminPermissions.js";
 import { s3Client } from "../../awsService/awsConfig.js";
 import { GetObjectCommand, PutObjectCommand } from "@aws-sdk/client-s3";
 import { codAmountDue, staffName } from "./manualFulfillment.js";
+import { deliveryOtpState } from "./deliveryOtp.js";
 
 // What an own-delivery rider (delivery.run) sees: only packages assigned to
 // them, with just enough customer data to complete the handover — name,
@@ -50,7 +51,7 @@ export const listMyDeliveries = async (riderId) => {
     "delivery_agent.user_id": new mongoose.Types.ObjectId(String(riderId)),
     fulfillment_mode: "self_delivery",
     $or: [{ status: "out_for_delivery" }, { status: "delivered", delivered_at: { $gte: since } }],
-  }).sort({ shipped_at: 1 }).lean();
+  }).select("+delivery_otp").sort({ shipped_at: 1 }).lean();
   if (!packages.length) return { open: [], done: [] };
 
   const orderIds = packages.map((p) => p.order_id);
@@ -82,6 +83,8 @@ export const listMyDeliveries = async (riderId) => {
       note: order.note || null,
       attempts: (pkg.delivery_attempts || []).map((a) => ({ at: a.at, reason: a.reason })),
       received_by: pkg.proof_of_delivery?.receiver_name || null,
+      otp: deliveryOtpState(pkg),
+      otp_verified: !!pkg.proof_of_delivery?.otp_verified,
     };
   }).filter(Boolean);
   return { open: cards.filter((c) => c.status !== "delivered"), done: cards.filter((c) => c.status === "delivered") };

@@ -73,6 +73,8 @@ class OrderResource extends Resource {
         delivery_attempt_count: pkg.delivery_attempt_count || 0,
         received_by: pkg.received_by || null,
         has_proof_photo: !!pkg.has_proof_photo,
+        otp_verified: !!pkg.otp_verified,
+        otp_sent: !!pkg.otp_sent,
         ...(pkg.items ? { items: pkg.items.map((line) => ({
           order_item_id: line.order_item_id,
           quantity: line.quantity,

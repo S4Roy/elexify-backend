@@ -10,6 +10,14 @@ import ShippingSettings from '../../../models/ShippingSettings.js';
 import Role from '../../../models/Role.js';
 import User from '../../../models/User.js';
 import { listDeliveryStaff, listMyDeliveries } from './deliveryRun.js';
+import { newDeliveryOtp, resendDeliveryOtp } from './deliveryOtp.js';
+import { sendSMS } from '../../sms/index.js';
+
+// Never text anyone from tests; the code sent is read back from the mock.
+vi.mock('../../sms/index.js', () => ({ sendSMS: vi.fn(async () => ({ success: true })) }));
+vi.mock('../../smsTemplate/getTemplate.js', () => ({
+  getTemplate: async () => ({ dlt_message_id: '189215', variables: ['name', 'purpose', 'otp'] }),
+}));
 
 // Same dedicated replica-set database as the return workflow suite.
 const uri = process.env.RETURN_TEST_MONGODB_URI;
@@ -78,6 +86,35 @@ suite('manual fulfillment with real MongoDB transactions', () => {
     const after = await listMyDeliveries(rider._id);
     expect(after.open).toHaveLength(0);
     expect(after.done[0]).toMatchObject({ order_number: order.id, received_by: 'Asha' });
+  });
+
+  it('verifies the handover code, counts wrong guesses and keeps the hash out of normal reads', async () => {
+    await User.create({ _id: order.user, name: 'Asha', role: 'user', phone_code: '91', mobile: '9123456780' });
+    const { pkg, otpSent } = await dispatchManual({ orderId: String(order._id), mode: 'store_pickup', agent: { name: 'Counter' }, reason: 'Pickup requested', adminId: admin });
+    expect(otpSent).toBe(true);
+    const firstCode = sendSMS.mock.calls.at(-1)[0].variables[2];
+    expect(sendSMS.mock.calls.at(-1)[0]).toMatchObject({ to: '919123456780', variables: ['Asha', 'Pickup', firstCode] });
+    expect((await Package.findById(pkg._id)).delivery_otp).toBeUndefined();
+    expect((await Package.findById(pkg._id).select('+delivery_otp')).delivery_otp).toMatchObject({ sent_count: 1, failed_attempts: 0 });
+
+    // A wrong code is rejected and still counted, though the delivery rolled back.
+    const wrong = firstCode === '0000' ? '1111' : '0000';
+    await expect(markManualDelivered({ packageId: String(pkg._id), deliveredAt: new Date(), receiverName: 'Asha', otp: wrong,
+      codCollection: { amount: 320, method: 'cash' }, adminId: admin })).rejects.toThrow(/Wrong code/);
+    expect((await Package.findById(pkg._id).select('+delivery_otp')).delivery_otp.failed_attempts).toBe(1);
+    expect((await Package.findById(pkg._id)).status).toBe('packed');
+
+    // Resend replaces the code; the old one stops working.
+    await expect(resendDeliveryOtp({ packageId: String(pkg._id) })).rejects.toThrow(/Wait/);
+    await Package.updateOne({ _id: pkg._id }, { $set: { 'delivery_otp.last_sent_at': new Date(Date.now() - 120_000) } });
+    await resendDeliveryOtp({ packageId: String(pkg._id) });
+    const secondCode = sendSMS.mock.calls.at(-1)[0].variables[2];
+    expect((await Package.findById(pkg._id).select('+delivery_otp')).delivery_otp).toMatchObject({ sent_count: 2, failed_attempts: 1 });
+
+    await markManualDelivered({ packageId: String(pkg._id), deliveredAt: new Date(), receiverName: 'Asha', otp: secondCode,
+      codCollection: { amount: 320, method: 'cash' }, adminId: admin });
+    expect((await Package.findById(pkg._id)).proof_of_delivery.otp_verified).toBe(true);
+    expect(newDeliveryOtp(pkg._id).code).toMatch(/^\d{4}$/);
   });
 
   it('rolls a returned pickup back to processing so it can be re-dispatched', async () => {

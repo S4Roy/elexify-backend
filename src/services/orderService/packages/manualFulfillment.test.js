@@ -8,6 +8,7 @@ import { transitionOrder } from "../transitionOrder.js";
 import { sendOrderNotification } from "../../notification/sendOrderNotification.js";
 import User from "../../../models/User.js";
 import Role from "../../../models/Role.js";
+import { newDeliveryOtp, sendDeliveryOtp, verifyDeliveryOtp } from "./deliveryOtp.js";
 import { codAmountDue, dispatchManual, markManualDelivered, recordFailedAttempt, returnToStore } from "./manualFulfillment.js";
 
 vi.mock("../../../models/Order.js", () => ({ default: { findOne: vi.fn(), findById: vi.fn(), updateOne: vi.fn(), findOneAndUpdate: vi.fn() } }));
@@ -20,6 +21,7 @@ vi.mock("../transitionOrder.js", () => ({ transitionOrder: vi.fn() }));
 vi.mock("../../notification/sendOrderNotification.js", () => ({ sendOrderNotification: vi.fn() }));
 vi.mock("../../../models/User.js", () => ({ default: { findOne: vi.fn() } }));
 vi.mock("../../../models/Role.js", () => ({ default: { findOne: vi.fn() } }));
+vi.mock("./deliveryOtp.js", () => ({ newDeliveryOtp: vi.fn(), sendDeliveryOtp: vi.fn(), verifyDeliveryOtp: vi.fn() }));
 vi.mock("./applyShiprocketShipment.js", () => ({
   fulfillmentBlocked: (o) => ["cancelled", "returned", "return_requested"].includes(o.order_status) || !!o.inventory_reverted,
 }));
@@ -45,6 +47,8 @@ beforeEach(() => {
     withTransaction: async (fn) => fn(),
     endSession: vi.fn(),
   });
+  newDeliveryOtp.mockReturnValue({ code: "4821", record: { hash: "h", sent_count: 1, failed_attempts: 0 } });
+  sendDeliveryOtp.mockResolvedValue(true);
 });
 
 describe("codAmountDue", () => {
@@ -67,8 +71,13 @@ describe("dispatchManual", () => {
   it("puts a self delivery package out for delivery and notifies the customer", async () => {
     setup(order());
     recomputeOrderStatus.mockResolvedValue({ order: order({ order_status: "out_for_delivery" }) });
-    await dispatchManual(args("self_delivery"));
+    const { otpSent } = await dispatchManual(args("self_delivery"));
     const [[doc]] = Package.create.mock.calls[0];
+    // The code is stored hashed on the package it was generated for and texted after commit.
+    expect(String(doc._id)).toBe(String(newDeliveryOtp.mock.calls[0][0]));
+    expect(doc.delivery_otp).toEqual({ hash: "h", sent_count: 1, failed_attempts: 0 });
+    expect(sendDeliveryOtp).toHaveBeenCalledWith(expect.objectContaining({ mode: "self_delivery", code: "4821" }));
+    expect(otpSent).toBe(true);
     expect(doc).toMatchObject({
       status: "out_for_delivery", fulfillment_mode: "self_delivery", integration_status: "not_applicable",
       reference_id: "ORD-1-P1", items: [{ order_item_id: "item1", quantity: 2 }],
@@ -122,6 +131,27 @@ describe("markManualDelivered", () => {
       }),
     }));
     expect(sendOrderNotification).toHaveBeenCalledWith(expect.objectContaining({ event: "ORDER_DELIVERED" }));
+  });
+
+  it("marks the handover OTP-verified only when a code was entered and checked", async () => {
+    setup(order({ payment_method: "razorpay", payment_status: "paid" }));
+    verifyDeliveryOtp.mockResolvedValue(true);
+    await markManualDelivered({ ...base, otp: "4821", riderId: undefined });
+    expect(verifyDeliveryOtp).toHaveBeenCalledWith({ packageId: PKG_ID, code: "4821", riderId: null });
+    expect(Package.updateOne.mock.calls[0][1].$set.proof_of_delivery.otp_verified).toBe(true);
+
+    vi.clearAllMocks();
+    setup(order({ payment_method: "razorpay", payment_status: "paid" }));
+    await markManualDelivered(base);
+    expect(verifyDeliveryOtp).not.toHaveBeenCalled();
+    expect(Package.updateOne.mock.calls[0][1].$set.proof_of_delivery.otp_verified).toBe(false);
+  });
+
+  it("does not deliver when the entered code is wrong", async () => {
+    setup(order({ payment_method: "razorpay", payment_status: "paid" }));
+    verifyDeliveryOtp.mockRejectedValue(new Error("Wrong code. 4 tries left."));
+    await expect(markManualDelivered({ ...base, otp: "0000" })).rejects.toThrow(/Wrong code/);
+    expect(Package.updateOne).not.toHaveBeenCalled();
   });
 
   it("settles only the balance for Partial COD", async () => {

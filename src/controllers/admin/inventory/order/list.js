@@ -91,6 +91,8 @@ export const list = async (req, res, next) => {
                   delivery_attempt_count: { $size: { $ifNull: ["$$pkg.delivery_attempts", []] } },
                   received_by: "$$pkg.proof_of_delivery.receiver_name",
                   has_proof_photo: { $gt: [{ $ifNull: ["$$pkg.proof_of_delivery.photo_key", null] }, null] },
+                  otp_verified: { $eq: ["$$pkg.proof_of_delivery.otp_verified", true] },
+                  otp_sent: { $gt: [{ $ifNull: ["$$pkg.delivery_otp.hash", null] }, null] },
                   item_count: { $size: { $ifNull: ["$$pkg.items", []] } },
                   items: { $ifNull: ["$$pkg.items", []] },
                 },

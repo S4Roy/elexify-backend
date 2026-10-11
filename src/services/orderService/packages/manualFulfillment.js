@@ -11,6 +11,7 @@ import { transitionOrder } from "../transitionOrder.js";
 import { packageReference } from "./packageReference.js";
 import { recomputeOrderStatus } from "./recomputeOrderStatus.js";
 import { fulfillmentBlocked } from "./applyShiprocketShipment.js";
+import { newDeliveryOtp, sendDeliveryOtp, verifyDeliveryOtp } from "./deliveryOtp.js";
 
 // Fulfillment without a courier: our own rider hand-delivers
 // ("self_delivery") or the customer collects from the store
@@ -100,6 +101,11 @@ export const dispatchManual = async ({ orderId, mode, agent, reason, adminId, di
   }
   if (!mongoose.Types.ObjectId.isValid(orderId)) throw StatusError.notFound("Order not found");
 
+  // Generated once outside the transaction so a retried attempt stores the
+  // same code that is texted afterwards.
+  const packageId = new mongoose.Types.ObjectId();
+  const otp = newDeliveryOtp(packageId);
+
   const { pkg, order, previousStatus } = await withTransaction(async (session) => {
     const order = await Order.findOne({ _id: orderId, deleted_at: null }).session(session);
     if (!order) throw StatusError.notFound("Order not found");
@@ -136,6 +142,7 @@ export const dispatchManual = async ({ orderId, mode, agent, reason, adminId, di
     const packageNumber = existingPackages.reduce((max, p) => Math.max(max, p.package_number), 0) + 1;
     const status = mode === "self_delivery" ? "out_for_delivery" : "packed";
     const [pkg] = await Package.create([{
+      _id: packageId,
       order_id: order._id,
       package_number: packageNumber,
       reference_id: packageReference(order.id, packageNumber),
@@ -145,6 +152,7 @@ export const dispatchManual = async ({ orderId, mode, agent, reason, adminId, di
       integration_status: "not_applicable",
       delivery_agent: { name: agentName, phone: agent.phone?.trim() || staff?.mobile || null, user_id: staff?._id || null },
       shipped_at: status === "out_for_delivery" ? now : null,
+      delivery_otp: otp.record,
       timeline: [{ status, occurred_at: now, raw: { source: "manual_fulfillment", mode, changed_by: String(adminId), reason: reason.trim() } }],
       created_by: adminId,
     }], { session });
@@ -158,7 +166,8 @@ export const dispatchManual = async ({ orderId, mode, agent, reason, adminId, di
     const event = mode === "self_delivery" ? "ORDER_OUT_FOR_DELIVERY" : "ORDER_READY_FOR_PICKUP";
     sendOrderNotification({ order, event, dedupeKey: `${order.id}:${event}` });
   }
-  return { pkg, order };
+  const otpSent = await sendDeliveryOtp({ order, mode, code: otp.code });
+  return { pkg, order, otpSent };
 };
 
 /**
@@ -168,7 +177,7 @@ export const dispatchManual = async ({ orderId, mode, agent, reason, adminId, di
  */
 export const markManualDelivered = async ({
   packageId, deliveredAt, receiverName, receiverRelation = null, photoUrl = null, photoKey = null, notes = null,
-  codCollection = null, adminId, riderId = null,
+  codCollection = null, otp = null, adminId, riderId = null,
 }) => {
   const handoverAt = new Date(deliveredAt);
   if (!Number.isFinite(handoverAt.getTime()) || handoverAt > new Date()) {
@@ -178,6 +187,8 @@ export const markManualDelivered = async ({
   if (riderId && Date.now() - handoverAt.getTime() > RIDER_BACKDATE_LIMIT_MS) {
     throw StatusError.badRequest("Delivered time can be at most 24 hours ago. Ask the office to record older deliveries.");
   }
+  // Optional: a code that is entered must be right.
+  const otpVerified = otp ? await verifyDeliveryOtp({ packageId, code: otp, riderId }) : false;
 
   const { order, previousStatus } = await withTransaction(async (session) => {
     const { pkg, order } = await loadManualPackage(packageId, session, riderId);
@@ -217,7 +228,7 @@ export const markManualDelivered = async ({
           delivered_at: handoverAt,
           photo_url: photoUrl || null,
           photo_key: photoKey || null,
-          otp_verified: false,
+          otp_verified: otpVerified,
           notes: notes?.trim() || null,
           recorded_by: adminId,
           recorded_at: now,
@@ -225,6 +236,7 @@ export const markManualDelivered = async ({
       },
       $push: { timeline: { status: "delivered", occurred_at: handoverAt, raw: {
         source: riderId ? "delivery_staff" : "manual_fulfillment", mode: pkg.fulfillment_mode, changed_by: String(adminId), receiver_name: receiverName.trim(),
+        otp_verified: otpVerified,
       } } },
     }, { session });
 

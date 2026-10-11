@@ -16,16 +16,25 @@ export const myDeliveries = async (req, res, next) => {
 export const markDelivered = async (req, res, next) => {
   try {
     const riderId = req.auth.user_id;
-    const { delivered_at, receiver_name, receiver_relation, notes, cod_method, cod_amount, cod_reference } = req.body;
+    const { delivered_at, receiver_name, receiver_relation, notes, cod_method, cod_amount, cod_reference, otp } = req.body;
     const photo = req.files?.photo;
     const photoKey = photo && !Array.isArray(photo) ? await uploadProofPhoto({ packageId: req.params.id, file: photo }) : null;
     const { order } = await orderService.markManualDelivered({
       packageId: req.params.id, riderId, adminId: riderId,
       deliveredAt: delivered_at || new Date(), receiverName: receiver_name, receiverRelation: receiver_relation,
-      notes, photoKey,
+      notes, photoKey, otp: otp || null,
       codCollection: cod_method ? { amount: Number(cod_amount), method: cod_method, reference: cod_reference } : null,
     });
     res.status(200).json({ status: "success", data: { order_status: order.order_status, payment_status: order.payment_status } });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const resendOtp = async (req, res, next) => {
+  try {
+    await orderService.resendDeliveryOtp({ packageId: req.params.id, riderId: req.auth.user_id });
+    res.status(200).json({ status: "success", message: "Code sent to the customer again" });
   } catch (error) {
     next(error);
   }

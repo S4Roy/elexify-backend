@@ -2,7 +2,7 @@ import { Router } from "express";
 import { celebrate, Joi } from "celebrate";
 import { requirePermission } from "../../middleware/requirePermission.js";
 import { PERMISSIONS } from "../../constants/adminPermissions.js";
-import { failedAttempt, markDelivered, myDeliveries } from "../../controllers/admin/delivery/index.js";
+import { failedAttempt, markDelivered, myDeliveries, resendOtp } from "../../controllers/admin/delivery/index.js";
 
 // Own-delivery riders. Every handler is scoped to the caller's assignments.
 const deliveryRouter = Router();
@@ -18,7 +18,10 @@ deliveryRouter.post("/:id/delivered", requirePermission(PERMISSIONS.DELIVERY_RUN
     cod_method: Joi.string().valid("cash", "upi").allow("", null),
     cod_amount: Joi.number().positive().precision(2).when("cod_method", { is: Joi.string().valid("cash", "upi"), then: Joi.required() }),
     cod_reference: Joi.string().trim().max(100).allow("", null),
+    otp: Joi.string().trim().pattern(/^\d{4}$/).allow("", null),
   }) }), markDelivered);
+deliveryRouter.post("/:id/resend-otp", requirePermission(PERMISSIONS.DELIVERY_RUN),
+  celebrate({ params: packageIdParam }), resendOtp);
 deliveryRouter.post("/:id/attempt", requirePermission(PERMISSIONS.DELIVERY_RUN),
   celebrate({ params: packageIdParam, body: Joi.object({ reason: Joi.string().trim().min(5).max(500).required() }) }), failedAttempt);
 

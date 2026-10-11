@@ -5,7 +5,7 @@ import { updateAddress } from "../../../controllers/admin/inventory/order/update
 import { addressOptions } from "../../../controllers/admin/customerAccount/address.js";
 import { addressEditSchema } from "../../../validations/admin/customerAccount/address.js";
 import { recordManualPayment } from "../../../controllers/admin/inventory/order/recordManualPayment.js";
-import { manualDispatch, manualDelivered, deliveryAttempt, returnToStore } from "../../../controllers/admin/inventory/order/manualFulfillment.js";
+import { manualDispatch, manualDelivered, resendOtp, deliveryAttempt, returnToStore } from "../../../controllers/admin/inventory/order/manualFulfillment.js";
 import { importRemittance, remittanceSummary } from "../../../controllers/admin/inventory/order/codRemittance.js";
 import { deliveryStaff, proofPhoto } from "../../../controllers/admin/delivery/index.js";
 import * as riderCash from "../../../controllers/admin/inventory/order/riderCash.js";
@@ -213,7 +213,10 @@ orderRouter.post("/package/:id/manual-delivered", requirePermission(PERMISSIONS.
       method: Joi.string().valid("cash", "upi").required(),
       reference: Joi.string().trim().max(100).allow("", null),
     }).allow(null),
+    otp: Joi.string().trim().pattern(/^\d{4}$/).allow("", null),
   }) }), manualDelivered);
+orderRouter.post("/package/:id/resend-otp", requirePermission(PERMISSIONS.ORDER_STATUS_MANAGE),
+  celebrate({ params: packageIdParam }), resendOtp);
 orderRouter.post("/package/:id/delivery-attempt", requirePermission(PERMISSIONS.ORDER_STATUS_MANAGE),
   celebrate({ params: packageIdParam, body: Joi.object({ reason: manualReason }) }), deliveryAttempt);
 orderRouter.post("/package/:id/return-to-store", requirePermission(PERMISSIONS.ORDER_STATUS_MANAGE),

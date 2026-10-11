@@ -59,6 +59,18 @@ const PackageSchema = new Schema(
       reason: String,
       recorded_by: { type: Types.ObjectId, ref: "users" },
     }],
+    // Handover code texted to the customer (services/orderService/packages/
+    // deliveryOtp.js). Only a hash is stored; never selected by default.
+    delivery_otp: {
+      type: new Schema({
+        hash: String,
+        sent_count: { type: Number, default: 0 },
+        last_sent_at: Date,
+        failed_attempts: { type: Number, default: 0 },
+      }, { _id: false }),
+      default: undefined,
+      select: false,
+    },
     proof_of_delivery: {
       type: new Schema({
         receiver_name: String,
