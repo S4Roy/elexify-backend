@@ -35,6 +35,7 @@ export const EMAIL_PREVIEW_FIXTURE = {
   tracking_number: "DEMO-TRACK-1",
   view_order_url: `${emailBrand.ordersUrl}/ORD-DEMO-1001`,
   account_url: emailBrand.accountUrl,
+  lockout_minutes: 5,
   storefront_url: emailBrand.storefrontUrl,
   otp: "123456",
   purpose: "login",

@@ -12,6 +12,9 @@ describe('admin route permission coverage', () => {
       routes.forEach((route, index) => {
         const body = text.slice(route.index + route[0].length, routes[index + 1]?.index || text.length);
         if (file.endsWith('/role.js') && route[3] === '/me') return;
+        // Self-service: any signed-in admin changes only their own password
+        // (old password required); the /admin mount already enforces admin auth.
+        if (file.endsWith('/user.js') && route[3] === '/change-password') return;
         if (!/require(?:Any)?Permission\(|requireOperationPermission\(|requireDataView|requireOperationHistoryView|\b(view|manage|configure|guard)\s*,/.test(body)) missing.push(`${path.relative(root, file)} ${route[1]} ${route[3]}`);
       });
     }

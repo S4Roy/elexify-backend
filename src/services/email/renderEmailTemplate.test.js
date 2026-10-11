@@ -45,6 +45,7 @@ const FIXTURE_DATA = {
   expiry: 10,
   reset_link: "https://elexify.online/reset-password?token=abc123",
   new_email: "new@example.com",
+  lockout_minutes: 5,
 };
 
 // Minimal fixture — only the fields every order email is guaranteed to
