@@ -76,6 +76,13 @@ describe('legacy shipment writes', () => {
       set: expect.objectContaining({ awb: 'A' }), expectedState: expect.objectContaining({ shiprocket_status_updated_at: null }) }));
     expect(result.statusChanged).toBe(true);
   });
+  it('marks a full COD legacy order paid on delivery', async () => {
+    const order = { _id: 'o1', order_status: 'shipped', payment_status: 'pending', payment_method: 'cod', grand_total: 500 };
+    transitionOrder.mockResolvedValue({ ...order, order_status: 'delivered', payment_status: 'paid' });
+    await applyLegacyShipment({ order, at, shipment: { current_status: 'Delivered', awb: 'A' } });
+    expect(transitionOrder).toHaveBeenCalledWith(expect.objectContaining({ paymentStatus: 'paid',
+      set: expect.objectContaining({ paid_at: at, cod_remittance: expect.objectContaining({ expected_amount: 500, delivered_at: at }) }) }));
+  });
   it('refuses the legacy path when packages exist', async () => {
     Package.exists.mockResolvedValue({ _id: 'p1' });
     await expect(applyLegacyShipment({ order: { _id: 'o1' }, shipment: {} })).rejects.toThrow('has packages');

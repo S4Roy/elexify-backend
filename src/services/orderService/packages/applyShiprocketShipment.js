@@ -97,6 +97,7 @@ export const applyPackageShipment = async ({ pkg, shipment, at = new Date(), raw
 export const applyLegacyShipment = async ({ order, shipment, at = new Date() }) => {
   const { default: Order } = await import("../../../models/Order.js");
   const { transitionOrder } = await import("../transitionOrder.js");
+  const { codSettlementOnDelivery } = await import("../codRemittance.js");
   const { canTransitionOrder } = await import("../../../constants/orderStatus.js");
   for (let attempt = 0; attempt < 3; attempt++) {
     if (!order) throw new Error("Order no longer exists");
@@ -119,10 +120,12 @@ export const applyLegacyShipment = async ({ order, shipment, at = new Date() }) 
       if (mapped === "shipped" && !order.shipped_at) set.shipped_at = at;
       if (mapped === "delivered" && !order.delivered_at) set.delivered_at = at;
     }
-    // A delivered COD advance is completed only for an actual delivery,
+    // COD (full or Partial balance) is settled only for an actual delivery,
     // never for returns/refunds or a single package on a split order.
-    const paid = !blocked && mapped === "delivered" && (forward || order.order_status === "delivered")
-      && order.payment_method === "cod" && order.payment_status === "advance_paid";
+    const settlement = !blocked && mapped === "delivered" && (forward || order.order_status === "delivered")
+      ? codSettlementOnDelivery(order, order.delivered_at || set.delivered_at || at) : null;
+    const paid = !!settlement;
+    if (settlement) Object.assign(set, settlement.set);
     try {
       const updated = await transitionOrder({
         orderId: order._id, orderStatus: forward ? mapped : undefined,

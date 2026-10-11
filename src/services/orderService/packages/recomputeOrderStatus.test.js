@@ -28,6 +28,20 @@ it('completes delivery and COD only when all ordered quantities are delivered', 
   expect(result.order.order_status).toBe('delivered');
   expect(result.order.payment_status).toBe('paid');
 });
+it('marks full COD paid on carrier delivery and awaits the remittance', async () => {
+  const fullCod = { ...order, payment_status: 'pending', is_partial_cod: false, grand_total: 1200 };
+  Order.findById.mockResolvedValue(fullCod);
+  Package.find.mockResolvedValue([packageFor('delivered'), packageFor('delivered')]);
+  await recomputeOrderStatus({ orderId: 'o1', source: 'carrier' });
+  expect(transitionOrder).toHaveBeenCalledWith(expect.objectContaining({ orderStatus: 'delivered', paymentStatus: 'paid',
+    set: expect.objectContaining({ cod_remittance: expect.objectContaining({ status: 'awaiting', expected_amount: 1200 }) }) }));
+});
+it('leaves full COD unpaid for an admin-driven recompute', async () => {
+  Order.findById.mockResolvedValue({ ...order, payment_status: 'pending', grand_total: 1200 });
+  Package.find.mockResolvedValue([packageFor('delivered'), packageFor('delivered')]);
+  await recomputeOrderStatus({ orderId: 'o1', source: 'application' });
+  expect(transitionOrder.mock.calls[0][0].paymentStatus).toBeUndefined();
+});
 it('does not treat unallocated quantities as delivered', async () => {
   Package.find.mockResolvedValue([packageFor('delivered')]);
   const result = await recomputeOrderStatus({ orderId: 'o1', source: 'carrier' });

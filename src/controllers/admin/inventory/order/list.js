@@ -590,6 +590,8 @@ export const list = async (req, res, next) => {
       data = new OrderResource(result[0]).exec();
       data.manual_payment = result[0].manual_payment || null;
       data.manual_status_history = result[0].manual_status_history || [];
+      data.cod_collection = result[0].cod_collection || null;
+      data.cod_remittance = result[0].cod_remittance || null;
     } else {
       const agg = Order.aggregate(pipeline);
       const result = await Order.aggregatePaginate(agg, options);

@@ -4,6 +4,7 @@ import Order from "../../../models/Order.js";
 import OrderItem from "../../../models/OrderItem.js";
 import Package from "../../../models/Package.js";
 import { transitionOrder } from "../transitionOrder.js";
+import { codSettlementOnDelivery } from "../codRemittance.js";
 import { derivePackageOrderStatus, summarizePackageQuantities } from "../derivePackageOrderStatus.js";
 
 // Recomputes the order's aggregate order_status from its Package docs (see
@@ -44,10 +45,14 @@ const recomputeOnce = async ({ orderId, source = "application", session = null }
   // Carrier snapshots never undo cancellation/return/refund effects or
   // overwrite a newer fulfillment state with a stale aggregate.
   if (source === "carrier" && (fulfillmentBlocked(order) || (derived && !canTransitionOrder(order.order_status, derived)))) derived = null;
-  const paymentStatus = source === "carrier" && !fulfillmentBlocked(order)
+  // COD (full or Partial balance) is collected by the courier: paid once
+  // every package is delivered, then awaits Shiprocket's remittance.
+  const settlement = source === "carrier" && !fulfillmentBlocked(order)
     && derived === "delivered" && nonCancelledPackages.length > 0
     && nonCancelledPackages.every(pkg => pkg.status === "delivered")
-    && order.payment_method === "cod" && order.payment_status === "advance_paid" ? "paid" : undefined;
+    ? codSettlementOnDelivery(order, order.delivered_at || new Date()) : null;
+  const paymentStatus = settlement?.paymentStatus;
+  if (settlement) Object.assign(set, settlement.set);
   if ((derived && derived !== order.order_status) || paymentStatus) {
     if (derived === "shipped" && !order.shipped_at) set.shipped_at = new Date();
     if (derived === "delivered" && !order.delivered_at) set.delivered_at = new Date();

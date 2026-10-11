@@ -6,6 +6,7 @@ import { addressOptions } from "../../../controllers/admin/customerAccount/addre
 import { addressEditSchema } from "../../../validations/admin/customerAccount/address.js";
 import { recordManualPayment } from "../../../controllers/admin/inventory/order/recordManualPayment.js";
 import { manualDispatch, manualDelivered, deliveryAttempt, returnToStore } from "../../../controllers/admin/inventory/order/manualFulfillment.js";
+import { importRemittance, remittanceSummary } from "../../../controllers/admin/inventory/order/codRemittance.js";
 import { tracking } from "../../../controllers/admin/inventory/order/tracking.js";
 import { celebrate, Joi } from "celebrate";
 import { returnOperation } from "../../../controllers/admin/inventory/order/returnOperations.js";
@@ -211,6 +212,12 @@ orderRouter.post("/package/:id/delivery-attempt", requirePermission(PERMISSIONS.
   celebrate({ params: packageIdParam, body: Joi.object({ reason: manualReason }) }), deliveryAttempt);
 orderRouter.post("/package/:id/return-to-store", requirePermission(PERMISSIONS.ORDER_STATUS_MANAGE),
   celebrate({ params: packageIdParam, body: Joi.object({ reason: manualReason }) }), returnToStore);
+
+// Shiprocket COD remittance: what the courier collected vs. what reached us.
+orderRouter.get("/cod-remittance/summary", requirePermission(PERMISSIONS.ORDER_PAYMENT_MANAGE),
+  celebrate({ query: Joi.object({ overdue_days: Joi.number().integer().min(1).max(90).default(10) }) }), remittanceSummary);
+orderRouter.post("/cod-remittance/import", requirePermission(PERMISSIONS.ORDER_PAYMENT_MANAGE),
+  celebrate({ body: Joi.object({ dry_run: Joi.string().valid("true", "false").default("true") }) }), importRemittance);
 
 orderRouter.post(
   "/sync-shiprocket-status",

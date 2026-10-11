@@ -99,6 +99,25 @@ const OrderSchema = new Schema(
       }, { _id: false }),
       default: undefined,
     },
+    // Courier-collected COD: paid at delivery, then remitted by Shiprocket
+    // (services/orderService/codRemittance.js).
+    cod_remittance: {
+      type: new Schema({
+        status: { type: String, enum: ["awaiting", "partially_remitted", "remitted"] },
+        expected_amount: Number,
+        remitted_amount: { type: Number, default: 0 },
+        discrepancy: { type: Number, default: 0 },
+        delivered_at: Date,
+        remitted_at: Date,
+        entries: [{
+          key: String, awb: String, amount: Number, utr: String, remittance_id: String,
+          remitted_at: Date,
+          recorded_by: { type: Schema.Types.ObjectId, ref: "users" },
+          recorded_at: Date,
+        }],
+      }, { _id: false }),
+      default: undefined,
+    },
     manual_status_history: [{
       from: String,
       to: String,
@@ -215,6 +234,10 @@ const OrderSchema = new Schema(
 // Indexes for performance
 OrderSchema.index({ user: 1, created_at: -1 });
 OrderSchema.index({ order_status: 1 });
+OrderSchema.index(
+  { "cod_remittance.status": 1, "cod_remittance.delivered_at": 1 },
+  { partialFilterExpression: { "cod_remittance.status": { $type: "string" } } },
+);
 OrderSchema.index({ "products.product": 1 });
 // Matches the {deleted_at, created_at range} $match every dashboard
 // endpoint (trend/performance/leaderboard/geo-stats) opens with — without
