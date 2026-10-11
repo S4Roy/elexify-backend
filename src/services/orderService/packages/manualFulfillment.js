@@ -238,7 +238,10 @@ export const markManualDelivered = async ({
           amount: Number(codCollection.amount), method: codCollection.method,
           reference: codCollection.reference?.trim() || null,
           collected_by: pkg.delivery_agent?.name || null, collected_at: handoverAt,
+          collected_by_user: pkg.delivery_agent?.user_id || null,
           recorded_by: adminId, recorded_at: now,
+          // Only cash a rider carries away has to be handed in.
+          handover: { status: codCollection.method === "cash" && pkg.fulfillment_mode === "self_delivery" ? "pending" : "not_required" },
         } },
       });
     } else {

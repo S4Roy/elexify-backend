@@ -1,11 +1,13 @@
 import { orderService } from "../../../services/index.js";
+import { cashInHand } from "../../../services/orderService/riderCash.js";
 import { getProofPhoto, listDeliveryStaff, listMyDeliveries, uploadProofPhoto } from "../../../services/orderService/packages/deliveryRun.js";
 
 // Own-delivery riders (delivery.run): every action is scoped to packages
 // assigned to req.auth.user_id — see services/orderService/packages/deliveryRun.js.
 export const myDeliveries = async (req, res, next) => {
   try {
-    res.status(200).json({ status: "success", data: await listMyDeliveries(req.auth.user_id) });
+    const [deliveries, cash] = await Promise.all([listMyDeliveries(req.auth.user_id), cashInHand(req.auth.user_id)]);
+    res.status(200).json({ status: "success", data: { ...deliveries, cash_in_hand: cash } });
   } catch (error) {
     next(error);
   }

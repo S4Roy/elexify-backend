@@ -94,8 +94,17 @@ const OrderSchema = new Schema(
       type: new Schema({
         amount: Number, method: String, reference: String,
         collected_by: String, collected_at: Date,
+        // Staff account of the rider, when assigned (packages/deliveryRun.js).
+        collected_by_user: { type: Schema.Types.ObjectId, ref: "users", default: null },
         recorded_by: { type: Schema.Types.ObjectId, ref: "users" },
         recorded_at: Date,
+        // Cash a rider carries back must be handed in to the office
+        // (services/orderService/riderCash.js). UPI and counter cash never wait.
+        handover: {
+          status: { type: String, enum: ["pending", "received", "not_required"] },
+          handover_id: { type: Schema.Types.ObjectId, ref: "cash_handovers", default: null },
+          received_at: { type: Date, default: null },
+        },
       }, { _id: false }),
       default: undefined,
     },
@@ -234,6 +243,10 @@ const OrderSchema = new Schema(
 // Indexes for performance
 OrderSchema.index({ user: 1, created_at: -1 });
 OrderSchema.index({ order_status: 1 });
+OrderSchema.index(
+  { "cod_collection.handover.status": 1, "cod_collection.collected_by_user": 1 },
+  { partialFilterExpression: { "cod_collection.handover.status": "pending" } },
+);
 OrderSchema.index(
   { "cod_remittance.status": 1, "cod_remittance.delivered_at": 1 },
   { partialFilterExpression: { "cod_remittance.status": { $type: "string" } } },

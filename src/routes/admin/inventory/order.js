@@ -8,6 +8,7 @@ import { recordManualPayment } from "../../../controllers/admin/inventory/order/
 import { manualDispatch, manualDelivered, deliveryAttempt, returnToStore } from "../../../controllers/admin/inventory/order/manualFulfillment.js";
 import { importRemittance, remittanceSummary } from "../../../controllers/admin/inventory/order/codRemittance.js";
 import { deliveryStaff, proofPhoto } from "../../../controllers/admin/delivery/index.js";
+import * as riderCash from "../../../controllers/admin/inventory/order/riderCash.js";
 import { tracking } from "../../../controllers/admin/inventory/order/tracking.js";
 import { celebrate, Joi } from "celebrate";
 import { returnOperation } from "../../../controllers/admin/inventory/order/returnOperations.js";
@@ -217,6 +218,19 @@ orderRouter.post("/package/:id/delivery-attempt", requirePermission(PERMISSIONS.
   celebrate({ params: packageIdParam, body: Joi.object({ reason: manualReason }) }), deliveryAttempt);
 orderRouter.post("/package/:id/return-to-store", requirePermission(PERMISSIONS.ORDER_STATUS_MANAGE),
   celebrate({ params: packageIdParam, body: Joi.object({ reason: manualReason }) }), returnToStore);
+
+// Own riders' COD cash: what each is holding, and recording a handover.
+const riderRef = { rider_user_id: Joi.string().hex().length(24).allow(null, ""), rider_name: Joi.string().trim().max(100).allow(null, "") };
+orderRouter.get("/rider-cash/summary", requirePermission(PERMISSIONS.ORDER_PAYMENT_MANAGE), riderCash.summary);
+orderRouter.get("/rider-cash/pending", requirePermission(PERMISSIONS.ORDER_PAYMENT_MANAGE),
+  celebrate({ query: Joi.object(riderRef).or("rider_user_id", "rider_name") }), riderCash.pending);
+orderRouter.post("/rider-cash/receive", requirePermission(PERMISSIONS.ORDER_PAYMENT_MANAGE),
+  celebrate({ body: Joi.object({
+    ...riderRef,
+    order_ids: Joi.array().items(Joi.string().hex().length(24)).min(1).max(500).unique().required(),
+    amount_received: Joi.number().min(0).precision(2).required(),
+    note: Joi.string().trim().max(500).allow("", null),
+  }).or("rider_user_id", "rider_name") }), riderCash.receive);
 
 // Shiprocket COD remittance: what the courier collected vs. what reached us.
 orderRouter.get("/cod-remittance/summary", requirePermission(PERMISSIONS.ORDER_PAYMENT_MANAGE),
