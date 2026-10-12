@@ -13,6 +13,13 @@ export const SESSION_EXPIRED_HEADER = "X-Session-Expired";
  * If no token is provided, it allows guest access via `x-guest-id`.
  */
 export const accessTokenIfAny = async (req, res, next) => {
+  // Always say whether the token was accepted. The app's HTTP cache (OkHttp)
+  // merges a 304 into the response it stored earlier, so a "1" saved while
+  // a token was expired would otherwise be replayed after the customer signs
+  // in again — and the app would sign them straight back out. An explicit
+  // "0" on every response overwrites it. Responses also vary by token.
+  res.setHeader(SESSION_EXPIRED_HEADER, "0");
+  res.vary("Authorization");
   const authHeader = req.headers.authorization;
   const token = authHeader?.startsWith("Bearer ")
     ? authHeader.split(" ")[1]
@@ -20,6 +27,8 @@ export const accessTokenIfAny = async (req, res, next) => {
   const guest_id = req.headers["x-guest-id"] || null;
   const stale = () => {
     res.setHeader(SESSION_EXPIRED_HEADER, "1");
+    // Never cache a "your session expired" response.
+    res.setHeader("Cache-Control", "no-store");
     // Never execute a customer's write as a guest and then replay it after refresh.
     if (req.method && !['GET', 'HEAD', 'OPTIONS'].includes(req.method) && !req.originalUrl?.includes('/auth/')) {
       return res.status(401).json({ status: 'error', code: 'ACCESS_TOKEN_EXPIRED', message: 'Please renew your session' });
