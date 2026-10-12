@@ -59,10 +59,14 @@ export const updateNotificationPreferences = async (req, res, next) => {
 
     await preferences.save();
 
+    // Marketing opt-in/out is consent (DPDP): keep what changed and where
+    // the customer did it (e.g. the app's after-install onboarding).
+    const source = ["onboarding", "settings"].includes(req.body.source) ? req.body.source : "settings";
     await auditService.recordAudit({
       userId: user_id,
       event: "NOTIFICATION_PREFERENCES_CHANGED",
       req,
+      metadata: marketing ? { marketing, source } : { source },
     });
 
     res.status(200).json({
