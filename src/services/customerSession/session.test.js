@@ -89,3 +89,31 @@ describe('customer session security', () => {
     expect(first.session_id).not.toBe(second.session_id);
   });
 });
+
+describe('session device labels', () => {
+  const native = (headers) => ({ headers: { 'x-auth-client': 'native', ...headers } });
+  it('uses the app headers for phone model, OS and app version', () => {
+    expect(service.describeDevice(native({ 'user-agent': 'okhttp/4.12.0', 'x-client-platform': 'android', 'x-client-os-version': '14',
+      'x-app-version': '1.0.9', 'x-device-model': 'Xiaomi Redmi Note 12' }))).toEqual({
+      deviceName: 'Xiaomi Redmi Note 12', deviceType: 'mobile', browser: 'Elexify app 1.0.9', os: 'Android 14' });
+  });
+  it('infers the platform from native user agents when an older app sends no headers', () => {
+    expect(service.describeDevice(native({ 'user-agent': 'okhttp/4.12.0' }))).toEqual({
+      deviceName: 'Mobile app', deviceType: 'mobile', browser: 'Elexify app', os: 'Android' });
+    expect(service.describeDevice(native({ 'user-agent': 'Elexify/9 CFNetwork/1568 Darwin/24.0.0' })).os).toBe('iOS');
+  });
+  it('keeps browser detection for web sign-ins and strips unprintable header text', () => {
+    expect(service.describeDevice({ headers: { 'user-agent': 'Mozilla/5.0 (Windows NT 10.0) AppleWebKit Chrome/140 Safari/537' } }))
+      .toMatchObject({ deviceName: 'Browser', deviceType: 'desktop', browser: 'Chrome', os: 'Windows' });
+    expect(service.describeDevice(native({ 'x-device-model': 'Pixel\u0000 8\n' })).deviceName).toBe('Pixel 8');
+  });
+  it('relabels app sessions saved before device headers existed', async () => {
+    vi.spyOn(CustomerSession, 'find').mockReturnValue({ select: () => ({ sort: () => ({ limit: () => ({ lean: async () => [
+      { _id: 's1', deviceName: 'Mobile app', deviceType: 'desktop', browser: 'Unknown', os: 'Unknown', userAgent: 'okhttp/4.9.2', lastActivityAt: new Date() },
+    ] }) }) }) });
+    vi.spyOn(CustomerSession, 'findOne').mockReturnValue({ sort: () => ({ select: () => ({ lean: async () => null }) }) });
+    const { sessions } = await service.sessionSummary(String(customerId), null);
+    expect(sessions[0]).toMatchObject({ deviceType: 'mobile', browser: 'Elexify app', os: 'Android' });
+    expect(sessions[0]).not.toHaveProperty('userAgent');
+  });
+});

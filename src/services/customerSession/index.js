@@ -51,14 +51,47 @@ function deliver(pair, session, req, res) {
   res.setHeader('Cache-Control', 'no-store');
   return token;
 }
+// Short, printable header value (client-supplied, so never trusted beyond display).
+const headerText = (req, name, max = 60) => String(req.headers[name] || '').replace(/[^\x20-\x7E]/g, '').trim().slice(0, max) || null;
+
+// Native HTTP stacks don't send a browser-style user agent (Android sends
+// "okhttp/4.x", iOS "<app>/<build> CFNetwork/… Darwin/…"), so the platform
+// is inferred from those when the app's own headers are missing.
+const nativeOs = ua => /okhttp|Android/i.test(ua) ? 'Android' : /CFNetwork|Darwin|iPhone|iPad/i.test(ua) ? 'iOS' : null;
+
+/** Display labels for a session's device. The app sends x-client-* headers (1.0.9+). */
+export function describeDevice(req) {
+  const ua = String(req.headers['user-agent'] || '');
+  if (isNative(req)) {
+    const platform = { android: 'Android', ios: 'iOS' }[String(req.headers['x-client-platform'] || '').toLowerCase()] || nativeOs(ua);
+    const osVersion = headerText(req, 'x-client-os-version', 20);
+    const appVersion = headerText(req, 'x-app-version', 20);
+    return {
+      deviceName: headerText(req, 'x-device-model') || 'Mobile app',
+      deviceType: 'mobile',
+      browser: appVersion ? `Elexify app ${appVersion}` : 'Elexify app',
+      os: platform ? [platform, osVersion].filter(Boolean).join(' ') : 'Unknown',
+    };
+  }
+  return {
+    deviceName: 'Browser', deviceType: /Mobile|Android|iPhone/i.test(ua) ? 'mobile' : 'desktop',
+    browser: /Edg\//.test(ua) ? 'Edge' : /OPR\//.test(ua) ? 'Opera' : /SamsungBrowser\//.test(ua) ? 'Samsung Internet' : /Chrome\//.test(ua) ? 'Chrome' : /Firefox\//.test(ua) ? 'Firefox' : /Safari\//.test(ua) ? 'Safari' : 'Unknown',
+    os: /Android/.test(ua) ? 'Android' : /iPhone|iPad/.test(ua) ? 'iOS' : /Windows/.test(ua) ? 'Windows' : /Mac/.test(ua) ? 'macOS' : /Linux/.test(ua) ? 'Linux' : 'Unknown',
+  };
+}
+
+// Sessions recorded before describeDevice: app logins were stored as a
+// "desktop" with an Unknown browser/OS. Relabel them from the saved user agent.
+const relabelLegacy = ({ userAgent, ...s }) => (s.deviceName === 'Mobile app' && s.browser === 'Unknown'
+  ? { ...s, deviceType: 'mobile', browser: 'Elexify app', os: nativeOs(userAgent || '') || s.os }
+  : s);
+
 export async function createSession(user, req, res, legacyTokenHash) {
   const now = new Date();
   const ua = String(req.headers['user-agent'] || '').slice(0, 512);
   const session = new CustomerSession({ legacyTokenHash, customerId: user._id, credentialChangedAt: user.password_changed_at || null,
     deviceId: String(req.headers['x-device-id'] || crypto.randomUUID()).slice(0, 128),
-    deviceName: isNative(req) ? 'Mobile app' : 'Browser', deviceType: /Mobile|Android|iPhone/i.test(ua) ? 'mobile' : 'desktop',
-    browser: /Edg\//.test(ua) ? 'Edge' : /Chrome\//.test(ua) ? 'Chrome' : /Firefox\//.test(ua) ? 'Firefox' : /Safari\//.test(ua) ? 'Safari' : 'Unknown',
-    os: /Android/.test(ua) ? 'Android' : /iPhone|iPad/.test(ua) ? 'iOS' : /Windows/.test(ua) ? 'Windows' : /Mac/.test(ua) ? 'macOS' : 'Unknown',
+    ...describeDevice(req),
     ipAddress: req.ip, userAgent: ua, lastActivityAt: now, lastRefreshAt: now,
     expiresAt: new Date(+now + policy.absoluteDays * 864e5),
   });
@@ -129,7 +162,7 @@ export async function revokeSession(customerId, sessionId, req, reason = 'SESSIO
 }
 export async function sessionSummary(customerId, currentSid, pagination) {
   const filter = { customerId: new mongoose.Types.ObjectId(customerId), ...activeFilter() };
-  const projection = { deviceName: 1, deviceType: 1, browser: 1, os: 1, lastActivityAt: 1, createdAt: 1, expiresAt: 1 };
+  const projection = { deviceName: 1, deviceType: 1, browser: 1, os: 1, userAgent: 1, lastActivityAt: 1, createdAt: 1, expiresAt: 1 };
   const result = pagination ? await CustomerSession.aggregatePaginate(CustomerSession.aggregate([
     { $match: filter }, { $sort: { lastActivityAt: -1, _id: -1 } }, { $project: projection },
   ]), pagination) : null;
@@ -137,7 +170,7 @@ export async function sessionSummary(customerId, currentSid, pagination) {
     .select(projection).sort({ lastActivityAt: -1, _id: -1 }).limit(100).lean();
   const latestActive = pagination ? await CustomerSession.findOne(filter).sort({ lastActivityAt: -1 }).select('lastActivityAt').lean() : sessions[0];
   const latest = await CustomerSession.findOne({ customerId }).sort({ lastActivityAt: -1 }).select('lastActivityAt').lean();
-  const docs = sessions.map(s => ({ ...s, id: String(s._id), isCurrent: String(s._id) === String(currentSid) }));
+  const docs = sessions.map(s => ({ ...relabelLegacy(s), id: String(s._id), isCurrent: String(s._id) === String(currentSid) }));
   return { ...(result ? { ...result, docs } : { sessions: docs }),
     online: !!latestActive && +latestActive.lastActivityAt > Date.now() - policy.onlineSeconds * 1000,
     lastActivityAt: latest?.lastActivityAt || null };
