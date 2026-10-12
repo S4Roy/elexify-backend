@@ -17,22 +17,36 @@ export const list = async (req, res, next) => {
     };
     const page = Math.min(1000000, positiveInteger(req.query.page, 1));
     const limit = Math.min(100, positiveInteger(req.query.limit, 25));
+    const queryFilter = zero_results === "true"
+      ? [{ $match: { zero_results: { $gt: 0 } } }]
+      : [];
     const [data] = await SearchEvent.aggregate([
       { $match: range ? { created_at: range } : {} },
+      { $group: {
+        _id: "$query",
+        searches: { $sum: 1 },
+        zero_results: { $sum: { $cond: [{ $eq: ["$result_count", 0] }, 1, 0] } },
+        last_searched: { $max: "$created_at" },
+      } },
       { $facet: {
-        summary: [{ $group: { _id: null, searches: { $sum: 1 }, zero_results: { $sum: { $cond: [{ $eq: ["$result_count", 0] }, 1, 0] } } } }],
-        queries: [
-          { $group: { _id: "$query", searches: { $sum: 1 }, zero_results: { $sum: { $cond: [{ $eq: ["$result_count", 0] }, 1, 0] } }, last_searched: { $max: "$created_at" } } },
-          ...(zero_results === "true" ? [{ $match: { zero_results: { $gt: 0 } } }] : []),
+        // Totals cover all queries in the date range, even when the table is filtered.
+        summary: [{ $group: {
+          _id: null,
+          searches: { $sum: "$searches" },
+          zero_results: { $sum: "$zero_results" },
+        } }],
+        docs: [
+          ...queryFilter,
           { $sort: { searches: -1, _id: 1 } },
-          { $facet: { docs: [{ $skip: (page - 1) * limit }, { $limit: limit }], count: [{ $count: "total" }] } },
+          { $skip: (page - 1) * limit },
+          { $limit: limit },
         ],
+        count: [...queryFilter, { $count: "total" }],
       } },
     ]);
-    const rows = data?.queries?.[0];
-    const totalDocs = rows?.count?.[0]?.total || 0;
+    const totalDocs = data?.count?.[0]?.total || 0;
     res.status(200).json({ status: "success", data: {
-      docs: rows?.docs || [], summary: data?.summary?.[0] || { searches: 0, zero_results: 0 },
+      docs: data?.docs || [], summary: data?.summary?.[0] || { searches: 0, zero_results: 0 },
       totalDocs, page, limit, totalPages: Math.ceil(totalDocs / limit),
       hasNextPage: page * limit < totalDocs, hasPrevPage: page > 1,
     } });
