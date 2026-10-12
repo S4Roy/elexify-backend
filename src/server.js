@@ -43,6 +43,7 @@ import { fileURLToPath } from "url";
 import { envs } from "./config/index.js";
 import { buildAllowedOrigins, buildCorsOptions } from "./config/corsOptions.js";
 import { errors } from "celebrate";
+import { runAbandonedCartCycle } from "./services/abandonedCart/index.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -203,6 +204,17 @@ cron.schedule("* * * * *", async () => {
     await notificationService.processNotificationQueue();
   } catch (e) {
     console.error("processNotificationQueue Cron Failed", e);
+  }
+});
+
+// Abandoned-cart recovery: closes recovered/expired episodes, detects newly
+// idle carts and sends due automatic reminders (only when enabled in the
+// admin panel) — see services/abandonedCart.
+cron.schedule("*/10 * * * *", async () => {
+  try {
+    await runAbandonedCartCycle();
+  } catch (e) {
+    console.error("abandonedCart Cron Failed", e);
   }
 });
 

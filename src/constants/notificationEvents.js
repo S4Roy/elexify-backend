@@ -230,6 +230,9 @@ export const NOTIFICATION_EVENTS = {
     channels: ["email", "whatsapp"],
     templateKey: "abandoned_cart",
     messagingVariables: ["name"],
+    // A cart reminder push is promotional: it needs marketing.push consent
+    // (enforced at delivery for the "marketing" push category).
+    pushCategory: "marketing",
   },
 };
 

@@ -38,6 +38,7 @@ import { zohoBooksRouter } from "./zohoBooks.js";
 import { userRouter } from "./user.js";
 import { deliveryRouter } from "./delivery.js";
 import { auditLogsRouter } from "./auditLogs.js";
+import { abandonedCartsRouter } from "./abandonedCarts.js";
 
 const v1AdminRouter = Router();
 // All routes go here
@@ -81,5 +82,6 @@ v1AdminRouter.use("/integration-credentials", integrationCredentialsRouter);
 v1AdminRouter.use("/mobile-update-policies", mobileUpdatePoliciesRouter);
 v1AdminRouter.use("/integrations/zoho-books", zohoBooksRouter);
 v1AdminRouter.use("/audit-logs", auditLogsRouter);
+v1AdminRouter.use("/abandoned-carts", abandonedCartsRouter);
 
 export { v1AdminRouter };

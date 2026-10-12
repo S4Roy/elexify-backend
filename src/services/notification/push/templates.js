@@ -3,7 +3,7 @@ export function validRoute(route) {
   return (
     typeof route === "string" &&
     route.length <= 240 &&
-    /^(\/notifications|\/orders(?:\/[A-Za-z0-9_-]+)?|\/products(?:\/[A-Za-z0-9_-]+)?|\/account\/security|\/\(tabs\)\/categories)$/.test(
+    /^(\/notifications|\/orders(?:\/[A-Za-z0-9_-]+)?|\/products(?:\/[A-Za-z0-9_-]+)?|\/account\/security|\/\(tabs\)\/(?:categories|cart))$/.test(
       route
     )
   );
@@ -72,10 +72,23 @@ export const PUSH_TYPES = Object.freeze([
   "PRICE_DROP",
   "NEW_PRODUCT",
   "CART_ABANDONED",
+  "ABANDONED_CART",
   "ACCOUNT_SECURITY",
   "OUT_FOR_DELIVERY",
 ]);
 export function resolvePushTemplate(event, data = {}) {
+  if (event === "ABANDONED_CART") {
+    const count = Number(data.item_count) || 0;
+    return {
+      type: event,
+      title: "You left something in your cart",
+      body: count > 1
+        ? `Your ${count} items are waiting. Complete your order before they sell out.`
+        : "Your cart is waiting. Complete your order before it sells out.",
+      route: "/(tabs)/cart",
+      data: { type: event, entityType: "cart", entityId: "" },
+    };
+  }
   if (!titles[event]) return null;
   const orderId = String(data.order_id || "");
   const order = /^[A-Za-z0-9_-]{1,100}$/.test(orderId);

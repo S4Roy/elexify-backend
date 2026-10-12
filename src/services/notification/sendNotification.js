@@ -90,7 +90,7 @@ export const sendNotification = async ({ userId, event, data = {}, dedupeKey = n
     if (!user) return { success: false, error: "user_not_found" };
 
     // Isolate push persistence failures from the existing channels.
-    try { await enqueuePushEvent({ userId, event, data, dedupeKey, category: eventMeta.category }); }
+    try { await enqueuePushEvent({ userId, event, data, dedupeKey, category: eventMeta.pushCategory || eventMeta.category }); }
     catch { console.error('push_enqueue_failed', { event, user_id: String(userId) }); }
     const preferences = await getOrCreatePreferences(userId);
 

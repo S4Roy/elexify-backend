@@ -43,7 +43,7 @@ async function accessToken(config) {
 // creates at startup (elexify-mobile .../NotificationChannels.kt): "orders"
 // and "account" are high-importance (heads-up + lock screen), "offers" is
 // default importance so promotions never interrupt.
-const OFFER_TYPES = new Set(["PROMOTIONAL_CAMPAIGN", "BACK_IN_STOCK", "PRICE_DROP", "NEW_PRODUCT", "CART_ABANDONED"]);
+const OFFER_TYPES = new Set(["PROMOTIONAL_CAMPAIGN", "BACK_IN_STOCK", "PRICE_DROP", "NEW_PRODUCT", "CART_ABANDONED", "ABANDONED_CART"]);
 const ACCOUNT_TYPES = /^(ACCOUNT_|PASSWORD_|EMAIL_CHANGED|MOBILE_CHANGED|SUSPICIOUS_)/;
 export function androidChannelFor(type = "") {
   if (OFFER_TYPES.has(type)) return "offers";
@@ -86,6 +86,7 @@ export function webPathFor(route = "") {
   if (/^\/products\/[A-Za-z0-9_-]+$/.test(route)) return route;
   if (route === "/account/security") return route;
   if (route === "/(tabs)/categories") return "/categories";
+  if (route === "/(tabs)/cart") return "/cart";
   return "/account/notifications";
 }
 function webpushFor(notification, ttlSeconds) {

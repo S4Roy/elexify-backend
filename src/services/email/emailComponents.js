@@ -95,6 +95,32 @@ const PARTIALS = {
   </tr>
 </table>`.trim(),
 
+  // {{> cartItemsCard}} — abandoned-cart reminder: expects items[]
+  // (product_name, variation_name, quantity, unit_price, total_price),
+  // more_items_count and cart_total.
+  cartItemsCard: `
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:16px 0;border:1px solid ${COLORS.border};border-radius:8px;">
+  <tr>
+    <td style="padding:6px 20px 16px 20px;font-family:Arial,Helvetica,sans-serif;">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="font-size:13px;">
+        {{#each items}}
+        <tr>
+          <td style="padding:10px 0;border-bottom:1px solid ${COLORS.border};color:${COLORS.text};">
+            {{this.product_name}}{{#if this.variation_name}}<br><span style="color:${COLORS.muted};font-size:12px;">{{this.variation_name}}</span>{{/if}}<br>
+            <span style="color:${COLORS.muted};font-size:12px;">Qty: {{this.quantity}} × {{currency this.unit_price}}</span>
+          </td>
+          <td style="padding:10px 0;border-bottom:1px solid ${COLORS.border};text-align:right;color:${COLORS.text};font-weight:bold;">{{currency this.total_price}}</td>
+        </tr>
+        {{/each}}
+        {{#if more_items_count}}
+        <tr><td colspan="2" style="padding:10px 0;border-bottom:1px solid ${COLORS.border};color:${COLORS.muted};font-size:12px;">+ {{more_items_count}} more item(s)</td></tr>
+        {{/if}}
+        <tr><td style="padding:10px 0 0 0;font-weight:bold;color:${COLORS.text};">Cart Total</td><td style="padding:10px 0 0 0;text-align:right;font-weight:bold;color:${COLORS.text};">{{currency cart_total}}</td></tr>
+      </table>
+    </td>
+  </tr>
+</table>`.trim(),
+
   // {{> orderSummaryCard}} — expects order_number, order_date, payment_method_label,
   // payment_status_label, order_status_label, items[], subtotal, discount,
   // coupon_code, shipping, grand_total, and (Partial COD only) is_partial_cod,

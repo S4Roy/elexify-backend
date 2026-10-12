@@ -349,9 +349,11 @@ ${p("An item on your wishlist just dropped in price.")}
 ${h1("You Left Something Behind")}
 ${p("Hi {{name}},")}
 ${p("You have items waiting in your cart. Complete your purchase before they sell out.")}
-{{> ctaButton url=storefront_url text="Complete Purchase"}}
+{{#if items}}{{> cartItemsCard}}{{/if}}
+{{#if coupon_code}}${p("Use code <strong>{{coupon_code}}</strong> at checkout for a special discount.")}{{/if}}
+{{> ctaButton url=cart_url text="Complete Purchase"}}
 `.trim(),
-    required_variables: ["name", "storefront_url"],
+    required_variables: ["name", "cart_url"],
     is_marketing: true,
   },
 };
