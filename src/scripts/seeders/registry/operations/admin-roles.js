@@ -76,7 +76,7 @@ export default {
   key: "admin-roles",
   name: "Seed starter admin roles",
   description:
-    "Creates starter admin roles (Store Manager, Catalog Manager, Order Manager, Warehouse Staff, Customer Support, Marketing Manager, Content Editor, Accounts & Finance, Read-only Viewer). Never changes a role that already exists.",
+    "Creates starter admin roles (Store Manager, Catalog Manager, Order Manager, Warehouse Staff, Customer Support, Marketing Manager, Content Editor, Accounts & Finance, Delivery Staff, Read-only Viewer). Never changes a role that already exists.",
   type: "SEEDER",
   category: "access",
   version: 1,
