@@ -40,6 +40,7 @@ import { deliveryRouter } from "./delivery.js";
 import { auditLogsRouter } from "./auditLogs.js";
 import { abandonedCartsRouter } from "./abandonedCarts.js";
 import { stockAlertsRouter } from "./stockAlerts.js";
+import { reportsRouter } from "./reports.js";
 
 const v1AdminRouter = Router();
 // All routes go here
@@ -85,5 +86,6 @@ v1AdminRouter.use("/integrations/zoho-books", zohoBooksRouter);
 v1AdminRouter.use("/audit-logs", auditLogsRouter);
 v1AdminRouter.use("/abandoned-carts", abandonedCartsRouter);
 v1AdminRouter.use("/stock-alerts", stockAlertsRouter);
+v1AdminRouter.use("/reports", reportsRouter);
 
 export { v1AdminRouter };
