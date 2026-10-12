@@ -21,6 +21,7 @@ export const list = async (req, res, next) => {
       sort_order = -1,
       _id = null,
       status = null,
+      priority = null,
       from_date = null,
       to_date = null,
     } = req.query;
@@ -42,8 +43,17 @@ export const list = async (req, res, next) => {
     if (status) {
       matchFilter.status = { $in: status.split(",") };
     }
+    if (priority === 'normal') matchFilter.$and = [{ $or: [{ priority: 'normal' }, { priority: { $exists: false } }] }];
+    else if (priority) matchFilter.priority = priority;
     if (from_date || to_date) matchFilter.created_at = istRange(from_date, to_date);
-    const pipeline = [{ $match: matchFilter }];
+    const pipeline = [{ $match: matchFilter }, { $lookup: {
+      from: 'contact_us_messages', let: { contactId: '$_id' },
+      pipeline: [
+        { $match: { $expr: { $eq: ['$contact_id', '$$contactId'] } } },
+        { $sort: { created_at: -1, _id: -1 } }, { $limit: 1 },
+        { $project: { kind: 1, created_at: 1, author_name: 1, delivery_status: 1 } },
+      ], as: 'latest_message',
+    } }, { $set: { latest_message: { $arrayElemAt: ['$latest_message', 0] } } }];
     let data;
     if (slug) {
       pipeline.push({ $match: { slug: slug } });

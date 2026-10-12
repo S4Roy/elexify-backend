@@ -11,11 +11,11 @@ export const edit = celebrate({
       }),
 
     status: Joi.string()
-      .valid("answered", "archived", "spam")
+      .valid("pending", "answered", "archived", "spam")
       .optional()
-      .allow("", null)
       .messages({
-        "any.only": "Status must be either 'answered' or 'archived' or 'spam'",
+        "any.only": "Invalid enquiry status",
       }),
+    priority: Joi.string().valid('low', 'normal', 'high', 'urgent').optional(),
   }),
 });

@@ -22,3 +22,13 @@ it("searches customer contact and enquiry fields literally while preserving stat
   expect(search.test('a+b@example.com')).toBe(true);
   expect(search.test('ab@exampleXcom')).toBe(false);
 });
+
+it('includes legacy enquiries in the normal-priority filter', async () => {
+  const res = { status: vi.fn().mockReturnThis(), json: vi.fn() };
+  const next = vi.fn();
+  await list({ query: { priority: 'normal' }, params: {}, __: value => value }, res, next);
+  expect(next).not.toHaveBeenCalled();
+  expect(ContactUs.aggregate.mock.calls[0][0][0].$match.$and).toEqual([
+    { $or: [{ priority: 'normal' }, { priority: { $exists: false } }] },
+  ]);
+});

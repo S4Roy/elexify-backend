@@ -47,12 +47,15 @@ const ContactUsSchema = new Schema(
       default: "pending",
     },
     is_read: { type: Boolean, default: false },
+    priority: { type: String, enum: ['low', 'normal', 'high', 'urgent'], default: 'normal' },
 
     // admin responses / notes
     notes: [
       {
         added_by: { type: Types.ObjectId, ref: "users" },
         content: { type: String, trim: true },
+        kind: { type: String, enum: ['note', 'activity'], default: 'note' },
+        author_name: { type: String, default: 'Support team' },
         created_at: { type: Date, default: Date.now },
       },
     ],
