@@ -3,6 +3,7 @@ import { logger } from "../../config/logger.js";
 
 // Count first-page requests, including autocomplete, without storing customer identifiers.
 export function recordSearch(query, page, resultCount) {
+  if (process.env.SEARCH_INSIGHTS_LEGACY_REQUESTS_ENABLED === "false") return;
   if (typeof query !== "string" || Number(page) !== 1) return;
   const normalized = query.normalize("NFKC").trim().replace(/\s+/g, " ").toLowerCase().slice(0, 200);
   if (!normalized || !Number.isFinite(resultCount) || resultCount < 0) return;

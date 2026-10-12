@@ -35,5 +35,5 @@ it("uses a single top-level facet with matching filters for rows and count", asy
   expect(docs).toContainEqual({ $limit: 10 });
   expect(summary[0].$group.searches).toEqual({ $sum: "$searches" });
   expect(summary[0].$group.zero_results).toEqual({ $sum: "$zero_results" });
-  expect(res.json.mock.calls[0][0].data).toMatchObject({ docs: [], totalDocs: 0, summary: { searches: 0, zero_results: 0 } });
+  expect(res.json.mock.calls[0][0].data).toMatchObject({ docs: [], totalDocs: 0, summary: { searches: 0, zero_results: 0, measured: 0 } });
 });

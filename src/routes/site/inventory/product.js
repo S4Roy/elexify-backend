@@ -1,9 +1,15 @@
+import rateLimit from "express-rate-limit";
+import { record as recordSearchEvent } from "../../../controllers/site/inventory/product/searchEvent.js";
 import { requireRecaptcha } from "../../../middleware/recaptcha.js";
 import { Router } from "express";
 import { inventoryController } from "../../../controllers/site/index.js";
 import { inventoryValidation } from "../../../validations/site/index.js";
 
 const productRouter = Router();
+// Independent of the search endpoint: an analytics limit never limits searching.
+productRouter.post("/search-events", rateLimit({
+  windowMs: 60 * 1000, limit: 120, standardHeaders: true, legacyHeaders: false,
+}), recordSearchEvent);
 
 productRouter.get(
   "/list",
