@@ -2,6 +2,7 @@ import crypto from "crypto";
 import { StatusError } from "../../../../config/index.js";
 import { orderService, notificationService, auditService } from "../../../../services/index.js";
 import { getRazorpayClient, getRazorpayConfig } from "../../../../services/integrationCredentials/razorpay.js";
+import { logCheckoutFailure } from "../../../../services/orderService/logCheckoutFailure.js";
 import { buildOrderContext, paymentContext } from "../../../../services/audit/paymentFailureContext.js";
 
 export const verifyPayment = async (req, res, next) => {
@@ -52,7 +53,13 @@ export const verifyPayment = async (req, res, next) => {
       data: { order: result.order },
     });
   } catch (error) {
-    console.error("❌ verifyPayment error:", error?.message || error);
-    next(error);
+    logCheckoutFailure("verify_payment", error, req, {
+      order_id: req.body?.order_id,
+      razorpay_order_id: req.body?.razorpay_order_id,
+      razorpay_payment_id: req.body?.razorpay_payment_id,
+    });
+    next(error?.statusCode ? error : StatusError.serverError(
+      "We couldn't confirm your payment yet. If money was deducted, your order will update automatically shortly.",
+    ));
   }
 };

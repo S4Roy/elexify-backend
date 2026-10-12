@@ -32,6 +32,7 @@ import { reconcileProviderOrderAttempt } from "../../../../services/paymentServi
 import { recordOperationalEvent } from "../../../../services/observability/recordOperationalEvent.js";
 import { injectPlacementFault } from "../../../../services/orderService/injectPlacementFault.js";
 import { nextOrderNumber } from "../../../../services/orderService/generateOrderNumber.js";
+import { logCheckoutFailure } from "../../../../services/orderService/logCheckoutFailure.js";
 import { notificationService } from "../../../../services/index.js";
 
 export const add = async (req, res, next, adminContext = null) => {
@@ -731,7 +732,18 @@ const address = await Address.findOne({
       req._checkoutRetryCount = (req._checkoutRetryCount || 0) + 1;
       return add(req, res, next, adminContext);
     }
+    const failureContext = {
+      idempotency_key: idempotencyKey,
+      address_id: req.body?.address_id,
+      payment_method: req.body?.payment_method,
+      coupon_code: req.body?.coupon_code || null,
+      is_direct_checkout: Boolean(req.body?.isDirectCheckout),
+      expected_total: req.body?.expected_total ?? null,
+      admin_actor: adminContext?.actor ? String(adminContext.actor) : null,
+      retries: req._checkoutRetryCount || 0,
+    };
     if (isTransientTransactionError) {
+      logCheckoutFailure("place_order", error, req, failureContext);
       return next(StatusError.serviceUnavailable(
         "Checkout temporarily conflicted with another request; retry with the same idempotency key",
       ));
@@ -740,7 +752,9 @@ const address = await Address.findOne({
       const existing = await Order.findOne({ user: req.auth?.user_id, idempotency_key: idempotencyKey });
       if (existing) {
         if (existing.idempotency_fingerprint !== requestFingerprint) {
-          return next(StatusError.conflict("Idempotency key was already used for a different checkout request"));
+          const conflict = StatusError.conflict("Idempotency key was already used for a different checkout request");
+          logCheckoutFailure("place_order", conflict, req, failureContext);
+          return next(conflict);
         }
         const checkoutKeyId = existing.payment_meta?.razorpay_order_id
           ? (await getRazorpayConfig()).key_id
@@ -764,7 +778,11 @@ const address = await Address.findOne({
         });
       }
     }
-    console.error("❌ Order creation failed:", error.message);
-    next(error);
+    logCheckoutFailure("place_order", error, req, failureContext);
+    // Unexpected failures (DB, provider SDK, bugs) carry internal wording —
+    // the full detail is in the log above; the customer gets a clear retry.
+    next(error?.statusCode ? error : StatusError.serverError(
+      "We couldn't place your order right now. Please try again in a moment.",
+    ));
   }
 };
