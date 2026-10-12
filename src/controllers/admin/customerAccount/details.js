@@ -38,6 +38,19 @@ const orderSummary = async (userId) => {
   };
 };
 
+// Last location the app/website reported (see services/location/customerLocation.js).
+const lastLocation = (location) => (location?.recorded_at ? {
+  pincode: location.pincode || null,
+  city: location.city || null,
+  state: location.state || null,
+  serviceable: !!location.serviceable,
+  latitude: location.latitude ?? null,
+  longitude: location.longitude ?? null,
+  accuracy_m: location.accuracy_m ?? null,
+  precise: location.precise ?? null,
+  recorded_at: location.recorded_at,
+} : null);
+
 export const details = async (req, res, next) => {
   try {
     const { id } = req.params;
@@ -73,6 +86,7 @@ export const details = async (req, res, next) => {
         status: customer.status,
         created_at: customer.created_at,
         updated_at: customer.updated_at,
+        last_location: lastLocation(customer.last_location),
         stats,
         recent_orders,
       },

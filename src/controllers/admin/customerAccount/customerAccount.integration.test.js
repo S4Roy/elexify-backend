@@ -82,6 +82,25 @@ suite("admin customer account API", () => {
     expect(payload.data.pending_mobile).not.toContain("922222"); // never the full number
   });
 
+  it("includes the customer's last location, or null when never shared", async () => {
+    const recorded_at = new Date("2026-10-12T07:30:00Z");
+    const located = await createCustomer({
+      last_location: { pincode: "700073", city: "Kolkata", state: "West Bengal", serviceable: true,
+        latitude: 22.572646, longitude: 88.363895, accuracy_m: 18, precise: true,
+        geo: { type: "Point", coordinates: [88.363895, 22.572646] }, recorded_at },
+    });
+    const never = await createCustomer({ email: "never.shared@example.com", mobile: "9333333333" });
+
+    const fetch = async (id) => {
+      const res = mockRes();
+      await details(mockReq({ params: { id: String(id) } }), res, (err) => { throw err; });
+      return res.json.mock.calls[0][0].data.last_location;
+    };
+    expect(await fetch(located._id)).toEqual({ pincode: "700073", city: "Kolkata", state: "West Bengal",
+      serviceable: true, latitude: 22.572646, longitude: 88.363895, accuracy_m: 18, precise: true, recorded_at });
+    expect(await fetch(never._id)).toBeNull();
+  });
+
   it("requirePermission blocks a role without the permission (403)", async () => {
     const admin = await createAdmin("staff");
     const req = mockReq({ auth: { role: "staff", user_id: admin._id } });
