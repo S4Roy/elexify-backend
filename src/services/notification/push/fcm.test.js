@@ -7,7 +7,7 @@ vi.mock("google-auth-library", () => ({
 }));
 import { GoogleAuth } from "google-auth-library";
 import { getIntegrationConfig } from "../../integrationCredentials/index.js";
-import { sendFcm, webPathFor } from "./fcm.js";
+import { apsFor, sendFcm, webPathFor } from "./fcm.js";
 const fetchMock = vi.fn();
 const device = {
   token: "device-secret",
@@ -57,11 +57,13 @@ it("submits a bounded, minimal FCM v1 payload with stable collapse identifiers",
   expect(payload.message.data).toEqual({
     notificationId: "notification-id",
     type: "ORDER_SHIPPED",
-    link: "/account",
+    link: "/account/notifications",
   });
   expect(payload.message.android.notification.tag).toBe("notification-id");
   expect(payload.message.webpush.notification).toMatchObject({ title: "Shipped", tag: "notification-id", icon: "/icons/icon-192.png" });
   expect(payload.message.webpush.headers.Urgency).toBe("high");
+  expect(payload.message.apns.headers["apns-priority"]).toBe("10");
+  expect(payload.message.apns.payload.aps).toEqual({ sound: "default", "interruption-level": "active", "thread-id": "orders" });
   expect(payload.message.apns.headers["apns-collapse-id"]).toBe(
     "notification-id"
   );
@@ -101,6 +103,13 @@ it("maps app routes to storefront pages for browser notifications", () => {
   expect(webPathFor("/products/usb-c-cable")).toBe("/products/usb-c-cable");
   expect(webPathFor("/(tabs)/categories")).toBe("/categories");
   expect(webPathFor("/account/security")).toBe("/account/security");
-  expect(webPathFor("/notifications")).toBe("/account");
-  expect(webPathFor(undefined)).toBe("/account");
+  expect(webPathFor("/notifications")).toBe("/account/notifications");
+  expect(webPathFor(undefined)).toBe("/account/notifications");
+});
+
+it("plays a sound on iOS for order/account updates but keeps offers passive", () => {
+  expect(apsFor({ type: "PASSWORD_CHANGED" })).toMatchObject({ sound: "default", "interruption-level": "active", "thread-id": "account" });
+  const offer = apsFor({ type: "PRICE_DROP", image_url: "https://cdn/x.jpg" });
+  expect(offer.sound).toBeUndefined();
+  expect(offer).toMatchObject({ "interruption-level": "passive", "thread-id": "offers", "mutable-content": 1 });
 });

@@ -65,6 +65,19 @@ function androidNotification(notification) {
   };
 }
 
+// iOS has no channels: without aps.sound a push arrives silently. Order and
+// account updates play the default sound; offers are "passive" — they land
+// in Notification Centre without sound or lighting the screen (iOS 15+).
+export function apsFor(notification) {
+  const offers = androidChannelFor(notification.type) === "offers";
+  return {
+    ...(offers ? {} : { sound: "default" }),
+    "interruption-level": offers ? "passive" : "active",
+    "thread-id": androidChannelFor(notification.type),
+    ...(notification.image_url ? { "mutable-content": 1 } : {}),
+  };
+}
+
 // Storefront page for an app route (templates.js validRoute), so a browser
 // notification opens the same place the app would.
 export function webPathFor(route = "") {
@@ -73,7 +86,7 @@ export function webPathFor(route = "") {
   if (/^\/products\/[A-Za-z0-9_-]+$/.test(route)) return route;
   if (route === "/account/security") return route;
   if (route === "/(tabs)/categories") return "/categories";
-  return "/account";
+  return "/account/notifications";
 }
 function webpushFor(notification, ttlSeconds) {
   const site = (envs.FRONTEND_URL || "").replace(/\/$/, "");
@@ -104,6 +117,7 @@ export async function sendFcm(device, notification) {
   const ttlSeconds = Math.max(0, Math.min(86400,
     Math.floor((new Date(notification.expires_at).getTime() - Date.now()) / 1000)));
   try {
+    const channelFor = androidChannelFor(notification.type);
     const access = await accessToken(c);
     if (!access.token)
       return { success: false, code: "FCM_AUTH_ERROR", retry: false };
@@ -146,7 +160,9 @@ export async function sendFcm(device, notification) {
                 "apns-expiration": String(
                   Math.floor(new Date(notification.expires_at).getTime() / 1000)
                 ),
+                "apns-priority": channelFor === "offers" ? "5" : "10",
               },
+              payload: { aps: apsFor(notification) },
             },
           },
         }),
