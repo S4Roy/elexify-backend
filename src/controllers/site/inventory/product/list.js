@@ -1,3 +1,4 @@
+import { recordSearch } from "../../../../services/searchInsights/recordSearch.js";
 import mongoose from "mongoose";
 import Category from "../../../../models/Category.js";
 import Product from "../../../../models/Product.js";
@@ -762,6 +763,8 @@ export const list = async (req, res, next) => {
       Product.aggregate([...productPipeline, ...pipeline]),
       options
     );
+
+    recordSearch(search_key, page, result.totalDocs);
 
     res.status(200).json({
       status: "success",
