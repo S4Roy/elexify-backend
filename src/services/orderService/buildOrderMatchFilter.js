@@ -1,6 +1,7 @@
 import mongoose from "mongoose";
 import { sourceCondition } from "../legacyImport/filter.js";
 import { StatusError } from "../../config/index.js";
+import { istRange } from "../../config/storeTime.js";
 
 // Shared between the Orders list (controllers/admin/inventory/order/list.js)
 // and the Orders export, so "export what I'm currently looking at" can never
@@ -29,15 +30,7 @@ export const buildOrderMatchFilter = (query, auth) => {
   if (order_status) matchFilter.order_status = { $in: order_status.split(",") };
   if (payment_status) matchFilter.payment_status = { $in: payment_status.split(",") };
   if (payment_method) matchFilter.payment_method = { $in: payment_method.split(",") };
-  if (from_date || to_date) {
-    matchFilter.created_at = {};
-    if (from_date) matchFilter.created_at.$gte = new Date(from_date);
-    if (to_date) {
-      const end = new Date(to_date);
-      end.setHours(23, 59, 59, 999);
-      matchFilter.created_at.$lte = end;
-    }
-  }
+  if (from_date || to_date) matchFilter.created_at = istRange(from_date, to_date);
   if (search_key) {
     matchFilter.$or = [
       { id: { $regex: search_key, $options: "i" } },

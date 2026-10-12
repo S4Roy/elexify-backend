@@ -3,22 +3,13 @@ import AbandonedCart from "../../models/AbandonedCart.js";
 import { envs, StatusError } from "../../config/index.js";
 import { auditService } from "../../services/index.js";
 import { deliverReminder, getReachability, getSettings } from "../../services/abandonedCart/index.js";
+import { istRange } from "../../config/storeTime.js";
 
 const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 const MANUAL_COOLDOWN_MS = 60 * 60 * 1000;
 const BULK_LIMIT = 100;
 
-const dateRange = (from, to) => {
-  if (!from && !to) return null;
-  const range = {};
-  if (from) range.$gte = new Date(from);
-  if (to) {
-    const end = new Date(to);
-    end.setHours(23, 59, 59, 999);
-    range.$lte = end;
-  }
-  return range;
-};
+const dateRange = istRange;
 
 // Admin "Abandoned Carts" list — episodes maintained by
 // services/abandonedCart, joined with the customer and annotated with the

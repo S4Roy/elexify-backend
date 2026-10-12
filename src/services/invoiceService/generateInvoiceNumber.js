@@ -1,10 +1,11 @@
 import Counter from "../../models/Counter.js";
+import { istFinancialYearStart } from "../../config/storeTime.js";
 
-// Indian financial year runs April -> March. A date in Jan-Mar belongs to
-// the FY that started the previous April.
+// Indian financial year runs April -> March (by the IST calendar date — an
+// invoice at 00:30 IST on 1 April belongs to the new FY). A date in Jan-Mar
+// belongs to the FY that started the previous April.
 export const getFinancialYear = (date = new Date()) => {
-  const year = date.getFullYear();
-  const startYear = date.getMonth() >= 3 ? year : year - 1; // month is 0-indexed, 3 = April
+  const startYear = istFinancialYearStart(date);
   const endYearShort = String((startYear + 1) % 100).padStart(2, "0");
   return `${startYear}-${endYearShort}`;
 };

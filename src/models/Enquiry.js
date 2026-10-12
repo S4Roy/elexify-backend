@@ -1,5 +1,6 @@
 // models/Enquiry.js
 import mongoose from "mongoose";
+import { istDayEnd, istDayStart, istYmd } from "../config/storeTime.js";
 import mongooseAggregatePaginate from "mongoose-aggregate-paginate-v2";
 
 const { Schema, model, Types } = mongoose;
@@ -86,12 +87,11 @@ const EnquirySchema = new Schema(
 );
 EnquirySchema.pre("save", async function (next) {
   if (!this.custom_id) {
-    const datePart = new Date().toISOString().slice(0, 10).replace(/-/g, ""); // YYYYMMDD
+    // Numbered per IST day: ENQ-YYYYMMDD-0001.
+    const today = istYmd();
+    const datePart = today.replace(/-/g, "");
     const count = await this.constructor.countDocuments({
-      created_at: {
-        $gte: new Date().setHours(0, 0, 0, 0),
-        $lt: new Date().setHours(23, 59, 59, 999),
-      },
+      created_at: { $gte: istDayStart(today), $lte: istDayEnd(today) },
     });
     this.custom_id = `ENQ-${datePart}-${String(count + 1).padStart(4, "0")}`;
   }

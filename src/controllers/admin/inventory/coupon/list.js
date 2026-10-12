@@ -3,6 +3,7 @@ import { StatusError } from "../../../../config/index.js";
 import { envs } from "../../../../config/index.js";
 import CouponResource from "../../../../resources/CouponResource.js";
 import mongoose from "mongoose";
+import { istDayEnd, istDayStart } from "../../../../config/storeTime.js";
 
 /**
  * Coupon List / Details
@@ -73,12 +74,10 @@ export const list = async (req, res, next) => {
     if (from_date || to_date) {
       matchFilter.$and = matchFilter.$and || [];
       if (from_date) {
-        matchFilter.$and.push({ end_date: { $gte: new Date(from_date) } });
+        matchFilter.$and.push({ end_date: { $gte: istDayStart(from_date) } });
       }
       if (to_date) {
-        const end = new Date(to_date);
-        end.setHours(23, 59, 59, 999);
-        matchFilter.$and.push({ start_date: { $lte: end } });
+        matchFilter.$and.push({ start_date: { $lte: istDayEnd(to_date) } });
       }
     }
 

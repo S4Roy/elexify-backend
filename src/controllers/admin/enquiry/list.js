@@ -3,6 +3,7 @@ import { StatusError } from "../../../config/index.js";
 import { envs } from "../../../config/index.js";
 import EnquiryResource from "../../../resources/EnquiryResource.js";
 import mongoose from "mongoose";
+import { istRange } from "../../../config/storeTime.js";
 
 /**
  * Enquiry List
@@ -46,15 +47,7 @@ export const list = async (req, res, next) => {
     if (type) {
       matchFilter.type = { $in: type.split(",") };
     }
-    if (from_date || to_date) {
-      matchFilter.created_at = {};
-      if (from_date) matchFilter.created_at.$gte = new Date(from_date);
-      if (to_date) {
-        const end = new Date(to_date);
-        end.setHours(23, 59, 59, 999);
-        matchFilter.created_at.$lte = end;
-      }
-    }
+    if (from_date || to_date) matchFilter.created_at = istRange(from_date, to_date);
     const pipeline = [
       { $match: matchFilter },
 

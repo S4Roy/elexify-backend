@@ -15,6 +15,7 @@ import StockTransaction from "../../models/StockTransaction.js";
 import { StatusError } from "../../config/index.js";
 import { ORDER_STATUS } from "../../constants/orderStatus.js";
 import { getOrderPolicy } from "./orderPolicy.js";
+import { istParts } from '../../config/storeTime.js';
 
 
 const activeStatuses = ["requested"];
@@ -64,7 +65,7 @@ export const createReturnRequest = async ({ orderId, customerId, items, reason, 
         const count = await Media.countDocuments({ _id: { $in: evidence }, created_by: customerId, type: 'image', deleted_at: null }).session(session);
         if (count !== evidence.length) throw StatusError.badRequest('Invalid evidence images');
       }
-      const year = new Date().getFullYear();
+      const year = istParts().year;
       const counter = await Counter.findOneAndUpdate({ _id: `return_${year}` }, { $inc: { seq: 1 } }, { upsert: true, new: true, session });
       const address = order.shipping_address_snapshot || await snapshotAddress(await Address.findById(order.shipping_address).session(session));
       const autoApprove = Boolean(policy.return_auto_approve);

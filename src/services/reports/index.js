@@ -2,12 +2,13 @@ import ExcelJS from "exceljs";
 import Order from "../../models/Order.js";
 import { StatusError } from "../../config/index.js";
 import { dashboardHelper } from "../../helpers/index.js";
+import { STORE_TIMEZONE, addDaysYmd, addMonthsYm, istYmd } from "../../config/storeTime.js";
 
 // Admin sales reports. Each report declares its columns once — the admin
 // table and the Excel export both render from them — and uses the same
 // date-range, revenue and segment (channel/payment) rules as the dashboard
 // (helpers/dashboard), so a report total always matches the dashboard for
-// the same filters.
+// the same filters. Days, weeks and months are IST (config/storeTime.js).
 
 const { EXCLUDED_REVENUE_STATUSES } = dashboardHelper;
 const EXPORT_ROW_LIMIT = 50000;
@@ -100,16 +101,19 @@ const lineTotals = {
 
 const PERIOD_FORMATS = { day: "%Y-%m-%d", week: "%Y-%m-%d", month: "%Y-%m" };
 
+// Every IST day / week (starting Monday) / month in the range, so the
+// series has no gaps.
 const listPeriods = (startDate, endDate, groupBy) => {
   const periods = [];
-  const cursor = new Date(Date.UTC(startDate.getUTCFullYear(), startDate.getUTCMonth(), startDate.getUTCDate()));
-  if (groupBy === "month") cursor.setUTCDate(1);
-  if (groupBy === "week") cursor.setUTCDate(cursor.getUTCDate() - ((cursor.getUTCDay() + 6) % 7)); // Monday
-  while (cursor <= endDate && periods.length < 1000) {
-    periods.push(groupBy === "month" ? cursor.toISOString().slice(0, 7) : cursor.toISOString().slice(0, 10));
-    if (groupBy === "month") cursor.setUTCMonth(cursor.getUTCMonth() + 1);
-    else cursor.setUTCDate(cursor.getUTCDate() + (groupBy === "week" ? 7 : 1));
+  const first = istYmd(startDate);
+  const last = istYmd(endDate);
+  if (groupBy === "month") {
+    for (let key = first.slice(0, 7); key <= last.slice(0, 7) && periods.length < 1000; key = addMonthsYm(key, 1)) periods.push(key);
+    return periods;
   }
+  let key = first;
+  if (groupBy === "week") key = addDaysYmd(first, -((new Date(`${first}T00:00:00Z`).getUTCDay() + 6) % 7)); // Monday
+  for (; key <= last && periods.length < 1000; key = addDaysYmd(key, groupBy === "week" ? 7 : 1)) periods.push(key);
   return periods;
 };
 
@@ -117,7 +121,7 @@ const salesReport = async (query) => {
   const groupBy = ["day", "week", "month"].includes(query.group_by) ? query.group_by : "day";
   const { match, startDate, endDate } = baseMatch(query);
   const periodDate = groupBy === "week"
-    ? { $dateTrunc: { date: "$created_at", unit: "week", startOfWeek: "monday" } }
+    ? { $dateTrunc: { date: "$created_at", unit: "week", startOfWeek: "monday", timezone: STORE_TIMEZONE } }
     : "$created_at";
   const sums = {
     orders: sumIf(isRevenue, 1),
@@ -134,7 +138,7 @@ const salesReport = async (query) => {
   const [grouped, [totals = {}]] = await Promise.all([
     Order.aggregate([
       { $match: match },
-      { $group: { _id: { $dateToString: { format: PERIOD_FORMATS[groupBy], date: periodDate } }, ...sums } },
+      { $group: { _id: { $dateToString: { format: PERIOD_FORMATS[groupBy], date: periodDate, timezone: STORE_TIMEZONE } }, ...sums } },
     ]).allowDiskUse(true),
     Order.aggregate([{ $match: match }, { $group: { _id: null, ...sums } }]).allowDiskUse(true),
   ]);
@@ -379,7 +383,7 @@ export const buildReportWorkbook = async (type, query = {}) => {
 
   const workbook = new ExcelJS.Workbook();
   const sheet = workbook.addWorksheet(report.title.slice(0, 31));
-  sheet.addRow([`${report.title} — ${startDate.toISOString().slice(0, 10)} to ${endDate.toISOString().slice(0, 10)}`]).font = { bold: true, size: 13 };
+  sheet.addRow([`${report.title} — ${istYmd(startDate)} to ${istYmd(endDate)} (IST)`]).font = { bold: true, size: 13 };
   sheet.addRow([]);
   const header = sheet.addRow(report.columns.map((c) => c.header));
   header.font = { bold: true };

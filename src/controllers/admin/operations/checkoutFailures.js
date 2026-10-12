@@ -1,6 +1,7 @@
 import mongoose from "mongoose";
 import CheckoutFailure from "../../../models/CheckoutFailure.js";
 import { envs } from "../../../config/index.js";
+import { istRange } from "../../../config/storeTime.js";
 
 const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
@@ -14,15 +15,7 @@ export const list = async (req, res, next) => {
     if (stages.length) match.stage = { $in: stages };
     if (["warning", "error"].includes(level)) match.level = level;
     if (user_id && mongoose.Types.ObjectId.isValid(user_id)) match.user_id = new mongoose.Types.ObjectId(user_id);
-    if (from || to) {
-      match.created_at = {};
-      if (from) match.created_at.$gte = new Date(from);
-      if (to) {
-        const end = new Date(to);
-        end.setHours(23, 59, 59, 999);
-        match.created_at.$lte = end;
-      }
-    }
+    if (from || to) match.created_at = istRange(from, to);
 
     const pipeline = [
       { $match: match },

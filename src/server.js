@@ -14,7 +14,12 @@ import mongoose, { mongooseConnection } from "./config/mongoose.js";
 import { ensureOwnerAccess } from "./services/rbac/owner.js";
 import * as middleware from "./middleware/index.js";
 import i18n from "i18n";
-import cron from "node-cron";
+import nodeCron from "node-cron";
+import { STORE_TIMEZONE } from "./config/storeTime.js";
+
+// Every scheduled job runs on IST (e.g. "30 2 * * *" = 2:30 am IST),
+// whatever the server's own timezone.
+const cron = { schedule: (expression, task) => nodeCron.schedule(expression, task, { timezone: STORE_TIMEZONE }) };
 import { processZohoQueue } from "./services/zoho/ZohoSyncQueue.js";
 
 cron.schedule("0 * * * *", () => { cleanupSessions().catch(() => console.error("Customer session cleanup failed")); });

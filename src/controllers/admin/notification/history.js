@@ -1,6 +1,7 @@
 import mongoose from "mongoose";
 import NotificationLog from "../../../models/NotificationLog.js";
 import { envs } from "../../../config/index.js";
+import { istRange } from "../../../config/storeTime.js";
 
 export const history = async (req, res, next) => {
   try {
@@ -20,15 +21,7 @@ export const history = async (req, res, next) => {
     if (event) match.event = event;
     if (channel) match.channel = channel;
     if (status) match.status = status;
-    if (from || to) {
-      match.created_at = {};
-      if (from) match.created_at.$gte = new Date(from);
-      if (to) {
-        const end = new Date(to);
-        end.setHours(23, 59, 59, 999);
-        match.created_at.$lte = end;
-      }
-    }
+    if (from || to) match.created_at = istRange(from, to);
 
     const pipeline = [
       { $match: match },

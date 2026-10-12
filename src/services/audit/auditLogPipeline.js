@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { istRange } from "../../config/storeTime.js";
 
 const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
@@ -16,15 +17,7 @@ export const buildAuditLogPipeline = (query = {}) => {
   }
   if (actor_id && mongoose.Types.ObjectId.isValid(actor_id)) match.actor_id = new mongoose.Types.ObjectId(actor_id);
   if (user_id && mongoose.Types.ObjectId.isValid(user_id)) match.user_id = new mongoose.Types.ObjectId(user_id);
-  if (from || to) {
-    match.created_at = {};
-    if (from) match.created_at.$gte = new Date(from);
-    if (to) {
-      const end = new Date(to);
-      end.setHours(23, 59, 59, 999);
-      match.created_at.$lte = end;
-    }
-  }
+  if (from || to) match.created_at = istRange(from, to);
 
   const pipeline = [
     { $match: match },

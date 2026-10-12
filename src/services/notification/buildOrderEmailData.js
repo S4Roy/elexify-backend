@@ -1,4 +1,5 @@
-import moment from "moment";
+import moment from "moment-timezone";
+import { STORE_TIMEZONE } from "../../config/storeTime.js";
 import OrderItem from "../../models/OrderItem.js";
 import Address from "../../models/Address.js";
 import { snapshotAddress } from "../invoiceService/snapshotAddress.js";
@@ -59,7 +60,7 @@ export const buildOrderEmailData = async (order) => {
   return {
     order_id: order.id,
     order_number: order.id,
-    order_date: moment(order.created_at).format("D MMM YYYY"),
+    order_date: moment(order.created_at).tz(STORE_TIMEZONE).format("D MMM YYYY"),
     payment_method_label: buildPartialCodLabel(order) || PAYMENT_METHOD_LABELS[order.payment_method] || humanize(order.payment_method),
     payment_status_label: order.payment_status === "advance_paid" ? "Advance Paid" : humanize(order.payment_status),
     order_status_label: humanize(order.order_status),

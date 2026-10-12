@@ -27,10 +27,10 @@ describe("buildOrderMatchFilter", () => {
     expect(filter.payment_method).toEqual({ $in: ["cod", "razorpay"] });
   });
 
-  it("builds an inclusive date range, extending to_date through end of day", () => {
+  it("builds an inclusive date range of whole IST days, extending to_date through end of day", () => {
     const filter = buildOrderMatchFilter({ from_date: "2026-01-01", to_date: "2026-01-31" }, { role: "superadmin" });
-    expect(filter.created_at.$gte.toISOString()).toBe("2026-01-01T00:00:00.000Z");
-    expect(filter.created_at.$lte.getHours()).toBe(23);
+    expect(filter.created_at.$gte.toISOString()).toBe("2025-12-31T18:30:00.000Z"); // 00:00 IST 1 Jan
+    expect(filter.created_at.$lte.toISOString()).toBe("2026-01-31T18:29:59.999Z"); // 23:59:59 IST 31 Jan
   });
 
   it("matches search_key against id, transaction_id, or order_status", () => {

@@ -1,4 +1,6 @@
 import morgan from "morgan";
+import moment from "moment-timezone";
+import { STORE_TIMEZONE } from "./storeTime.js";
 import split2 from "split2";
 import { createLogger, format, transports } from "winston";
 
@@ -6,7 +8,8 @@ const logger = createLogger({
   transports: [
     new transports.Console({
       format: format.combine(
-        format.timestamp({ format: "MMM-DD-YYYY HH:mm:ss" }),
+        // IST, whatever the server timezone (config/storeTime.js).
+        format.timestamp({ format: () => moment().tz(STORE_TIMEZONE).format("MMM-DD-YYYY HH:mm:ss") }),
         format.json()
       ),
     }),

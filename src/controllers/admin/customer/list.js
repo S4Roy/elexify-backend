@@ -13,6 +13,7 @@ import { StatusError } from "../../../config/index.js";
 import { envs } from "../../../config/index.js";
 import UserResource from "../../../resources/UserResource.js";
 import mongoose from "mongoose";
+import { istRange } from "../../../config/storeTime.js";
 
 /**
  *  User
@@ -63,15 +64,7 @@ export const list = async (req, res, next) => {
     if (status) {
       matchFilter.status = { $in: status.split(",") };
     }
-    if (from_date || to_date) {
-      matchFilter.created_at = {};
-      if (from_date) matchFilter.created_at.$gte = new Date(from_date);
-      if (to_date) {
-        const end = new Date(to_date);
-        end.setHours(23, 59, 59, 999);
-        matchFilter.created_at.$lte = end;
-      }
-    }
+    if (from_date || to_date) matchFilter.created_at = istRange(from_date, to_date);
     if (email_verified) {
       matchFilter.email_verified_at =
         email_verified === "yes" ? { $ne: null } : null;

@@ -2,6 +2,7 @@ import WebhookLog from "../../../models/WebhookLog.js";
 import Order from "../../../models/Order.js";
 import { StatusError } from "../../../config/index.js";
 import { envs } from "../../../config/index.js";
+import { istRange } from "../../../config/storeTime.js";
 
 // Powers the admin "Webhook Logs" audit view — every inbound provider
 // webhook call as received (see src/models/WebhookLog.js), independent of
@@ -62,15 +63,7 @@ export const list = async (req, res, next) => {
         ];
       }
     }
-    if (from || to) {
-      match.received_at = {};
-      if (from) match.received_at.$gte = new Date(from);
-      if (to) {
-        const end = new Date(to);
-        end.setHours(23, 59, 59, 999);
-        match.received_at.$lte = end;
-      }
-    }
+    if (from || to) match.received_at = istRange(from, to);
 
     const pipeline = [
       { $match: match },
