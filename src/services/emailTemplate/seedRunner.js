@@ -71,6 +71,30 @@ export const runSeedEmailTemplates = async () => {
   };
 };
 
+// Creates one default template if it's missing (never touches an existing
+// row) — lets a feature that introduces a new template send it without
+// waiting for an admin to run the seed.
+export const ensureEmailTemplate = async (action) => {
+  const defaults = TEMPLATES[action];
+  if (!defaults) return;
+  await EmailTemplate.updateOne(
+    { action, site_language: LANGUAGE },
+    { $setOnInsert: {
+      action,
+      site_language: LANGUAGE,
+      subject: defaults.subject,
+      preheader: defaults.preheader || "",
+      body: defaults.body,
+      required_variables: defaults.required_variables || [],
+      is_marketing: Boolean(defaults.is_marketing),
+      template_version: TEMPLATE_DEFAULTS_VERSION,
+      status: "active",
+      created_at: new Date(),
+    } },
+    { upsert: true },
+  );
+};
+
 // One-time-per-environment migration: overwrites subject/preheader/body/
 // required_variables/is_marketing with the current defaults, but only for
 // rows still below TEMPLATE_DEFAULTS_VERSION (i.e. never customized past

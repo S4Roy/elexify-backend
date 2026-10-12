@@ -206,13 +206,17 @@ export const NOTIFICATION_EVENTS = {
     templateKey: "promotional_offer",
     messagingVariables: ["name"],
   },
+  // Sent only to customers who explicitly tapped "Notify me" on an
+  // out-of-stock product (services/stockAlerts) — a one-time alert they
+  // requested, so it doesn't depend on the general marketing opt-in.
   BACK_IN_STOCK: {
-    category: "marketing",
+    category: "transactional",
     preferenceKey: "marketing",
-    mandatory: false,
-    channels: ["email", "sms", "whatsapp"],
+    mandatory: true,
+    channels: ["email", "whatsapp"],
     templateKey: "back_in_stock",
     messagingVariables: ["name"],
+    pushCategory: "transactional",
   },
   PRICE_DROP: {
     category: "marketing",

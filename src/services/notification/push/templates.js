@@ -77,6 +77,20 @@ export const PUSH_TYPES = Object.freeze([
   "OUT_FOR_DELIVERY",
 ]);
 export function resolvePushTemplate(event, data = {}) {
+  if (event === "BACK_IN_STOCK") {
+    const slug = String(data.product_slug || "");
+    const name = String(data.product_name || "").slice(0, 80);
+    const routable = /^[A-Za-z0-9_-]{1,200}$/.test(slug);
+    return {
+      type: event,
+      title: "Back in stock",
+      body: name
+        ? `${name} is available again. Tap to buy before it sells out.`
+        : "An item you asked about is available again. Tap to see it.",
+      route: routable ? `/products/${slug}` : "/notifications",
+      data: { type: event, entityType: "product", entityId: routable ? slug : "" },
+    };
+  }
   if (event === "ABANDONED_CART") {
     const count = Number(data.item_count) || 0;
     return {

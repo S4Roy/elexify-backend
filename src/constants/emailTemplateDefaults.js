@@ -319,16 +319,19 @@ ${p("Check out our latest offers and discounts.")}
     is_marketing: true,
   },
   back_in_stock: {
-    subject: "Back in stock!",
-    preheader: "An item on your wishlist is back in stock.",
+    subject: "{{product_name}} is back in stock",
+    preheader: "The item you asked about is available again.",
     body: `
-${h1("Back In Stock")}
+${h1("It's Back In Stock")}
 ${p("Hi {{name}},")}
-${p("An item on your wishlist is back in stock.")}
-{{> ctaButton url=storefront_url text="Shop Now"}}
+${p("Good news — the item you asked us to tell you about is available again. Stock is limited, so grab it before it sells out.")}
+{{#if image_url}}<p style="margin:0 0 16px 0;text-align:center;"><img src="{{image_url}}" alt="{{product_name}}" width="200" style="max-width:200px;height:auto;border-radius:8px;"></p>{{/if}}
+${p("<strong>{{product_name}}</strong>{{#if variation_name}}<br><span style=\"color:#52606d;font-size:13px;\">{{variation_name}}</span>{{/if}}{{#if price}}<br>{{currency price}}{{/if}}")}
+{{> ctaButton url=product_url text="Buy Now"}}
+${small("You're receiving this because you asked to be notified when this item is available.")}
 `.trim(),
-    required_variables: ["name", "storefront_url"],
-    is_marketing: true,
+    required_variables: ["name", "product_name", "product_url"],
+    is_marketing: false,
   },
   price_drop: {
     subject: "Price drop alert",
@@ -341,6 +344,22 @@ ${p("An item on your wishlist just dropped in price.")}
 `.trim(),
     required_variables: ["name", "storefront_url"],
     is_marketing: true,
+  },
+  // Admin-facing (sent to StockAlertSettings.low_stock_recipients), not a
+  // customer notification.
+  low_stock_alert: {
+    subject: "Stock alert: {{out_count}} out of stock, {{low_count}} running low",
+    preheader: "Products that need restocking.",
+    body: `
+${h1("Stock Alert")}
+${p("These products just sold out or dropped below the low-stock threshold ({{threshold}}).")}
+{{> stockItemsTable}}
+{{#if more_items_count}}${small("+ {{more_items_count}} more item(s) — see the full list in the admin panel.")}{{/if}}
+${small("\"Waiting\" is the number of customers who asked to be notified when the item is back.")}
+{{#if admin_url}}{{> ctaButton url=admin_url text="Open Stock Alerts"}}{{/if}}
+`.trim(),
+    required_variables: ["threshold"],
+    is_marketing: false,
   },
   abandoned_cart: {
     subject: "You left something in your cart",

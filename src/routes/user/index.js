@@ -6,6 +6,7 @@ import { addressRouter } from "./address.js";
 import { accountRouter } from "./account.js";
 import { ratingRouter } from "./rating.js";
 import { mediaRouter } from "./media.js";
+import { stockAlertsRouter } from "./stockAlerts.js";
 
 const v1UserRouter = Router();
 // All routes go here
@@ -18,5 +19,6 @@ v1UserRouter.use("/address", addressRouter);
 v1UserRouter.use("/account", accountRouter);
 v1UserRouter.use("/rating", ratingRouter);
 v1UserRouter.use("/media", mediaRouter);
+v1UserRouter.use("/stock-alerts", stockAlertsRouter);
 
 export { v1UserRouter };

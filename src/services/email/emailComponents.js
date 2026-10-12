@@ -95,6 +95,20 @@ const PARTIALS = {
   </tr>
 </table>`.trim(),
 
+  // {{> stockItemsTable}} — admin low-stock digest: expects stock_items[]
+  // (product_name, variation_name, sku, stock_quantity, level_label, waiting).
+  stockItemsTable: `
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 16px 0;border:1px solid ${COLORS.border};border-radius:8px;font-family:Arial,Helvetica,sans-serif;font-size:13px;">
+  <tr style="background:#f5f7fa;color:${COLORS.muted};"><td style="padding:8px 12px;">Product</td><td style="padding:8px 12px;text-align:right;">Stock</td><td style="padding:8px 12px;text-align:right;">Waiting</td></tr>
+  {{#each stock_items}}
+  <tr>
+    <td style="padding:8px 12px;border-top:1px solid ${COLORS.border};color:${COLORS.text};">{{this.product_name}}{{#if this.variation_name}}<br><span style="color:${COLORS.muted};font-size:12px;">{{this.variation_name}}</span>{{/if}}{{#if this.sku}}<br><span style="color:${COLORS.muted};font-size:12px;">SKU {{this.sku}}</span>{{/if}}</td>
+    <td style="padding:8px 12px;border-top:1px solid ${COLORS.border};text-align:right;white-space:nowrap;"><strong>{{this.stock_quantity}}</strong><br><span style="color:${COLORS.muted};font-size:12px;">{{this.level_label}}</span></td>
+    <td style="padding:8px 12px;border-top:1px solid ${COLORS.border};text-align:right;">{{this.waiting}}</td>
+  </tr>
+  {{/each}}
+</table>`.trim(),
+
   // {{> cartItemsCard}} — abandoned-cart reminder: expects items[]
   // (product_name, variation_name, quantity, unit_price, total_price),
   // more_items_count and cart_total.

@@ -44,6 +44,7 @@ import { envs } from "./config/index.js";
 import { buildAllowedOrigins, buildCorsOptions } from "./config/corsOptions.js";
 import { errors } from "celebrate";
 import { runAbandonedCartCycle } from "./services/abandonedCart/index.js";
+import { runBackInStockCycle, runLowStockCycle } from "./services/stockAlerts/index.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -215,6 +216,24 @@ cron.schedule("*/10 * * * *", async () => {
     await runAbandonedCartCycle();
   } catch (e) {
     console.error("abandonedCart Cron Failed", e);
+  }
+});
+
+// Stock alerts: "Notify me" back-in-stock notifications to customers, and
+// the low-stock digest to admin inboxes (when enabled) — see
+// services/stockAlerts.
+cron.schedule("*/10 * * * *", async () => {
+  try {
+    await runBackInStockCycle();
+  } catch (e) {
+    console.error("backInStock Cron Failed", e);
+  }
+});
+cron.schedule("15 * * * *", async () => {
+  try {
+    await runLowStockCycle();
+  } catch (e) {
+    console.error("lowStock Cron Failed", e);
   }
 });
 
