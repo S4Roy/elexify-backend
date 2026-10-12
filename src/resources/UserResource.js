@@ -17,6 +17,17 @@ class UserResource extends Resource {
       created_at: this.created_at || null,
       created_by: this.created_by || null,
       updated_at: this.updated_at || null,
+      last_location: this.last_location?.recorded_at ? {
+        pincode: this.last_location.pincode || null,
+        city: this.last_location.city || null,
+        state: this.last_location.state || null,
+        serviceable: !!this.last_location.serviceable,
+        latitude: this.last_location.latitude ?? null,
+        longitude: this.last_location.longitude ?? null,
+        accuracy_m: this.last_location.accuracy_m ?? null,
+        precise: this.last_location.precise ?? null,
+        recorded_at: this.last_location.recorded_at,
+      } : null,
     };
 
     return doc;

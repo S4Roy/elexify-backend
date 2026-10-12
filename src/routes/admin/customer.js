@@ -6,6 +6,7 @@ import { customerValidation } from "../../validations/admin/index.js";
 const customerRouter = Router();
 
 customerRouter.get("/list", requirePermission("customers.view"), customerValidation.list, customerController.list);
+customerRouter.get("/location-areas", requirePermission("customers.view"), customerController.locationAreas);
 customerRouter.get(
   "/details/:id", requirePermission("customers.view"),
   customerValidation.details,

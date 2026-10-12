@@ -54,6 +54,14 @@ accountRouter.post(
   userController.accountController.resendOtp
 );
 
+// Last known area from the app (permission-gated, at most daily).
+accountRouter.post(
+  "/location",
+  accountChangeRateLimiter,
+  userValidation.accountValidation.updateLocation,
+  userController.accountController.updateLocation
+);
+
 accountRouter.get(
   "/notification-preferences",
   userController.accountController.getNotificationPreferences

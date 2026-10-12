@@ -4,5 +4,6 @@ import { list } from "./list.js";
 import { remove } from "./remove.js";
 import { details } from "./details.js";
 import { changeStatus } from "./change-status.js";
+import { locationAreas } from "./locationAreas.js";
 
-export { add, edit, list, details, remove, changeStatus };
+export { add, edit, list, details, remove, changeStatus, locationAreas };

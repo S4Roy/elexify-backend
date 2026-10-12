@@ -17,6 +17,11 @@ export const list = celebrate({
       .allow("", null),
     has_email: Joi.string().valid("yes", "no").optional().allow("", null),
     has_mobile: Joi.string().valid("yes", "no").optional().allow("", null),
+    // Last known area (see services/location/customerLocation.js).
+    has_location: Joi.string().valid("yes", "no").optional().allow("", null),
+    location_state: Joi.string().trim().max(100).optional().allow("", null),
+    location_city: Joi.string().trim().max(100).optional().allow("", null),
+    location_pincode: Joi.string().trim().pattern(/^\d{1,6}$/).optional().allow("", null),
     page: Joi.number().integer().min(1).optional(),
     limit: Joi.number().integer().min(1).max(100).optional(),
     search_key: Joi.string().optional().allow("", null),

@@ -19,6 +19,11 @@ describe('customer list query validation', () => {
   it('accepts all sortable activity columns', async () => {
     for (const sort_by of ['order_activity', 'session_activity', 'source', 'status']) expect(await validate({ sort_by, sort_order: -1 })).toBeNull();
   });
+  it('accepts area filters and rejects a malformed pincode', async () => {
+    expect(await validate({ has_location: 'yes', location_state: 'West Bengal', location_city: 'Kolkata', location_pincode: '700' })).toBeNull();
+    expect(await validate({ has_location: 'maybe' })).toBeTruthy();
+    expect(await validate({ location_pincode: '70001A' })).toBeTruthy();
+  });
   it('continues rejecting unknown parameters', async () => {
     expect(await validate({ unexpected: 'yes' })).toBeTruthy();
   });

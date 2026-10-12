@@ -9,7 +9,11 @@ const allowed = {
   order_activity: ["none", "one", "repeat"],
   has_email: ["yes", "no"],
   has_mobile: ["yes", "no"],
+  has_location: ["yes", "no"],
 };
+
+const escapeRegex = (value) => String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const exactInsensitive = (value) => ({ $regex: `^${escapeRegex(value.trim())}$`, $options: "i" });
 
 // Apply filters before aggregate pagination so counts describe the complete result.
 export function customerDirectoryFilters(query, now = new Date()) {
@@ -18,6 +22,16 @@ export function customerDirectoryFilters(query, now = new Date()) {
       throw StatusError.badRequest(`Invalid ${key} filter`);
   }
   const pipeline = [];
+  // Last known area: has/has not, state, city (exact, any case), pincode prefix.
+  const area = {};
+  if (query.has_location) area["last_location.recorded_at"] = query.has_location === "yes" ? { $type: "date" } : { $not: { $type: "date" } };
+  if (query.location_state?.trim()) area["last_location.state"] = exactInsensitive(query.location_state);
+  if (query.location_city?.trim()) area["last_location.city"] = exactInsensitive(query.location_city);
+  if (query.location_pincode) {
+    if (!/^\d{1,6}$/.test(query.location_pincode)) throw StatusError.badRequest("Invalid pincode filter");
+    area["last_location.pincode"] = { $regex: `^${query.location_pincode}` };
+  }
+  if (Object.keys(area).length) pipeline.push({ $match: area });
   for (const [key, field] of [
     ["has_email", "email"],
     ["has_mobile", "mobile"],

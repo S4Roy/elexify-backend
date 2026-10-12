@@ -134,7 +134,7 @@ export async function deleteCustomerAccount({ userId, reason = null }) {
         email_verified_at: null,
         mobile_verified_at: null,
       },
-      $unset: { email: "", gstin: "", legacy_import: "" },
+      $unset: { email: "", gstin: "", legacy_import: "", last_location: "" },
     },
     { new: false, lean: true },
   );

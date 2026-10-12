@@ -6,6 +6,7 @@ import { verifyEmailChange } from "./verifyEmailChange.js";
 import { requestMobileChange } from "./requestMobileChange.js";
 import { verifyMobileChange } from "./verifyMobileChange.js";
 import { resendOtp } from "./resendOtp.js";
+import { updateLocation } from "./location.js";
 import {
   getNotificationPreferences,
   updateNotificationPreferences,
@@ -25,6 +26,7 @@ export {
   requestMobileChange,
   verifyMobileChange,
   resendOtp,
+  updateLocation,
   getNotificationPreferences,
   updateNotificationPreferences,
   deletionStatus,

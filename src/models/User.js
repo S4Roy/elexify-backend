@@ -104,6 +104,34 @@ const UserSchema = new Schema(
       type: Date,
       default: null,
     },
+    // Customer's last known area from the app (only with location permission,
+    // at most daily, never in the background). Area-level by design: the
+    // server stores coordinates rounded to ~1km plus the resolved pincode,
+    // city and state — never a precise position. See
+    // services/location/customerLocation.js.
+    last_location: {
+      type: new mongoose.Schema({
+        pincode: { type: String, default: null },
+        city: { type: String, default: null },
+        city_id: { type: Number, default: null },
+        state: { type: String, default: null },
+        state_id: { type: Number, default: null },
+        serviceable: { type: Boolean, default: false },
+        latitude: { type: Number, default: null },
+        longitude: { type: Number, default: null },
+        // GPS accuracy radius in metres, and whether the customer granted
+        // precise location (Android 12+/iOS 14+ let them pick approximate).
+        accuracy_m: { type: Number, default: null },
+        precise: { type: Boolean, default: null },
+        // Same point as GeoJSON for $near / $geoWithin queries.
+        geo: {
+          type: { type: String, enum: ["Point"] },
+          coordinates: { type: [Number], default: undefined },
+        },
+        recorded_at: { type: Date, default: null },
+      }, { _id: false }),
+      default: undefined,
+    },
     // Set while an email/mobile change is awaiting OTP confirmation.
     // The verified `email`/`mobile` fields above are never overwritten
     // until the OTP against the pending value succeeds — see
@@ -204,6 +232,11 @@ UserSchema.index(
     },
   },
 );
+
+// Admin customer filters by area.
+UserSchema.index({ "last_location.state": 1, "last_location.city": 1 }, { partialFilterExpression: { "last_location.recorded_at": { $type: "date" } } });
+UserSchema.index({ "last_location.geo": "2dsphere" });
+UserSchema.index({ "last_location.pincode": 1 }, { partialFilterExpression: { "last_location.recorded_at": { $type: "date" } } });
 
 // mobile: unique per phone_code+mobile combo among non-deleted users.
 UserSchema.index(
