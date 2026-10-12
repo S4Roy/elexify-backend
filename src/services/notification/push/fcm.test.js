@@ -7,7 +7,7 @@ vi.mock("google-auth-library", () => ({
 }));
 import { GoogleAuth } from "google-auth-library";
 import { getIntegrationConfig } from "../../integrationCredentials/index.js";
-import { sendFcm } from "./fcm.js";
+import { sendFcm, webPathFor } from "./fcm.js";
 const fetchMock = vi.fn();
 const device = {
   token: "device-secret",
@@ -57,8 +57,11 @@ it("submits a bounded, minimal FCM v1 payload with stable collapse identifiers",
   expect(payload.message.data).toEqual({
     notificationId: "notification-id",
     type: "ORDER_SHIPPED",
+    link: "/account",
   });
   expect(payload.message.android.notification.tag).toBe("notification-id");
+  expect(payload.message.webpush.notification).toMatchObject({ title: "Shipped", tag: "notification-id", icon: "/icons/icon-192.png" });
+  expect(payload.message.webpush.headers.Urgency).toBe("high");
   expect(payload.message.apns.headers["apns-collapse-id"]).toBe(
     "notification-id"
   );
@@ -90,4 +93,14 @@ it("uses rotated admin credentials on subsequent submissions", async () => {
     expect((await sendFcm(device, notification)).success).toBe(true);
     expect(GoogleAuth).toHaveBeenLastCalledWith(expect.objectContaining({ credentials: { client_email: "sender@stage.iam.gserviceaccount.com", private_key } }));
   }
+});
+
+it("maps app routes to storefront pages for browser notifications", () => {
+  expect(webPathFor("/orders/abc123")).toBe("/account/orders/abc123");
+  expect(webPathFor("/orders")).toBe("/account/orders");
+  expect(webPathFor("/products/usb-c-cable")).toBe("/products/usb-c-cable");
+  expect(webPathFor("/(tabs)/categories")).toBe("/categories");
+  expect(webPathFor("/account/security")).toBe("/account/security");
+  expect(webPathFor("/notifications")).toBe("/account");
+  expect(webPathFor(undefined)).toBe("/account");
 });

@@ -8,7 +8,7 @@ const schema = new Schema(
     token: { type: String, required: true, select: false },
     token_hash: { type: String, required: true, select: false },
     device_id: { type: String, required: true },
-    platform: { type: String, enum: ["android", "ios"], required: true },
+    platform: { type: String, enum: ["android", "ios", "web"], required: true },
     app_version: String,
     is_active: { type: Boolean, default: true },
     last_seen_at: { type: Date, default: Date.now },

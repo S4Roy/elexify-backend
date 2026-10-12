@@ -38,7 +38,7 @@ deviceTokensRouter.post(
       device_id: Joi.string()
         .pattern(/^[A-Za-z0-9_-]{16,100}$/)
         .required(),
-      platform: Joi.string().valid("android", "ios").required(),
+      platform: Joi.string().valid("android", "ios", "web").required(),
       app_version: Joi.string().max(50),
       environment: Joi.string()
         .valid("development", "staging", "production")

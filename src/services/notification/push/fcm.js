@@ -1,5 +1,6 @@
 import { GoogleAuth } from "google-auth-library";
 import { pushConfig, eligibleEnvironmentUser } from "./config.js";
+import { envs } from "../../../config/envs.js";
 const defaultAuth = new GoogleAuth({
   scopes: ["https://www.googleapis.com/auth/firebase.messaging"],
 });
@@ -64,6 +65,33 @@ function androidNotification(notification) {
   };
 }
 
+// Storefront page for an app route (templates.js validRoute), so a browser
+// notification opens the same place the app would.
+export function webPathFor(route = "") {
+  const order = /^\/orders(\/[A-Za-z0-9_-]+)?$/.exec(route);
+  if (order) return `/account/orders${order[1] || ""}`;
+  if (/^\/products\/[A-Za-z0-9_-]+$/.test(route)) return route;
+  if (route === "/account/security") return route;
+  if (route === "/(tabs)/categories") return "/categories";
+  return "/account";
+}
+function webpushFor(notification, ttlSeconds) {
+  const site = (envs.FRONTEND_URL || "").replace(/\/$/, "");
+  const offers = androidChannelFor(notification.type) === "offers";
+  return {
+    headers: { TTL: String(ttlSeconds), Urgency: offers ? "normal" : "high" },
+    notification: {
+      title: notification.title,
+      body: notification.body,
+      icon: "/icons/icon-192.png",
+      tag: String(notification._id),
+      ...(notification.image_url ? { image: notification.image_url } : {}),
+    },
+    // FCM only accepts an absolute HTTPS link.
+    ...(site.startsWith("https://") ? { fcm_options: { link: `${site}${webPathFor(notification.route)}` } } : {}),
+  };
+}
+
 export async function sendFcm(device, notification) {
   const c = await pushConfig();
   if (
@@ -73,6 +101,8 @@ export async function sendFcm(device, notification) {
   ) {
     return { success: false, code: "ENVIRONMENT_BLOCKED", retry: false };
   }
+  const ttlSeconds = Math.max(0, Math.min(86400,
+    Math.floor((new Date(notification.expires_at).getTime() - Date.now()) / 1000)));
   try {
     const access = await accessToken(c);
     if (!access.token)
@@ -101,19 +131,13 @@ export async function sendFcm(device, notification) {
             data: {
               notificationId: String(notification._id),
               type: notification.type,
+              // The storefront service worker opens this on click.
+              link: webPathFor(notification.route),
             },
+            webpush: webpushFor(notification, ttlSeconds),
             android: {
               priority: notification.priority === "high" ? "HIGH" : "NORMAL",
-              ttl: `${Math.max(
-                0,
-                Math.min(
-                  86400,
-                  Math.floor(
-                    (new Date(notification.expires_at).getTime() - Date.now()) /
-                      1000
-                  )
-                )
-              )}s`,
+              ttl: `${ttlSeconds}s`,
               notification: androidNotification(notification),
             },
             apns: {
