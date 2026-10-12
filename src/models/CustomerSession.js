@@ -3,6 +3,9 @@ import mongooseAggregatePaginate from 'mongoose-aggregate-paginate-v2';
 const schema = new mongoose.Schema({
   customerId: { type: mongoose.Schema.Types.ObjectId, ref: 'users', required: true },
   refreshTokenHash: { type: String, required: true, select: false },
+  // The token it replaced, honoured for a short grace window after a
+  // rotation (see services/customerSession refreshSession).
+  previousRefreshTokenHash: { type: String, default: null, select: false },
   legacyTokenHash: { type: String, select: false },
   credentialChangedAt: { type: Date, default: null },
   deviceId: String, deviceName: String, deviceType: String, browser: String, os: String,

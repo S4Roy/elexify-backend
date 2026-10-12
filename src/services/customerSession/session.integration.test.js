@@ -86,11 +86,32 @@ suite('MongoDB customer session integration', () => {
       expect(() => customerDirectoryFilters({ presence: 'invalid' })).toThrow();
     } finally { await Order.deleteMany({ user: { $in: ids } }); }
   });
-  it('allows one atomic rotation and treats concurrent reuse as compromise', async () => {
+  it('lets concurrent refreshes with the same token converge on one new token', async () => {
     const customer = await user(); const token = await service.createSession(customer, req, response);
-    const results = await Promise.allSettled([1, 2].map(() => service.refreshSession({ ...req, body: { refresh_token: token.refresh_token } }, response)));
-    expect(results.filter(r => r.status === 'fulfilled')).toHaveLength(1);
-    expect((await CustomerSession.findById(token.session_id)).revokedAt).toBeTruthy();
+    const results = await Promise.all([1, 2, 3].map(() => service.refreshSession({ ...req, body: { refresh_token: token.refresh_token } }, response)));
+    expect(new Set(results.map(r => r.refresh_token)).size).toBe(1);
+    expect((await CustomerSession.findById(token.session_id)).revokedAt).toBeNull();
+    // ...and that token keeps working.
+    await expect(service.refreshSession({ ...req, body: { refresh_token: results[0].refresh_token } }, response)).resolves.toHaveProperty('access_token');
+  });
+  it('honours the replaced token briefly (lost response) but treats later or older reuse as theft', async () => {
+    const customer = await user(); const t0 = await service.createSession(customer, req, response);
+    const t1 = await service.refreshSession({ ...req, body: { refresh_token: t0.refresh_token } }, response);
+    // Client never received t1 (tab closed mid-refresh) and retries with t0.
+    const retry = await service.refreshSession({ ...req, body: { refresh_token: t0.refresh_token } }, response);
+    expect(retry.refresh_token).toBe(t1.refresh_token);
+    const t2 = await service.refreshSession({ ...req, body: { refresh_token: t1.refresh_token } }, response);
+    // t0 is now two rotations old: theft.
+    await expect(service.refreshSession({ ...req, body: { refresh_token: t0.refresh_token } }, response)).rejects.toMatchObject({ code: 'TOKEN_REUSE_DETECTED' });
+    expect((await CustomerSession.findById(t0.session_id)).revokedAt).toBeTruthy();
+    expect(t2.refresh_token).not.toBe(t1.refresh_token);
+  });
+  it('treats reuse of the replaced token after the grace window as theft', async () => {
+    const customer = await user(); const t0 = await service.createSession(customer, req, response);
+    await service.refreshSession({ ...req, body: { refresh_token: t0.refresh_token } }, response);
+    await CustomerSession.updateOne({ _id: t0.session_id }, { lastRefreshAt: new Date(Date.now() - (service.policy.reuseGraceSeconds + 5) * 1000) });
+    await expect(service.refreshSession({ ...req, body: { refresh_token: t0.refresh_token } }, response)).rejects.toMatchObject({ code: 'TOKEN_REUSE_DETECTED' });
+    expect((await CustomerSession.findById(t0.session_id)).revokedAt).toBeTruthy();
   });
   it('denies cross-customer revocation and marks quiet authenticated customers offline', async () => {
     const customer = await user(); const other = await user();

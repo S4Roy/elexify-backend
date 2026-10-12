@@ -49,10 +49,11 @@ describe('customer session security', () => {
     await expect(service.refreshSession({ ...req, body: { refresh_token: token.refresh_token } }, res())).rejects.toMatchObject({ code: 'TOKEN_REUSE_DETECTED' });
     expect(CustomerSession.updateOne).toHaveBeenCalledWith({ _id: session._id }, expect.objectContaining({ $set: expect.objectContaining({ revokeReason: 'TOKEN_REUSE_DETECTED' }) }));
   });
-  it('fails closed when concurrent refresh loses the compare-and-swap', async () => {
+  it('fails closed (no tokens) when the compare-and-swap keeps losing', async () => {
     const token = await login(); findSession();
-    vi.spyOn(CustomerSession, 'findOneAndUpdate').mockResolvedValue(null);
-    await expect(service.refreshSession({ ...req, body: { refresh_token: token.refresh_token } }, res())).rejects.toMatchObject({ code: 'TOKEN_REUSE_DETECTED' });
+    const swap = vi.spyOn(CustomerSession, 'findOneAndUpdate').mockResolvedValue(null);
+    await expect(service.refreshSession({ ...req, body: { refresh_token: token.refresh_token } }, res())).rejects.toMatchObject({ statusCode: 401, code: 'REFRESH_CONFLICT' });
+    expect(swap).toHaveBeenCalledTimes(3);
   });
   it.each(['revoked', 'absolute', 'idle', 'blocked', 'password'])('rejects %s sessions', async state => {
     const token = await login(); findSession();

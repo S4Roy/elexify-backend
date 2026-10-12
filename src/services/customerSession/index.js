@@ -16,6 +16,12 @@ export const policy = {
   absoluteDays: positive('REFRESH_TOKEN_EXPIRES_DAYS', 30, 90),
   idleDays: positive('SESSION_IDLE_TIMEOUT_DAYS', 7, 90),
   onlineSeconds: positive('CUSTOMER_ONLINE_THRESHOLD_SECONDS', 300, 3600),
+  // Refresh-token rotation grace (Auth0 "reuse interval", Okta "grace
+  // period"): the token a rotation just replaced keeps working this long, so
+  // a lost response — tab closed or reloaded mid-refresh, app killed, flaky
+  // mobile network, two tabs racing — doesn't look like theft and sign the
+  // customer out. Older tokens, or the replaced one after this, still revoke.
+  reuseGraceSeconds: positive('REFRESH_TOKEN_REUSE_GRACE_SECONDS', 60, 300),
 };
 const COOKIE = 'elx_refresh';
 const cookieOptions = { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'lax', path: '/' };
@@ -36,13 +42,20 @@ export async function audit(eventType, customerId, sessionId, req, reason) {
   await AuthEvent.create({ eventType, customerId, sessionId, actorId: req?.auth?.user_id,
     ipAddress: req?.ip, userAgent: String(req?.headers?.['user-agent'] || '').slice(0, 512), reason });
 }
-function tokens(session) {
+// The refresh token is deterministic for (session, tokenVersion): its jti
+// is an HMAC of both and it carries no iat. So a request inside the rotation
+// grace window can be handed the *same* current token the racing request
+// got, instead of a third one that would strand the other client.
+function refreshFor(session, version) {
+  const jti = crypto.createHmac('sha256', secret()).update(`${session._id}:${version}`).digest('hex');
+  return jwt.sign({ sub: String(session.customerId), sid: String(session._id), type: 'refresh',
+    jti, exp: Math.floor(+new Date(session.expiresAt) / 1000) },
+    secret(), { algorithm: 'HS256', audience: 'customer-refresh', noTimestamp: true });
+}
+function tokens(session, version = session.tokenVersion || 0) {
   const access = jwt.sign({ sub: String(session.customerId), sid: String(session._id), type: 'access' },
     envs.jwt.accessToken.secret, { algorithm: 'HS256', expiresIn: policy.accessSeconds });
-  const refresh = jwt.sign({ sub: String(session.customerId), sid: String(session._id), type: 'refresh',
-    jti: crypto.randomBytes(32).toString('hex'), exp: Math.floor(+new Date(session.expiresAt) / 1000) },
-    secret(), { algorithm: 'HS256', audience: 'customer-refresh' });
-  return { access, refresh };
+  return { access, refresh: refreshFor(session, version) };
 }
 function deliver(pair, session, req, res) {
   const token = { access_token: pair.access, access_token_expiry: policy.accessSeconds, session_id: String(session._id) };
@@ -117,26 +130,51 @@ export function verifyRefresh(raw) {
 export async function refreshSession(req, res) {
   const raw = readRefresh(req);
   const claims = verifyRefresh(raw);
-  const session = await CustomerSession.findOne({ _id: claims.sid, customerId: claims.sub }).select('+refreshTokenHash');
+  const session = await CustomerSession.findOne({ _id: claims.sid, customerId: claims.sub }).select('+refreshTokenHash +previousRefreshTokenHash');
   if (!session || session.revokedAt) throw authError('SESSION_REVOKED');
   if (+session.expiresAt <= Date.now() || +session.lastActivityAt <= Date.now() - policy.idleDays * 864e5) throw authError('REFRESH_TOKEN_EXPIRED');
   await checkAccount(session);
-  if (session.refreshTokenHash !== hashToken(raw)) {
-    await CustomerSession.updateOne({ _id: session._id }, { $set: { revokedAt: new Date(), revokeReason: 'TOKEN_REUSE_DETECTED' } });
-    await audit('TOKEN_REUSE_DETECTED', session.customerId, session._id, req);
-    throw authError('TOKEN_REUSE_DETECTED');
+  const presented = hashToken(raw);
+  // Retried because a concurrent refresh may rotate between read and write.
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const current = attempt === 0 ? session
+      : await CustomerSession.findOne({ _id: session._id, ...activeFilter() }).select('+refreshTokenHash +previousRefreshTokenHash');
+    if (!current) throw authError('SESSION_REVOKED');
+    const latest = current.refreshTokenHash === presented;
+    const withinGrace = !latest && !!current.previousRefreshTokenHash && current.previousRefreshTokenHash === presented &&
+      Date.now() - +new Date(current.lastRefreshAt) <= policy.reuseGraceSeconds * 1000;
+    if (!latest && !withinGrace) {
+      await CustomerSession.updateOne({ _id: session._id }, { $set: { revokedAt: new Date(), revokeReason: 'TOKEN_REUSE_DETECTED' } });
+      await audit('TOKEN_REUSE_DETECTED', session.customerId, session._id, req);
+      throw authError('TOKEN_REUSE_DETECTED');
+    }
+    const version = current.tokenVersion || 0;
+    let pair; let change;
+    if (latest) {
+      pair = tokens(current, version + 1);
+      change = { $set: { refreshTokenHash: hashToken(pair.refresh), previousRefreshTokenHash: presented, tokenVersion: version + 1,
+        lastRefreshAt: new Date(), lastActivityAt: new Date() } };
+    } else {
+      pair = tokens(current, version);
+      // Same token the racing request received: nothing to rotate.
+      if (hashToken(pair.refresh) === current.refreshTokenHash) change = { $set: { lastActivityAt: new Date() } };
+      // Current token predates deterministic tokens: issue a new one, without
+      // moving the grace window forward (a replaced token can't be kept
+      // alive by refreshing repeatedly).
+      else {
+        pair = tokens(current, version + 1);
+        change = { $set: { refreshTokenHash: hashToken(pair.refresh), tokenVersion: version + 1, lastActivityAt: new Date() } };
+      }
+    }
+    const updated = await CustomerSession.findOneAndUpdate(
+      { _id: session._id, refreshTokenHash: current.refreshTokenHash, ...activeFilter() },
+      change, { new: true });
+    if (!updated) continue;
+    await checkAccount(updated);
+    await audit('TOKEN_REFRESH', session.customerId, session._id, req, latest ? undefined : 'ROTATION_GRACE');
+    return deliver(pair, updated, req, res);
   }
-  const pair = tokens(session);
-  const updated = await CustomerSession.findOneAndUpdate({ _id: session._id, refreshTokenHash: hashToken(raw), ...activeFilter() },
-    { $set: { refreshTokenHash: hashToken(pair.refresh), lastRefreshAt: new Date(), lastActivityAt: new Date() }, $inc: { tokenVersion: 1 } }, { new: true });
-  if (!updated) {
-    await CustomerSession.updateOne({ _id: session._id }, { $set: { revokedAt: new Date(), revokeReason: 'TOKEN_REUSE_DETECTED' } });
-    await audit('TOKEN_REUSE_DETECTED', session.customerId, session._id, req);
-    throw authError('TOKEN_REUSE_DETECTED');
-  }
-  await checkAccount(updated);
-  await audit('TOKEN_REFRESH', session.customerId, session._id, req);
-  return deliver(pair, updated, req, res);
+  throw authError('REFRESH_CONFLICT');
 }
 export async function validateSession(claims, req) {
   if (claims.type !== 'access' || !mongoose.isValidObjectId(claims.sid) || !mongoose.isValidObjectId(claims.sub)) throw authError('INVALID_ACCESS_TOKEN');
