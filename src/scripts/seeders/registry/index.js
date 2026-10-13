@@ -1,3 +1,4 @@
+import sampleEmailCampaigns from "./operations/sample-email-campaigns.js";
 // Aggregates every data-operations registry entry and validates them at
 // module-load time — fails fast (throws on import) rather than silently
 // admitting a duplicate key or a malformed entry, per the plan's explicit
@@ -44,6 +45,7 @@ import wooCommerceMissingData from "./operations/woocommerce-missing-data.js";
 import repairRatingData from "./operations/repair-rating-data.js";
 
 const RAW_ENTRIES = [
+  sampleEmailCampaigns,
   repairRatingData,
   wooCommerceMissingData,
   emailTemplates,

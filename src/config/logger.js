@@ -32,7 +32,8 @@ morgan.token("content", (req, res) => {
   return res.locals.error || "-";
 });
 
-const morganFormat = ":method :url :status :content - :response-time ms";
+morgan.token("safe-url", req => req.originalUrl.replace(/(\/newsletter\/unsubscribe\/)[a-fA-F0-9]{64}/g, "$1[redacted]"));
+const morganFormat = ":method :safe-url :status :content - :response-time ms";
 const stream = split2().on("data", (line) => logger.info(line));
 
 logger.stream(stream);

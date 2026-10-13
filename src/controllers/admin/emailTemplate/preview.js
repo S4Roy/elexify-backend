@@ -3,8 +3,8 @@ import { StatusError } from "../../../config/index.js";
 import { renderEmailTemplate } from "../../../services/email/renderEmailTemplate.js";
 import { renderEmailShell } from "../../../services/email/emailLayout.js";
 import { htmlToText } from "../../../services/email/htmlToText.js";
-import { emailBrand } from "../../../config/emailBrand.js";
-import { EMAIL_PREVIEW_FIXTURE } from "../../../constants/emailPreviewFixture.js";
+import { resolveEmailBrand } from "../../../services/email/resolveEmailBrand.js";
+import { emailPreviewFixture } from "../../../constants/emailPreviewFixture.js";
 
 // Renders (never sends) a template with safe sample fixture data — the
 // admin editor's live preview. Renders the CURRENT unsaved form content
@@ -23,11 +23,11 @@ export const preview = async (req, res, next) => {
       required_variables: template.required_variables,
     };
 
-    const rendered = renderEmailTemplate(draft, EMAIL_PREVIEW_FIXTURE);
+    const rendered = renderEmailTemplate(draft, emailPreviewFixture(action));
     const html = renderEmailShell({
       subject: rendered.subject,
       preheaderText: rendered.preheader,
-      brand: emailBrand,
+      brand: await resolveEmailBrand(),
       contentHtml: rendered.body,
       showPreferencesLink: Boolean(template.is_marketing),
     });

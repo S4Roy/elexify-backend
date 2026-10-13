@@ -5,9 +5,10 @@ class SubscriberResource extends Resource {
     return {
       _id: this._id || null,
       email: this.email || null,
+      source: this.source || "web",
       ip: this.ip || null,
       user_agent: this.user_agent || null,
-      status: this.status || null, // e.g., pending, approved, completed
+      status: this.status || null,
       created_at: this.created_at || null,
       created_by: this.created_by || null,
       updated_at: this.updated_at || null,

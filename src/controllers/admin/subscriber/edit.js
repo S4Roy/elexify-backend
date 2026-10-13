@@ -11,9 +11,9 @@ export const edit = async (req, res, next) => {
   try {
     const { _id, status } = req.body;
 
-    // Find existing rating
-    const rating = await Subscriber.findById(_id);
-    if (!rating) {
+    // Only manage live subscriber records
+    const subscriber = await Subscriber.findOne({ _id, deleted_at: null });
+    if (!subscriber) {
       throw StatusError.notFound(req.__("Subscriber not found"));
     }
 
@@ -24,11 +24,13 @@ export const edit = async (req, res, next) => {
       updated_by: req.auth?.user_id || null,
     };
 
-    const updatedRating = await Subscriber.findByIdAndUpdate(
-      _id,
+    const updatedRating = await Subscriber.findOneAndUpdate(
+      { _id, deleted_at: null },
       { $set: updateData },
-      { new: true }
+      { new: true, runValidators: true }
     );
+
+    if (!updatedRating) throw StatusError.notFound(req.__("Subscriber not found"));
 
     res.status(200).json({
       status: "success",

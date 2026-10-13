@@ -1,3 +1,5 @@
+import { newsletterUnsubscribeRouter } from "./routes/site/newsletterUnsubscribe.js";
+import { processEmailCampaigns } from "./services/campaigns/worker.js";
 import { sessionSummary, cleanupSessions } from './services/customerSession/index.js';
 import { getMobileUpdatePolicy } from './services/mobileUpdatePolicy.js';
 import path, { resolve, dirname } from "path";
@@ -21,6 +23,8 @@ import { STORE_TIMEZONE } from "./config/storeTime.js";
 // whatever the server's own timezone.
 const cron = { schedule: (expression, task) => nodeCron.schedule(expression, task, { timezone: STORE_TIMEZONE }) };
 import { processZohoQueue } from "./services/zoho/ZohoSyncQueue.js";
+
+cron.schedule("* * * * *", () => { processEmailCampaigns().catch(() => console.error("Email campaign worker failed; pending work retained.")); });
 
 cron.schedule("0 * * * *", () => { cleanupSessions().catch(() => console.error("Customer session cleanup failed")); });
 
@@ -151,6 +155,7 @@ app.use(
   }),
 );
 app.use(express.static("public"));
+app.use(`${envs.basePath}/api/v1/newsletter/unsubscribe`, newsletterUnsubscribeRouter);
 app.use(bearerToken());
 app.use(StatusSuccess);
 // Public bootstrap endpoint: available before login/session restoration.

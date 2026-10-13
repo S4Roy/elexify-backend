@@ -1,7 +1,7 @@
 import EmailTemplate from "../../../models/EmailTemplate.js";
 import { StatusError } from "../../../config/index.js";
 import { emailService, auditService } from "../../../services/index.js";
-import { EMAIL_PREVIEW_FIXTURE } from "../../../constants/emailPreviewFixture.js";
+import { emailPreviewFixture } from "../../../constants/emailPreviewFixture.js";
 
 // Sends a real email using only the safe sample fixture — never real
 // customer/order data — and bypasses the notification job queue entirely
@@ -15,7 +15,7 @@ export const sendTest = async (req, res, next) => {
     const template = await EmailTemplate.findOne({ action, site_language: "en" }).lean();
     if (!template) throw StatusError.notFound(req.__("Email template not found"));
 
-    const delivered = await emailService.sendEmail(email, action, undefined, "en", EMAIL_PREVIEW_FIXTURE);
+    const delivered = await emailService.sendEmail(email, action, undefined, "en", emailPreviewFixture(action));
     if (!delivered) {
       throw StatusError.badRequest(req.__("Test email could not be sent — check the template renders without unresolved variables"));
     }

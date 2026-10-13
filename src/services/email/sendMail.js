@@ -1,7 +1,7 @@
+import { resolveEmailBrand } from './resolveEmailBrand.js';
 import nodemailer from "nodemailer";
 import { emailTemplateService } from "../index.js";
 import { envs } from "../../config/index.js";
-import { emailBrand } from "../../config/emailBrand.js";
 import { renderEmailTemplate } from "./renderEmailTemplate.js";
 import { renderEmailShell } from "./emailLayout.js";
 import { htmlToText } from "./htmlToText.js";
@@ -36,16 +36,18 @@ export const sendEmail = async (
       return false;
     }
 
+    const brand = await resolveEmailBrand();
+
     // Default substitution values, available to every template body as
     // flat vars (e.g. "contact {{support_email}}") in addition to the
     // structured `brand` object the shared shell/components consume.
     const defaultSubstitutions = {
-      logo_url: emailBrand.logoUrl,
-      privacy_url: emailBrand.privacyUrl,
-      company_name: emailBrand.brandName,
-      support_email: emailBrand.supportEmail,
-      account_url: emailBrand.accountUrl,
-      storefront_url: emailBrand.storefrontUrl,
+      logo_url: brand.logoUrl,
+      privacy_url: brand.privacyUrl,
+      company_name: brand.brandName,
+      support_email: brand.supportEmail,
+      account_url: brand.accountUrl,
+      storefront_url: brand.storefrontUrl,
       year: new Date().getFullYear(),
     };
 
@@ -77,11 +79,11 @@ export const sendEmail = async (
     const html = renderEmailShell({
       subject: rendered.subject,
       preheaderText: rendered.preheader,
-      brand: emailBrand,
+      brand,
       contentHtml: rendered.body,
       showPreferencesLink: Boolean(emailTemplate.is_marketing),
     });
-    const text = `${htmlToText(rendered.body)}\n\n--\n${emailBrand.brandName}\nNeed help? ${emailBrand.supportEmail}\nMy Account: ${emailBrand.accountUrl}\nOrders: ${emailBrand.ordersUrl}`;
+    const text = `${htmlToText(rendered.body)}\n\n--\n${brand.brandName}\nNeed help? ${brand.supportEmail}\nMy Account: ${brand.accountUrl}\nOrders: ${brand.ordersUrl}`;
 
     // SMTP settings are admin-manageable (Settings > Integration
     // Credentials); env vars remain the fallback when no managed
@@ -113,7 +115,7 @@ export const sendEmail = async (
     // Mail details
     const mailOptions = {
       from: {
-        name: emailBrand.brandName,
+        name: brand.brandName,
         address: smtpConfig.fromEmail || smtpConfig.email,
       },
       to: email,

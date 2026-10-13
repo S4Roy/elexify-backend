@@ -21,6 +21,7 @@ export const list = async (req, res, next) => {
       sort_order = -1,
       _id = null,
       status = null,
+      source = null,
       from_date = null,
       to_date = null,
     } = req.query;
@@ -34,11 +35,13 @@ export const list = async (req, res, next) => {
     let matchFilter = { deleted_at: null };
 
     if (search_key) {
+      const literalSearch = search_key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
       matchFilter.$or = [
-        { email: { $regex: ".*" + search_key + ".*", $options: "i" } },
-        { status: { $regex: ".*" + search_key + ".*", $options: "i" } },
+        { email: { $regex: literalSearch, $options: "i" } },
+        { status: { $regex: literalSearch, $options: "i" } },
       ];
     }
+    if (source) matchFilter.source = source;
     if (status) {
       matchFilter.status = { $in: status.split(",") };
     }
@@ -52,7 +55,7 @@ export const list = async (req, res, next) => {
     );
     data.docs = await SubscriberResource.collection(data.docs);
 
-    res.status(201).json({
+    res.status(200).json({
       status: "success",
       message: req.__(`Data fetched successfully`),
       data: data,

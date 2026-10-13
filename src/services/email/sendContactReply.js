@@ -1,7 +1,7 @@
+import { resolveEmailBrand } from './resolveEmailBrand.js';
 import nodemailer from 'nodemailer';
 import Handlebars from 'handlebars';
 import { envs } from '../../config/envs.js';
-import { emailBrand } from '../../config/emailBrand.js';
 import { getIntegrationConfig } from '../integrationCredentials/index.js';
 import { renderEmailShell } from './emailLayout.js';
 
@@ -14,10 +14,11 @@ export async function sendContactReply(contact, message, previous = []) {
     error.definitelyNotSent = true;
     throw error;
   }
+  const brand = await resolveEmailBrand();
   const subject = `Re: [${ticketReference(contact._id)}] ${(contact.subject || 'Your enquiry').replace(/[\r\n]/g, ' ')}`;
   const escape = Handlebars.escapeExpression;
   // Only this reply is sent. Internal remarks and activity never enter the email.
-  const contentHtml = `<p>Hello ${escape(contact.name || 'there')},</p><div style="white-space:pre-wrap;line-height:1.7">${escape(message.content)}</div><p>Regards,<br>${escape(emailBrand.brandName)} Support</p><p style="font-size:12px;color:#52606d">Reference: ${ticketReference(contact._id)}</p>`;
+  const contentHtml = `<p>Hello ${escape(contact.name || 'there')},</p><div style="white-space:pre-wrap;line-height:1.7">${escape(message.content)}</div><p>Regards,<br>${escape(brand.brandName)} Support</p><p style="font-size:12px;color:#52606d">Reference: ${ticketReference(contact._id)}</p>`;
   const references = previous.filter(Boolean);
   const transport = nodemailer.createTransport({
     host: config.host, port: Number(config.port) || 465,
@@ -27,13 +28,13 @@ export async function sendContactReply(contact, message, previous = []) {
   });
   try {
     const info = await transport.sendMail({
-      from: { name: `${emailBrand.brandName} Support`, address: config.fromEmail || config.email },
+      from: { name: `${brand.brandName} Support`, address: config.fromEmail || config.email },
       to: { name: contact.name || '', address: contact.email },
-      replyTo: emailBrand.supportEmail,
+      replyTo: brand.supportEmail,
       subject, messageId: message.message_id,
       ...(references.length && { inReplyTo: references[references.length - 1], references }),
-      text: `Hello ${contact.name || 'there'},\n\n${message.content}\n\nRegards,\n${emailBrand.brandName} Support\nReference: ${ticketReference(contact._id)}`,
-      html: renderEmailShell({ subject, preheaderText: 'A response to your enquiry', brand: emailBrand, contentHtml }),
+      text: `Hello ${contact.name || 'there'},\n\n${message.content}\n\nRegards,\n${brand.brandName} Support\nReference: ${ticketReference(contact._id)}`,
+      html: renderEmailShell({ subject, preheaderText: 'A response to your enquiry', brand, contentHtml }),
       disableFileAccess: true, disableUrlAccess: true,
     });
     if (!info.accepted?.length) {

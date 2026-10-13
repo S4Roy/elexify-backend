@@ -1,3 +1,4 @@
+import { emailCampaignsRouter } from "./emailCampaigns.js";
 import { roleRouter } from "./role.js";
 import { Router } from "express";
 import { inventoryRouter } from "./inventory/index.js";
@@ -62,6 +63,7 @@ v1AdminRouter.use("/rating", ratingRouter);
 v1AdminRouter.use("/settings", settingsRouter);
 v1AdminRouter.use("/contact-us", contactUsRouter);
 v1AdminRouter.use("/subscriber", subscriberRouter);
+v1AdminRouter.use("/email-campaigns", emailCampaignsRouter);
 v1AdminRouter.use("/enquiry", enquiryRouter);
 v1AdminRouter.use("/country", countryRouter);
 v1AdminRouter.use("/state", stateRouter);

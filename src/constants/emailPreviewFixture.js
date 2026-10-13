@@ -8,9 +8,11 @@ export const EMAIL_PREVIEW_FIXTURE = {
   name: "Test Customer",
   order_id: "ORD-DEMO-1001",
   order_number: "ORD-DEMO-1001",
+  return_request_number: "RET-DEMO-1001",
+  return_status: "Inspection in progress",
   order_date: "1 Jan 2026",
   payment_method_label: "Cash on Delivery",
-  payment_status_label: "Paid",
+  payment_status_label: "Pending",
   order_status_label: "Confirmed",
   is_cod: true,
   items: [
@@ -21,7 +23,7 @@ export const EMAIL_PREVIEW_FIXTURE = {
   coupon_code: null,
   shipping: 0,
   grand_total: 1575,
-  refund_amount: 1575,
+  refund_amount: 0,
   shipping_address: {
     name: "Test Customer",
     line1: "123 Demo Street",
@@ -59,3 +61,20 @@ export const EMAIL_PREVIEW_FIXTURE = {
   reset_link: `${emailBrand.storefrontUrl}/reset-password?token=demo`,
   new_email: "demo.new@example.com",
 };
+
+// Preview and test sends use the same event-specific demonstration state.
+export function emailPreviewFixture(action) {
+  const data = { ...EMAIL_PREVIEW_FIXTURE };
+  const states = { order_shipped: 'Shipped', order_delivered: 'Delivered', order_cancelled: 'Cancelled', order_processing: 'Processing', order_out_for_delivery: 'Out for delivery', order_ready_for_pickup: 'Ready for pickup', refund_initiated: 'Refund initiated', refund_completed: 'Refunded' };
+  data.order_status_label = states[action] || 'Confirmed';
+  if (action === 'payment_success') { data.is_cod = false; data.payment_method_label = 'Online payment'; data.payment_status_label = 'Paid'; }
+  if (action === 'payment_failed') { data.is_cod = false; data.payment_method_label = 'Online payment'; data.payment_status_label = 'Failed'; }
+  if (action === 'order_delivered') data.payment_status_label = 'Paid';
+  if (['refund_initiated', 'refund_completed'].includes(action)) {
+    data.is_cod = false;
+    data.payment_method_label = 'Online payment';
+    data.payment_status_label = action === 'refund_completed' ? 'Refunded' : 'Paid';
+    data.refund_amount = data.grand_total;
+  }
+  return data;
+}

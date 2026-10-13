@@ -17,9 +17,12 @@ const SubscriberSchema = new Schema(
     // status & workflow
     status: {
       type: String,
-      enum: ["pending", "answered", "archived", "spam"],
-      default: "pending",
+      enum: ["subscribed", "unsubscribed", "suppressed", "pending", "answered", "archived", "spam"],
+      default: "subscribed",
     },
+
+    unsubscribe_token: { type: String, select: false },
+    unsubscribed_at: { type: Date, default: null },
 
     // auditing
     created_by: { type: Types.ObjectId, ref: "users", default: null },
@@ -37,6 +40,8 @@ const SubscriberSchema = new Schema(
 SubscriberSchema.index({ email: 1 }, { unique: true });
 SubscriberSchema.index({ created_at: -1 });
 SubscriberSchema.index({ ip: 1 });
+SubscriberSchema.index({ unsubscribe_token: 1 }, { unique: true, sparse: true });
+SubscriberSchema.index({ status: 1, deleted_at: 1, source: 1, _id: 1 });
 
 // Pagination plugin (same as your Consultation schema)
 SubscriberSchema.plugin(mongooseAggregatePaginate);

@@ -10,6 +10,7 @@ export const submit = async (req, res, next) => {
         { email },
         { $setOnInsert: {
           email,
+          status: "subscribed",
           source: "web",
           ip: req.ip || null,
           user_agent: req.get("User-Agent") || null,

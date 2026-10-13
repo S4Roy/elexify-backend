@@ -27,6 +27,30 @@ describe("renderEmailShell", () => {
     expect(html).toContain("Manage communication preferences");
   });
 
+  it("shows the app download section only for configured store links", () => {
+    const html = renderEmailShell({ ...base, brand: { ...emailBrand, androidAppUrl: "https://play.google.com/store/apps/details?id=com.elexify" } });
+    expect(html).toContain("Get the Elexify app");
+    expect(html).toContain("Get it on Google Play");
+    expect(html).not.toContain("Download on the App Store");
+    expect(renderEmailShell(base)).not.toContain("Get the Elexify app");
+  });
+
+  it("renders configured social icons beside raster store badges", () => {
+    const html = renderEmailShell({ ...base, brand: { ...emailBrand,
+      androidAppUrl: 'https://play.google.com/store/apps/details?id=com.elexify',
+      socialLinks: [{ label: 'Instagram', url: 'https://instagram.com/example', iconUrl: 'https://example.com/email/instagram.png' }] } });
+    expect(html).toContain('Follow us'); expect(html).toContain('alt="Instagram"');
+    expect(html).toContain('/email/google-play.png'); expect(html).toContain('border-right:1px solid');
+    expect(html).not.toContain('Your next discovery, on the go');
+  });
+
+  it("keeps unsubscribe in the footer and never adds it to transactional messages", () => {
+    const html = renderEmailShell({ ...base, isMarketing: true, unsubscribeUrl: "https://example.com/unsubscribe/token" });
+    expect(html).toContain('href="https://example.com/unsubscribe/token"');
+    expect(html).not.toContain("Preview only");
+    expect(renderEmailShell(base)).not.toContain("Unsubscribe from newsletter emails");
+  });
+
   it("uses email-safe typography and a 600px max-width container", () => {
     const html = renderEmailShell(base);
     expect(html).toContain("Arial,Helvetica,sans-serif");

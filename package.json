@@ -26,7 +26,9 @@
     "data:status": "node src/scripts/cli.js status",
     "data:run": "node src/scripts/cli.js run",
     "data:dry-run": "node src/scripts/cli.js dry-run",
-    "start": "nodemon src/server.js "
+    "start": "nodemon src/server.js ",
+    "test:campaigns": "vitest run src/services/campaigns/content.test.js src/services/campaigns/delivery.test.js src/services/campaigns/campaigns.integration.test.js",
+    "seed:sample-campaigns": "node src/scripts/cli.js run sample-email-campaigns"
   },
   "author": {
     "name": "Subhankar Roy <Baseweb Technologies>",

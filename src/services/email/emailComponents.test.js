@@ -8,7 +8,7 @@ describe("emailComponents partials", () => {
   it("statusBadge renders the label and defaults to the brand tone", () => {
     const html = render('{{> statusBadge label="Order Confirmed"}}', {});
     expect(html).toContain("Order Confirmed");
-    expect(html).toContain("#eef2ff"); // brand tone badgeBg
+    expect(html).toContain("#edf8f5"); // brand tone badgeBg
   });
 
   it("statusBadge switches colors for the warn tone", () => {

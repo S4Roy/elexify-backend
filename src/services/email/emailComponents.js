@@ -11,10 +11,10 @@ const COLORS = {
   text: "#1f2933",
   muted: "#52606d",
   border: "#e4e7eb",
-  brand: "#1a56db",
+  brand: "#087f73",
   brandText: "#ffffff",
-  badgeBg: "#eef2ff",
-  badgeText: "#3730a3",
+  badgeBg: "#edf8f5",
+  badgeText: "#16614f",
   warnBg: "#fffbeb",
   warnText: "#92400e",
   infoBg: "#eff6ff",
@@ -40,7 +40,7 @@ const PARTIALS = {
   statusBadge: `
 <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 16px 0;">
   <tr>
-    <td style="background-color:{{toneBg tone}};color:{{toneText tone}};font-family:Arial,Helvetica,sans-serif;font-size:13px;font-weight:bold;padding:6px 12px;border-radius:4px;display:inline-block;">
+    <td style="background-color:{{toneBg tone}};color:{{toneText tone}};font-family:Arial,Helvetica,sans-serif;font-size:13px;font-weight:bold;padding:6px 12px;border-radius:20px;">
       {{label}}
     </td>
   </tr>
@@ -48,10 +48,10 @@ const PARTIALS = {
 
   // {{> ctaButton url=view_order_url text="View Order"}}
   ctaButton: `
-<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:24px 0;">
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:24px 0 8px;">
   <tr>
     <td style="border-radius:6px;background-color:${COLORS.brand};">
-      <a href="{{url}}" target="_blank" rel="noopener" style="display:inline-block;padding:12px 28px;font-family:Arial,Helvetica,sans-serif;font-size:15px;font-weight:bold;color:${COLORS.brandText};text-decoration:none;border-radius:6px;">
+      <a href="{{url}}" target="_blank" rel="noopener" style="display:inline-block;padding:15px 26px;line-height:20px;border:1px solid #087f73;background-color:#087f73;font-family:Arial,Helvetica,sans-serif;font-size:15px;font-weight:bold;color:${COLORS.brandText};text-decoration:none;border-radius:6px;">
         {{text}}
       </a>
     </td>
