@@ -1,8 +1,12 @@
+import cors from 'cors';
 import { Router } from 'express';
 import { celebrate, Joi } from 'celebrate';
 import rateLimit from 'express-rate-limit';
 import Subscriber from '../../models/Subscriber.js';
 const router = Router();
+// No cookies or session: possession of the random token authorizes opt-out.
+// Permit opaque origins and mailbox providers without opening normal APIs.
+router.use(cors({ origin: '*', credentials: false, methods: ['GET', 'POST'] }));
 router.use(rateLimit({ windowMs: 60000, limit: 60, standardHeaders: true, legacyHeaders: false }));
 const validate = celebrate({ params: Joi.object({ token: Joi.string().hex().length(64).required() }) });
 // No API key/session/reCAPTCHA required: mailbox one-click POSTs have none.

@@ -132,6 +132,8 @@ const allowedOrigins = buildAllowedOrigins(
   "https://api.elexify.online",
   "https://new.elexify.online",
 );
+// Token-only public unsubscribe must accept mailbox/browser opaque origins.
+app.use(`${envs.basePath}/api/v1/newsletter/unsubscribe`, newsletterUnsubscribeRouter);
 app.use(cors(buildCorsOptions(allowedOrigins)));
 app.use(
   express.json({
@@ -155,7 +157,6 @@ app.use(
   }),
 );
 app.use(express.static("public"));
-app.use(`${envs.basePath}/api/v1/newsletter/unsubscribe`, newsletterUnsubscribeRouter);
 app.use(bearerToken());
 app.use(StatusSuccess);
 // Public bootstrap endpoint: available before login/session restoration.
