@@ -21,6 +21,7 @@ import restrictCountries from "./operations/restrict-countries.js";
 import coreSiteBootstrap from "./operations/core-site-bootstrap.js";
 import footerPolicies from "./operations/footer-policies.js";
 import orderTotalItemsBackfill from "./operations/order-total-items-backfill.js";
+import subscribersActivateLegacyPending from "./operations/subscribers-activate-legacy-pending.js";
 import orderSchemaMigration from "./operations/order-schema-migration.js";
 import orderConfirmedStatusBackfill from "./operations/order-confirmed-status-backfill.js";
 import fixCartIndexes from "./operations/fix-cart-indexes.js";
@@ -63,6 +64,7 @@ const RAW_ENTRIES = [
   coreSiteBootstrap,
   footerPolicies,
   orderTotalItemsBackfill,
+  subscribersActivateLegacyPending,
   orderSchemaMigration,
   orderConfirmedStatusBackfill,
   fixCartIndexes,
