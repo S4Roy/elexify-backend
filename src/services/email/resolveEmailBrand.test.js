@@ -21,6 +21,14 @@ describe('email app settings', () => {
     expect(brand.socialLinks).toHaveLength(1);
     expect(brand.socialLinks[0]).toMatchObject({ label: 'Instagram', url: 'https://instagram.com/example' });
   });
+  it('falls back to the company address from Settings when the env var is unset', async () => {
+    mocks.links.mockResolvedValue({});
+    mocks.settings.mockResolvedValue([{ slug: 'company_address', value: ' 57, T.N. Banerjee Road, Kolkata ' }]);
+    const { resolveEmailBrand } = await import('./resolveEmailBrand.js');
+    const brand = await resolveEmailBrand();
+    expect(brand.companyAddress).toBe(process.env.EMAIL_BRAND_COMPANY_ADDRESS?.trim() || '57, T.N. Banerjee Road, Kolkata');
+    expect(brand.socialLinks).toEqual([]);
+  });
   it('keeps email sending available when optional app settings cannot be read', async () => {
     mocks.links.mockRejectedValue(new Error('settings unavailable'));
     const { resolveEmailBrand } = await import('./resolveEmailBrand.js');

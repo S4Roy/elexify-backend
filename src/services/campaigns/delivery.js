@@ -24,7 +24,10 @@ export async function campaignPreflight({ test = false } = {}) {
   // Test emails have no live unsubscribe link and do not reach an audience.
   if (!test) {
     unsubscribeBase();
-    if (!emailBrand.companyAddress.trim()) throw StatusError.badRequest('Set EMAIL_BRAND_COMPANY_ADDRESS before sending campaigns.');
+    // Postal address is required in marketing email (resolved from env or Settings > company address).
+    if (!(await resolveEmailBrand()).companyAddress?.trim()) {
+      throw StatusError.badRequest('Add the company address in Settings (company_address) or set EMAIL_BRAND_COMPANY_ADDRESS before sending campaigns.');
+    }
   }
   const config = await getIntegrationConfig('smtp', envs.smtp);
   if (!config?.host || !config.email || !config.password) throw new Error('Configure and enable SMTP before sending campaigns.');

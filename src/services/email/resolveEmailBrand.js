@@ -12,10 +12,10 @@ export async function resolveEmailBrand() {
   if (cached && Date.now() < expires) return cached;
   pending ||= Promise.all([
     websiteAppLinks(),
-    SiteSetting.find({ slug: { $in: ['social_instagram_url', 'social_facebook_url', 'social_youtube_url', 'social_twitter_url', 'social_telegram_url'] } }).select('slug value').lean(),
+    SiteSetting.find({ slug: { $in: ['social_instagram_url', 'social_facebook_url', 'social_youtube_url', 'social_twitter_url', 'social_telegram_url', 'company_address'] } }).select('slug value').lean(),
   ]).then(([links, settings]) => {
     const labels = { instagram: 'Instagram', facebook: 'Facebook', youtube: 'YouTube', twitter: 'X (Twitter)', telegram: 'Telegram' };
-    const socialLinks = settings.flatMap(setting => {
+    const socialLinks = settings.filter(setting => setting.slug.startsWith('social_')).flatMap(setting => {
       const key = setting.slug.replace('social_', '').replace('_url', '');
       try {
         const url = new URL(setting.value);
@@ -23,7 +23,11 @@ export async function resolveEmailBrand() {
         return [{ url: url.href, label: labels[key], iconUrl: `${emailBrand.storefrontUrl}/email/${key}.png` }];
       } catch { return []; }
     });
-    cached = { ...emailBrand, socialLinks,
+    // EMAIL_BRAND_COMPANY_ADDRESS wins; otherwise the admin-editable company
+    // address from Settings (the one printed on invoices).
+    const companyAddress = emailBrand.companyAddress.trim()
+      || String(settings.find(setting => setting.slug === 'company_address')?.value || '').trim();
+    cached = { ...emailBrand, socialLinks, companyAddress,
       androidAppUrl: validStoreUrl('android', links.android) ? links.android : '',
       iosAppUrl: validStoreUrl('ios', links.ios) ? links.ios : '',
     };
