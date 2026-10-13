@@ -104,3 +104,10 @@ describe('contact conversation', () => {
     expect(next.mock.calls[0][0].details.get('body').details[0].path).toEqual(['content']);
   });
 });
+
+it('uses the selected contact-thread page size', async () => {
+  req.query.limit = 50;
+  await thread(req, res, next);
+  expect(next).not.toHaveBeenCalled();
+  expect(Message.aggregatePaginate).toHaveBeenCalledWith('aggregation', { page: 2, limit: 50 });
+});

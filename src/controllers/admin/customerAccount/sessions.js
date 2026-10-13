@@ -2,6 +2,10 @@ import mongoose from 'mongoose';
 import User from '../../../models/User.js';
 import AuthEvent from '../../../models/AuthEvent.js';
 import * as sessions from '../../../services/customerSession/index.js';
+const pageLimit = (value, fallback) => {
+  const parsed = Number(value);
+  return Number.isSafeInteger(parsed) && parsed > 0 ? Math.min(100, parsed) : fallback;
+};
 const handler = fn => async (req, res, next) => {
   try {
     if (!mongoose.isValidObjectId(req.params.id)) return res.status(400).json({ status: 'error', message: 'Invalid customer id' });
@@ -12,14 +16,14 @@ const handler = fn => async (req, res, next) => {
 };
 export const listSessions = handler(async (req, res) => {
   res.setHeader('Cache-Control', 'no-store');
-  res.json({ status: 'success', data: await sessions.sessionSummary(req.params.id, undefined, { page: Math.max(1, Math.min(10000, Math.floor(Number(req.query.page) || 1))), limit: 5 }) });
+  res.json({ status: 'success', data: await sessions.sessionSummary(req.params.id, undefined, { page: Math.max(1, Math.min(10000, Math.floor(Number(req.query.page) || 1))), limit: pageLimit(req.query.limit, 5) }) });
 });
 export const securityEvents = handler(async (req, res) => {
   const page = Math.max(1, Math.min(10000, Math.floor(Number(req.query.page) || 1)));
   const data = await AuthEvent.aggregatePaginate(AuthEvent.aggregate([
     { $match: { customerId: new mongoose.Types.ObjectId(req.params.id) } },
     { $sort: { createdAt: -1, _id: -1 } },
-  ]), { page, limit: 10 });
+  ]), { page, limit: pageLimit(req.query.limit, 10) });
   res.setHeader('Cache-Control', 'no-store');
   res.json({ status: 'success', data });
 });

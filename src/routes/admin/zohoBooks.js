@@ -105,18 +105,18 @@ zohoBooksRouter.put("/configuration", configure, body({
 }));
 
 zohoBooksRouter.get("/jobs", view, celebrate({ [Segments.QUERY]: Joi.object({
-  page: Joi.number().integer().min(1).max(10000).default(1),
+  page: Joi.number().integer().min(1).max(10000).default(1), limit: Joi.number().integer().min(1).max(100).default(50),
   status: Joi.string().valid("queued", "running", "retrying", "synced", "dead_letter", "review"),
 }) }), endpoint(async req => {
   const connection = await storedConnection();
   const filter = { organization_id: connection.organization_id, ...(req.query.status ? { status: req.query.status } : {}) };
-  return { jobs: await ZohoSyncJob.find(filter).sort({ updatedAt: -1 }).skip((req.query.page - 1) * 50).limit(50).lean(), total: await ZohoSyncJob.countDocuments(filter) };
+  return { jobs: await ZohoSyncJob.find(filter).sort({ updatedAt: -1 }).skip((req.query.page - 1) * req.query.limit).limit(req.query.limit).lean(), total: await ZohoSyncJob.countDocuments(filter) };
 }));
-zohoBooksRouter.get("/logs", view, celebrate({ [Segments.QUERY]: Joi.object({ page: Joi.number().integer().min(1).max(10000).default(1), paginated: Joi.boolean().default(false) }) }), endpoint(async req => {
+zohoBooksRouter.get("/logs", view, celebrate({ [Segments.QUERY]: Joi.object({ page: Joi.number().integer().min(1).max(10000).default(1), limit: Joi.number().integer().min(1).max(100).default(50), paginated: Joi.boolean().default(false) }) }), endpoint(async req => {
   const connection = await storedConnection();
   const filter = { $or: [{ organization_id: connection.organization_id }, { organization_id: { $exists: false } }] };
   const logs = await ZohoIntegrationLog.find(filter)
-    .sort({ created_at: -1, _id: -1 }).skip((req.query.page - 1) * 50).limit(50).lean();
+    .sort({ created_at: -1, _id: -1 }).skip((req.query.page - 1) * req.query.limit).limit(req.query.limit).lean();
   return req.query.paginated ? { logs, total: await ZohoIntegrationLog.countDocuments(filter) } : logs;
 }));
 zohoBooksRouter.post("/sync", manage, body({ kind: Joi.string().valid("item", "variation", "contact", "order_contact", "salesorder").required(), ids: Joi.array().items(objectId).min(1).max(100).unique().required() }), endpoint(async req => {

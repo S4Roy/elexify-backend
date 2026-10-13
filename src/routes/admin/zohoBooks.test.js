@@ -113,3 +113,14 @@ describe("order customer sync controls", () => {
     expect(enqueueSync).not.toHaveBeenCalled();
   });
 });
+
+it('applies selected Zoho log page sizes and rejects unbounded sizes', async () => {
+  const query = { sort: vi.fn().mockReturnThis(), skip: vi.fn().mockReturnThis(), limit: vi.fn().mockReturnThis(), lean: vi.fn().mockResolvedValue([]) };
+  ZohoIntegrationLog.find.mockReturnValue(query);
+  ZohoIntegrationLog.countDocuments.mockResolvedValue(73);
+  const response = await request(app('manager')).get('/logs?page=3&limit=25&paginated=true');
+  expect(response.status).toBe(200);
+  expect(query.skip).toHaveBeenCalledWith(50);
+  expect(query.limit).toHaveBeenCalledWith(25);
+  expect((await request(app('manager')).get('/logs?limit=101')).status).toBe(400);
+});

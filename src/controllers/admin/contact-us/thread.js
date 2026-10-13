@@ -9,7 +9,7 @@ import { sendContactReply } from '../../../services/email/sendContactReply.js';
 const id = Joi.string().pattern(/^[a-fA-F0-9]{24}$/).required();
 export const threadValidation = celebrate({
   params: Joi.object({ id }),
-  query: Joi.object({ page: Joi.number().integer().min(1).default(1) }),
+  query: Joi.object({ page: Joi.number().integer().min(1).default(1), limit: Joi.number().integer().min(1).max(100).default(20) }),
 });
 export const messageValidation = celebrate({
   params: Joi.object({ id }),
@@ -31,7 +31,7 @@ export async function thread(req, res, next) {
     const messages = await ContactUsMessage.aggregatePaginate(ContactUsMessage.aggregate([
       { $match: { contact_id: new mongoose.Types.ObjectId(req.params.id) } },
       { $sort: { created_at: -1, _id: -1 } },
-    ]), { page: req.query.page || 1, limit: 20 });
+    ]), { page: req.query.page || 1, limit: req.query.limit || 20 });
     res.setHeader('Cache-Control', 'no-store');
     res.json({ status: 'success', data: { contact, messages } });
   } catch (error) { next(error); }

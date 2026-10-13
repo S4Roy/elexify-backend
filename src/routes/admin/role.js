@@ -63,13 +63,13 @@ roleRouter.get('/list', requirePermission('roles.view'), endpoint(async () => {
   const [roles, counts] = await Promise.all([Role.find({ deleted_at: null }).sort({ name: 1 }).lean(), User.aggregate([{ $match: { deleted_at: null, admin_role_id: { $ne: null } } }, { $group: { _id: '$admin_role_id', count: { $sum: 1 } } }])]);
   return roles.map(role => ({ ...role, user_count: counts.find(row => String(row._id) === String(role._id))?.count || 0 }));
 }));
-roleRouter.get('/staff', requirePermission('staff.view'), celebrate({ query: Joi.object({ page: Joi.number().integer().min(1).default(1), search: Joi.string().max(100).allow(''), paginated: Joi.boolean().default(false) }) }), endpoint(async req => {
+roleRouter.get('/staff', requirePermission('staff.view'), celebrate({ query: Joi.object({ page: Joi.number().integer().min(1).default(1), search: Joi.string().max(100).allow(''), limit: Joi.number().integer().min(1).max(100).default(50), paginated: Joi.boolean().default(false) }) }), endpoint(async req => {
   const filter = { rbac_migrated: true, deleted_at: null };
   if (req.query.search) filter.name = { $regex: req.query.search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), $options: 'i' };
-  const docs = await User.find(filter).select('name email status admin_role_id').sort({ name: 1, _id: 1 }).skip((req.query.page - 1) * 50).limit(50).lean();
+  const docs = await User.find(filter).select('name email status admin_role_id').sort({ name: 1, _id: 1 }).skip((req.query.page - 1) * req.query.limit).limit(req.query.limit).lean();
   if (!req.query.paginated) return docs;
   const totalDocs = await User.countDocuments(filter);
-  return { docs, page: req.query.page, limit: 50, totalDocs, totalPages: Math.max(1, Math.ceil(totalDocs / 50)) };
+  return { docs, page: req.query.page, limit: req.query.limit, totalDocs, totalPages: Math.max(1, Math.ceil(totalDocs / req.query.limit)) };
 }));
 roleRouter.post('/staff', requirePermission('staff.create', 'roles.assign'), body({ name: Joi.string().trim().min(1).max(100).required(), email: Joi.string().email().lowercase().required(), password: Joi.string().min(12).max(72).required(), role_id: id.required() }), endpoint(async req => {
   const password = await bcrypt.hash(req.body.password, 12);
