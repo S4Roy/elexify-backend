@@ -1,4 +1,5 @@
 import { recordSearch } from "../../../../services/searchInsights/recordSearch.js";
+import { thumbnailUrlExpr } from "../../../../services/media/mediaUrlExpr.js";
 import { searchTerms } from "../../../../services/search/synonyms.js";
 import { searchPattern } from "../../../../services/search/pattern.js";
 import { suggestAlternatives } from "../../../../services/search/suggest.js";
@@ -541,6 +542,7 @@ export const list = async (req, res, next) => {
               in: {
                 _id: "$$img._id",
                 url: { $concat: [envs.s3.BASE_URL, "$$img.url"] },
+                thumbnail: thumbnailUrlExpr("$$img.thumbnail"),
                 alt: "$$img.alt",
               },
             },

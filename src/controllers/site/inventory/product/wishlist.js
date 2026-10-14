@@ -1,4 +1,5 @@
 import Category from "../../../../models/Category.js";
+import { thumbnailUrlExpr } from "../../../../services/media/mediaUrlExpr.js";
 import Product from "../../../../models/Product.js";
 import Wishlist from "../../../../models/Wishlist.js";
 import ExchangeRate from "../../../../models/ExchangeRate.js";
@@ -246,6 +247,7 @@ export const wishlist = async (req, res, next) => {
               in: {
                 _id: "$$img._id",
                 url: { $concat: [envs.s3.BASE_URL, "$$img.url"] },
+                thumbnail: thumbnailUrlExpr("$$img.thumbnail"),
                 alt: "$$img.alt",
               },
             },

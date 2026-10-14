@@ -1,4 +1,5 @@
 import ShippingSettings from "../../../../models/ShippingSettings.js";
+import { thumbnailUrlExpr } from "../../../../services/media/mediaUrlExpr.js";
 import { resolveCatalogSlug, LEGACY_PRODUCT_SLUGS } from "../../../../services/inventory/resolveCatalogSlug.js";
 import Product from "../../../../models/Product.js";
 import ExchangeRate from "../../../../models/ExchangeRate.js";
@@ -167,6 +168,7 @@ export const details = async (req, res, next) => {
               in: {
                 _id: "$$img._id",
                 url: { $concat: [envs.s3.BASE_URL, "$$img.url"] },
+                thumbnail: thumbnailUrlExpr("$$img.thumbnail"),
                 alt: "$$img.alt",
               },
             },
@@ -336,6 +338,7 @@ export const details = async (req, res, next) => {
                         in: {
                           _id: "$$img._id",
                           url: { $concat: [envs.s3.BASE_URL, "$$img.url"] },
+                          thumbnail: thumbnailUrlExpr("$$img.thumbnail"),
                           alt: "$$img.alt",
                         },
                       },

@@ -1,4 +1,5 @@
 import Cart from "../../../../models/Cart.js";
+import { thumbnailUrlExpr } from "../../../../services/media/mediaUrlExpr.js";
 import ExchangeRate from "../../../../models/ExchangeRate.js";
 import Address from "../../../../models/Address.js";
 import User from "../../../../models/User.js";
@@ -150,6 +151,7 @@ export const carts = async (req, res, next) => {
               in: {
                 _id: "$$img._id",
                 url: { $concat: [envs.s3.BASE_URL, "$$img.url"] },
+                thumbnail: thumbnailUrlExpr("$$img.thumbnail"),
                 alt: "$$img.alt",
               },
             },

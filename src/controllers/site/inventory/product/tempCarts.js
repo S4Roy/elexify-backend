@@ -1,4 +1,5 @@
 import TempCart from "../../../../models/TempCart.js";
+import { thumbnailUrlExpr } from "../../../../services/media/mediaUrlExpr.js";
 import ExchangeRate from "../../../../models/ExchangeRate.js";
 import { StatusError } from "../../../../config/index.js";
 import { envs } from "../../../../config/index.js";
@@ -147,6 +148,7 @@ export const tempCarts = async (req, res, next) => {
               in: {
                 _id: "$$img._id",
                 url: { $concat: [envs.s3.BASE_URL, "$$img.url"] },
+                thumbnail: thumbnailUrlExpr("$$img.thumbnail"),
                 alt: "$$img.alt",
               },
             },

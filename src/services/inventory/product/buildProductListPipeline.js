@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { thumbnailUrlExpr } from "../../media/mediaUrlExpr.js";
 import Category from "../../../models/Category.js";
 import Tag from "../../../models/Tag.js";
 import Brand from "../../../models/Brand.js";
@@ -361,6 +362,7 @@ export const buildProductListPipeline = async (query = {}, slug = null) => {
                         in: {
                           _id: "$$img._id",
                           url: { $concat: [envs.s3.BASE_URL, "$$img.url"] },
+                          thumbnail: thumbnailUrlExpr("$$img.thumbnail"),
                           alt: "$$img.alt",
                         },
                       },

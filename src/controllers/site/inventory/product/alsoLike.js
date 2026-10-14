@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { thumbnailUrlExpr } from "../../../../services/media/mediaUrlExpr.js";
 import Product from "../../../../models/Product.js";
 import OrderItem from "../../../../models/OrderItem.js";
 import ExchangeRate from "../../../../models/ExchangeRate.js";
@@ -132,6 +133,7 @@ export const alsoLike = async (req, res, next) => {
               in: {
                 _id: "$$img._id",
                 url: { $concat: [envs.s3.BASE_URL, "$$img.url"] },
+                thumbnail: thumbnailUrlExpr("$$img.thumbnail"),
                 alt: "$$img.alt",
               },
             },
