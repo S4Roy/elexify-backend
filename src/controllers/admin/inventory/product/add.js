@@ -1,4 +1,5 @@
 import Product from "../../../../models/Product.js";
+import { inRequestedOrder } from "../../../../services/media/orderedMedia.js";
 import ProductAttribute from "../../../../models/ProductAttribute.js";
 import ProductVariation from "../../../../models/ProductVariation.js";
 import ProductSpecification from "../../../../models/ProductSpecification.js";
@@ -124,7 +125,7 @@ export const add = async (req, res, next) => {
       sub_categories: subCategoryArray,
       tags: tagsArray,
       classifications: classificationsArray,
-      images: validMediaDocs.map((img) => img._id),
+      images: inRequestedOrder(mediaIds, validMediaDocs),
       status: status || "active",
       seo: seo._id,
       weight,
@@ -233,7 +234,7 @@ export const add = async (req, res, next) => {
           prepaid_only: Boolean(v.prepaid_only),
           visible_in_list: v.visible_in_list || false,
           attributes: v.attributes || [],
-          images: foundVariationImages.map((m) => m._id),
+          images: inRequestedOrder(validVariationImages, foundVariationImages),
           power_level: v.power_level || 0,
           rarity: v.rarity || "",
           status: "active",

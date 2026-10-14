@@ -1,4 +1,5 @@
 import Category from "../../../../models/Category.js";
+import { keepOrderOf, orderedMediaLookup } from "../../../../services/media/orderedMedia.js";
 import { thumbnailUrlExpr } from "../../../../services/media/mediaUrlExpr.js";
 import Product from "../../../../models/Product.js";
 import Wishlist from "../../../../models/Wishlist.js";
@@ -125,8 +126,7 @@ export const wishlist = async (req, res, next) => {
               $match: {
                 $expr: { $in: ["$_id", "$$imageIds"] },
               },
-            },
-          ],
+            }, ...keepOrderOf("$$imageIds")],
           as: "variation_images",
         },
       },
@@ -230,14 +230,7 @@ export const wishlist = async (req, res, next) => {
           as: "categories",
         },
       },
-      {
-        $lookup: {
-          from: "medias",
-          localField: "images",
-          foreignField: "_id",
-          as: "images",
-        },
-      },
+      orderedMediaLookup({ localField: "images", as: "images" }),
       {
         $addFields: {
           images: {

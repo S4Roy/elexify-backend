@@ -1,4 +1,5 @@
 import Product from "../../../../models/Product.js";
+import { inRequestedOrder } from "../../../../services/media/orderedMedia.js";
 import ProductAttribute from "../../../../models/ProductAttribute.js";
 import ProductVariation from "../../../../models/ProductVariation.js";
 import ProductSpecification from "../../../../models/ProductSpecification.js";
@@ -123,7 +124,7 @@ export const edit = async (req, res, next) => {
       sub_categories: subCategoryArray,
       tags: tagsArray,
       classifications: classificationsArray,
-      images: validMediaDocs.map((img) => img._id),
+      images: inRequestedOrder(mediaIds, validMediaDocs),
       status,
       weight,
       dimensions: { length, width, height },
@@ -261,7 +262,7 @@ export const edit = async (req, res, next) => {
           cod_status: v.cod_status || "use_global",
           prepaid_only: Boolean(v.prepaid_only),
           attributes: v.attributes || [],
-          images: foundVariationImages.map((m) => m._id),
+          images: inRequestedOrder(validVariationImages, foundVariationImages),
           status: "active",
           deleted_at: null, // reset if it was soft-deleted earlier
           updated_by: req.auth.user_id,

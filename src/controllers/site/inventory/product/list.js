@@ -1,4 +1,5 @@
 import { recordSearch } from "../../../../services/searchInsights/recordSearch.js";
+import { keepOrderOf, orderedMediaLookup } from "../../../../services/media/orderedMedia.js";
 import { thumbnailUrlExpr } from "../../../../services/media/mediaUrlExpr.js";
 import { searchTerms } from "../../../../services/search/synonyms.js";
 import { searchPattern } from "../../../../services/search/pattern.js";
@@ -249,8 +250,7 @@ export const list = async (req, res, next) => {
               $match: {
                 $expr: { $in: ["$_id", { $ifNull: ["$$imageIds", []] }] },
               },
-            },
-          ],
+            }, ...keepOrderOf("$$imageIds")],
           as: "variation_images",
         },
       },
@@ -525,14 +525,7 @@ export const list = async (req, res, next) => {
       },
 
       // Resolve media ids to URLs
-      {
-        $lookup: {
-          from: "medias",
-          localField: "images",
-          foreignField: "_id",
-          as: "images",
-        },
-      },
+      orderedMediaLookup({ localField: "images", as: "images" }),
       {
         $addFields: {
           images: {

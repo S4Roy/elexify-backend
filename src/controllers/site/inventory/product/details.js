@@ -1,4 +1,5 @@
 import ShippingSettings from "../../../../models/ShippingSettings.js";
+import { keepOrderOf, orderedMediaLookup } from "../../../../services/media/orderedMedia.js";
 import { thumbnailUrlExpr } from "../../../../services/media/mediaUrlExpr.js";
 import { resolveCatalogSlug, LEGACY_PRODUCT_SLUGS } from "../../../../services/inventory/resolveCatalogSlug.js";
 import Product from "../../../../models/Product.js";
@@ -95,8 +96,7 @@ export const details = async (req, res, next) => {
                 sort_order: 1,
                 created_at: 1,
               },
-            },
-          ],
+            }, ...keepOrderOf("$$imageIds")],
           as: "images",
         },
       },
@@ -318,14 +318,7 @@ export const details = async (req, res, next) => {
                 },
               },
             },
-            {
-              $lookup: {
-                from: "medias",
-                localField: "images",
-                foreignField: "_id",
-                as: "media_docs",
-              },
-            },
+            orderedMediaLookup({ localField: "images", as: "media_docs" }),
             {
               $addFields: {
                 images: {

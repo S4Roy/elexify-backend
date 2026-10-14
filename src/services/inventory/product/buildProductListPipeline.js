@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { orderedMediaLookup } from "../../media/orderedMedia.js";
 import { thumbnailUrlExpr } from "../../media/mediaUrlExpr.js";
 import Category from "../../../models/Category.js";
 import Tag from "../../../models/Tag.js";
@@ -198,14 +199,7 @@ export const buildProductListPipeline = async (query = {}, slug = null) => {
           as: "classifications",
         },
       },
-      {
-        $lookup: {
-          from: "medias",
-          localField: "images",
-          foreignField: "_id",
-          as: "images",
-        },
-      },
+      orderedMediaLookup({ localField: "images", as: "images" }),
       {
         $lookup: {
           from: "seos",
@@ -351,11 +345,23 @@ export const buildProductListPipeline = async (query = {}, slug = null) => {
                   {
                     images: {
                       $map: {
+                        // Walk the variation's own id list so images keep the admin's order.
                         input: {
                           $filter: {
-                            input: "$variation_media",
+                            input: {
+                              $map: {
+                                input: { $ifNull: ["$$variation.images", []] },
+                                as: "vid",
+                                in: {
+                                  $arrayElemAt: [
+                                    { $filter: { input: "$variation_media", as: "m", cond: { $eq: ["$$m._id", "$$vid"] } } },
+                                    0,
+                                  ],
+                                },
+                              },
+                            },
                             as: "m",
-                            cond: { $in: ["$$m._id", "$$variation.images"] },
+                            cond: { $ne: ["$$m", null] },
                           },
                         },
                         as: "img",

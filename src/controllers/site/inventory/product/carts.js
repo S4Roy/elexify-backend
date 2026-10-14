@@ -1,4 +1,5 @@
 import Cart from "../../../../models/Cart.js";
+import { keepOrderOf, orderedMediaLookup } from "../../../../services/media/orderedMedia.js";
 import { thumbnailUrlExpr } from "../../../../services/media/mediaUrlExpr.js";
 import ExchangeRate from "../../../../models/ExchangeRate.js";
 import Address from "../../../../models/Address.js";
@@ -120,19 +121,11 @@ export const carts = async (req, res, next) => {
               $match: {
                 $expr: { $in: ["$_id", "$$imageIds"] },
               },
-            },
-          ],
+            }, ...keepOrderOf("$$imageIds")],
           as: "variation_images",
         },
       },
-      {
-        $lookup: {
-          from: "medias",
-          localField: "product.images",
-          foreignField: "_id",
-          as: "product_images",
-        },
-      },
+      orderedMediaLookup({ localField: "product.images", as: "product_images" }),
 
       {
         $addFields: {

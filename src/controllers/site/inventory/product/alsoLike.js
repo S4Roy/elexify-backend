@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { orderedMediaLookup } from "../../../../services/media/orderedMedia.js";
 import { thumbnailUrlExpr } from "../../../../services/media/mediaUrlExpr.js";
 import Product from "../../../../models/Product.js";
 import OrderItem from "../../../../models/OrderItem.js";
@@ -116,14 +117,7 @@ export const alsoLike = async (req, res, next) => {
           as: "categories",
         },
       },
-      {
-        $lookup: {
-          from: "medias",
-          localField: "images",
-          foreignField: "_id",
-          as: "images",
-        },
-      },
+      orderedMediaLookup({ localField: "images", as: "images" }),
       {
         $addFields: {
           images: {
