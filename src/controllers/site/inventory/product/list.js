@@ -1,4 +1,5 @@
 import { recordSearch } from "../../../../services/searchInsights/recordSearch.js";
+import { searchTerms } from "../../../../services/search/synonyms.js";
 import mongoose from "mongoose";
 import Category from "../../../../models/Category.js";
 import Product from "../../../../models/Product.js";
@@ -746,7 +747,10 @@ export const list = async (req, res, next) => {
       // like `TS to TS 6.35mm (1/4")...`) is matched as text, not
       // interpreted as regex syntax (e.g. unescaped "(...)" silently
       // becomes a non-matching capture group instead of literal parens).
-      const escapedSearchKey = search_key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      // Admin-defined synonyms widen the match to any of the alternatives.
+      const escapedSearchKey = (await searchTerms(search_key))
+        .map(term => term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
+        .join("|");
       pipeline.push({
         $match: {
           $or: [
