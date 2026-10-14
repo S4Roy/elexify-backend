@@ -772,7 +772,8 @@ export const list = async (req, res, next) => {
       options
     );
 
-    recordSearch(search_key, page, result.totalDocs);
+    // Admin previews reuse this handler for exact counts but are not shopper searches.
+    if (!req.skipSearchRecording) recordSearch(search_key, page, result.totalDocs);
 
     res.status(200).json({
       status: "success",

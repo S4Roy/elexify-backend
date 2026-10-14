@@ -1,6 +1,8 @@
 import { beforeEach, expect, it, vi } from "vitest";
 import SearchSynonym from "../../../models/SearchSynonym.js";
-import { create, list, remove, update } from "./searchSynonyms.js";
+import { create, list, preview, remove, update } from "./searchSynonyms.js";
+import { list as storefrontList } from "../../site/inventory/product/list.js";
+vi.mock("../../site/inventory/product/list.js", () => ({ list: vi.fn() }));
 vi.mock("../../../models/SearchSynonym.js", () => ({ default: {
   find: vi.fn(), countDocuments: vi.fn(), create: vi.fn(), findByIdAndUpdate: vi.fn(), findByIdAndDelete: vi.fn(), findOne: vi.fn(),
 } }));
@@ -45,4 +47,20 @@ it("maps duplicate terms to 409 and unknown ids to 404", async () => {
   await remove({ params: { id: "not-an-id" } }, response(), next);
   expect(next.mock.calls[0][0].statusCode).toBe(404);
   expect(SearchSynonym.findByIdAndDelete).not.toHaveBeenCalled();
+});
+
+it("previews exact storefront counts without recording shopper searches", async () => {
+  storefrontList.mockImplementation(async (req, res) => {
+    res.status(200).json({ data: { totalDocs: req.query.search_key === "lithium" ? 12 : 0 } });
+  });
+  const res = response();
+  await preview({ body: { terms: ["Li Ion", "lithium", "li ion", ""] } }, res, vi.fn());
+  expect(storefrontList).toHaveBeenCalledTimes(2);
+  for (const [req] of storefrontList.mock.calls) {
+    expect(req).toMatchObject({ skipSearchRecording: true, auth: null, query: { page: 1, limit: 1 } });
+  }
+  expect(res.json.mock.calls[0][0].data).toEqual([{ term: "li ion", count: 0 }, { term: "lithium", count: 12 }]);
+  const next = vi.fn();
+  await preview({ body: { terms: Array.from({ length: 12 }, (_, i) => `t${i}`) } }, response(), next);
+  expect(next.mock.calls[0][0].statusCode).toBe(400);
 });
