@@ -1,4 +1,13 @@
 import { envs } from "../../config/index.js";
+import { deriveStockStatus } from "../stock/availability.js";
+
+const schemaAvailability = (product) => {
+  if (product.status !== "active") return "https://schema.org/OutOfStock";
+  const status = product.type === "variable" && product.stock_status ? product.stock_status : deriveStockStatus(product);
+  if (status === "in_stock") return "https://schema.org/InStock";
+  if (status === "on_backorder") return "https://schema.org/BackOrder";
+  return "https://schema.org/OutOfStock";
+};
 
 // Builds a schema.org/Product JSON-LD object using only fields that actually
 // exist on the product doc — never fabricates certifications, benefits,
@@ -34,10 +43,7 @@ export const generateStructuredData = (product, seo, { baseUrl } = {}) => {
       "@type": "Offer",
       priceCurrency: "INR",
       price: String(price),
-      availability:
-        product.status === "active" && (product.stock_quantity ?? 0) > 0
-          ? "https://schema.org/InStock"
-          : "https://schema.org/OutOfStock",
+      availability: schemaAvailability(product),
       ...(baseUrl && product.slug ? { url: `${baseUrl.replace(/\/$/, "")}/product/${product.slug}/` } : {}),
     };
   }

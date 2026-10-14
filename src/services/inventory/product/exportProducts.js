@@ -3,6 +3,7 @@ import mongoose from 'mongoose';
 import Product from '../../../models/Product.js';
 import { StatusError } from '../../../config/index.js';
 import { buildProductListPipeline } from './buildProductListPipeline.js';
+import { availableOf } from '../../stock/availability.js';
 
 export const PRODUCT_EXPORT_ROW_LIMIT = 20000;
 
@@ -16,7 +17,9 @@ export const productExportRows = product => {
     slug: product.slug, created_at: product.created_at,
   };
   const row = item => ({ ...common, sku: item.sku || '', hsn: item.hsn_sac || product.hsn_sac || '', regular_price: item.regular_price,
-    sale_price: item.sale_price, stock_quantity: item.stock_quantity, weight: item.weight,
+    sale_price: item.sale_price, stock_quantity: item.stock_quantity, reserved_quantity: item.reserved_quantity ?? 0,
+    available_quantity: item.manage_stock === false ? 'Not tracked' : availableOf(item), stock_status: item.stock_status || '',
+    weight: item.weight,
     variation_id: item === product ? '' : String(item._id),
     attributes: (item.attributes || []).filter(a => a.value).map(a => `${a.attribute?.name || ''}: ${a.value?.name || a.value?.value || ''}`).join(', '),
   });
@@ -36,7 +39,8 @@ export const buildProductsExportWorkbook = async (query = {}) => {
     ['Variation ID', 'variation_id'], ['Attributes', 'attributes'], ['Status', 'status'],
     ['Brand', 'brand'], ['Categories', 'categories'], ['Subcategories', 'sub_categories'],
     ['Tags', 'tags'], ['Regular price', 'regular_price'], ['Sale price', 'sale_price'],
-    ['Stock quantity', 'stock_quantity'], ['Weight (kg)', 'weight'], ['Slug', 'slug'], ['Created at', 'created_at'],
+    ['On hand', 'stock_quantity'], ['Reserved', 'reserved_quantity'], ['Available', 'available_quantity'],
+    ['Stock status', 'stock_status'], ['Weight (kg)', 'weight'], ['Slug', 'slug'], ['Created at', 'created_at'],
   ].map(([header, key]) => ({ header, key, width: key === 'name' ? 45 : 24 }));
   let count = 0;
   let productCount = 0;

@@ -11,6 +11,7 @@ import User from "../../models/User.js";
 import { getOrGenerateInvoice } from "../invoiceService/getOrGenerateInvoice.js";
 import ProviderOrderAttempt from "../../models/ProviderOrderAttempt.js";
 import { cancelOrder } from "./cancelOrder.js";
+import StockReservation from "../../models/StockReservation.js";
 
 const uri = process.env.TEST_MONGODB_URI;
 const suite = uri ? describe : describe.skip;
@@ -96,10 +97,7 @@ suite("finalizeCapturedPayment replica-set integration", () => {
 
   beforeEach(async () => {
     await mongoose.connection.db.dropDatabase();
-    await StockTransaction.collection.createIndex(
-      { reference_id: 1, product: 1, variation: 1, type: 1 },
-      { unique: true, partialFilterExpression: { reference_type: "order" } },
-    );
+    await Promise.all([StockTransaction.syncIndexes(), StockReservation.syncIndexes()]);
     await CouponUsage.collection.createIndex({ order: 1 }, { unique: true });
     await Order.collection.createIndex(
       { user: 1, idempotency_key: 1 },
@@ -115,7 +113,7 @@ suite("finalizeCapturedPayment replica-set integration", () => {
     }
   });
 
-  it("allows exactly one of two orders to buy the last unit", async () => {
+  it("lets exactly one of two late captures buy the last unit and refunds the other", async () => {
     const productId = oid();
     await Product.collection.insertOne({ _id: productId, name: "Last unit", status: "active", stock_quantity: 1 });
     const first = await seedOrder({ productIds: [productId], quantities: [1], suffix: "race-a", coupon: true });
@@ -126,14 +124,20 @@ suite("finalizeCapturedPayment replica-set integration", () => {
       finalizeCapturedPayment({ orderId: second.id, paymentData: paymentFor(second, "pay_race_b"), source: "integration" }),
     ]);
 
-    expect(results.filter((result) => result.status === "fulfilled")).toHaveLength(1);
-    expect(results.filter((result) => result.status === "rejected")).toHaveLength(1);
-    expect(results.find((result) => result.status === "rejected").reason.message).toContain("OUT_OF_STOCK");
+    // Neither order held a reservation, so both captures race for the unit.
+    // The loser is not thrown back at the webhook (which would dead-letter
+    // it): its payment is recorded, the order cancelled and a refund tried.
+    expect(results.every((result) => result.status === "fulfilled")).toBe(true);
+    expect(results.filter((result) => result.value.outOfStock)).toHaveLength(1);
     expect((await Product.findById(productId)).stock_quantity).toBe(0);
     expect(await StockTransaction.countDocuments({ product: productId, type: "sale" })).toBe(1);
     expect(await CouponUsage.countDocuments()).toBeLessThanOrEqual(1);
-    const failed = results[0].status === "rejected" ? first : second;
-    expect((await Order.findById(failed._id)).stock_reserved).toBe(false);
+    const failed = results[0].value.outOfStock ? first : second;
+    const loser = await Order.findById(failed._id);
+    expect(loser.stock_reserved).toBe(false);
+    expect(loser.order_status).toBe("cancelled");
+    expect(loser.stock_flag).toBe("late_capture_oos");
+    expect(["refund_pending", "refund_failed", "refunded"]).toContain(loser.payment_status);
   });
 
   it("rolls back every line, ledger and coupon when one SKU is unavailable", async () => {
@@ -146,16 +150,23 @@ suite("finalizeCapturedPayment replica-set integration", () => {
     const order = await seedOrder({
       productIds: [available, unavailable], quantities: [2, 1], suffix: "rollback", coupon: true,
     });
-    await expect(finalizeCapturedPayment({
+    const result = await finalizeCapturedPayment({
       orderId: order.id, paymentData: paymentFor(order, "pay_rollback"), source: "integration",
-    })).rejects.toThrow("OUT_OF_STOCK");
+    });
+    expect(result.outOfStock).toBe(true);
 
     expect((await Product.findById(available)).stock_quantity).toBe(5);
     expect(await StockTransaction.countDocuments({ reference_id: order._id })).toBe(0);
     expect(await CouponUsage.countDocuments({ order: order._id })).toBe(0);
-    const unchanged = await Order.findById(order._id);
-    expect(unchanged.payment_status).toBe("pending");
-    expect(unchanged.stock_reserved).toBe(false);
+    const cancelled = await Order.findById(order._id);
+    expect(cancelled.order_status).toBe("cancelled");
+    expect(cancelled.stock_flag).toBe("late_capture_oos");
+    expect(cancelled.stock_reserved).toBe(false);
+    // Replays of the same capture are no-ops.
+    const replay = await finalizeCapturedPayment({
+      orderId: order.id, paymentData: paymentFor(order, "pay_rollback"), source: "integration",
+    });
+    expect(replay.alreadyFinalized).toBe(true);
   });
 
   it("finalizes concurrent duplicate requests exactly once", async () => {
@@ -201,7 +212,7 @@ suite("finalizeCapturedPayment replica-set integration", () => {
     ]);
 
     expect((await Product.findById(productId)).stock_quantity).toBe(4);
-    expect(await StockTransaction.countDocuments({ reference_id: order._id, type: "return" })).toBe(1);
+    expect(await StockTransaction.countDocuments({ reference_id: order._id, type: "restock" })).toBe(1);
     expect((await Order.findById(order._id)).inventory_reverted).toBe(true);
   });
 

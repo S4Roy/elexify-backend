@@ -10,6 +10,9 @@ import SEO from "../../../../models/SEO.js";
 import ProductResource from "../../../../resources/ProductResource.js";
 import { generalHelper } from "../../../../helpers/index.js";
 import { scheduleGoogleFeedRegeneration } from "../../../../services/inventory/product/googleFeedService.js";
+import { stockService } from "../../../../services/index.js";
+import { stockSettings } from "../../../../services/stock/settings.js";
+
 
 /**
  * Update Product with SEO, Media, Variations & Meta
@@ -53,11 +56,6 @@ export const edit = async (req, res, next) => {
       sale_end_date,
       sku,
       hsn_sac,
-      stock_status,
-      stock_quantity,
-
-      allow_backorders,
-      manage_stock,
       sold_individually,
 
       variations = [],
@@ -141,11 +139,11 @@ export const edit = async (req, res, next) => {
       sale_start_date: product_type === "simple" ? sale_start_date : undefined,
       sale_end_date: product_type === "simple" ? sale_end_date : undefined,
       sku: product_type === "simple" ? sku : undefined,
-      stock_status: product_type === "simple" ? stock_status : undefined,
-      stock_quantity: product_type === "simple" ? stock_quantity : undefined,
-
-      allow_backorders,
-      manage_stock,
+      // Stock levels are never written here — on-hand only changes through
+      // services/stock (POST /admin/inventory/stock/adjust), so a sale made
+      // while this form was open can't be overwritten. stock_status is
+      // derived on save.
+      ...stockSettings(req.body),
       sold_individually,
       updated_by: req.auth.user_id,
     });
@@ -259,7 +257,7 @@ export const edit = async (req, res, next) => {
           enable_enquiry: v.enable_enquiry || false,
           regular_price: v.regular_price,
           sale_price: v.sale_price || null,
-          stock_quantity: v.stock_quantity || 0,
+          ...stockSettings(v),
           weight: v.weight || 0,
           dimensions: {
             length: v.length || 0,
@@ -279,15 +277,23 @@ export const edit = async (req, res, next) => {
         if (v._id && /^[0-9a-fA-F]{24}$/.test(v._id)) {
           // Update existing variation
           await ProductVariation.findByIdAndUpdate(v._id, variationData);
+          await stockService.refreshStockStatus({ product: product._id, variation: v._id });
         } else {
-          // Create new variation
+          // Create new variation; its starting quantity is booked as an
+          // opening balance in the stock ledger.
           const newVariation = new ProductVariation({
             ...variationData,
+            stock_quantity: 0,
             created_by: req.auth.user_id,
           });
           await newVariation.save();
+          await stockService.recordOpeningStock({
+            product: product._id, variation: newVariation._id, quantity: v.stock_quantity,
+            actor: { type: "admin", id: req.auth.user_id },
+          });
         }
       }
+      await stockService.refreshParentStatus(product._id);
     }
     // Replace specifications
     await ProductSpecification.deleteMany({ product_id: product._id });

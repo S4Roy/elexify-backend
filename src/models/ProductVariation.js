@@ -1,6 +1,8 @@
 import mongoose from "mongoose";
 import mongooseAggregatePaginate from "mongoose-aggregate-paginate-v2";
 import slugify from "slugify";
+import { STOCK_STATUSES } from "../constants/stock.js";
+import { deriveStockStatus } from "../services/stock/availability.js";
 
 const { Schema, model, Types } = mongoose;
 
@@ -70,11 +72,43 @@ const ProductVariationSchema = new Schema(
       min: 0, // Ensure sale price is non-negative
       default: null,
     },
+    // On-hand units. May go negative only for allow_backorders SKUs (units
+    // owed to customers); services/stock guards every other decrement.
     stock_quantity: {
       type: Number,
       required: true,
-      min: 0, // Ensure stock is non-negative
       default: 0,
+    },
+    // On-hand = stock_quantity. Units held by unpaid prepaid orders live in
+    // reserved_quantity; available = stock_quantity - reserved_quantity.
+    // Both are only ever moved through services/stock (guarded $inc), never
+    // written directly — $inc bypasses the `min` validators.
+    reserved_quantity: {
+      type: Number,
+      min: 0,
+      default: 0,
+    },
+    manage_stock: {
+      type: Boolean,
+      default: true,
+    },
+    allow_backorders: {
+      type: Boolean,
+      default: false,
+    },
+    // Derived from the fields above by services/stock deriveStockStatus();
+    // stored so list filters / feeds don't have to compute it.
+    stock_status: {
+      type: String,
+      enum: STOCK_STATUSES,
+      default: "out_of_stock",
+    },
+    // Per-SKU low-stock threshold; null falls back to the
+    // `low_stock_threshold` site setting.
+    low_stock_threshold: {
+      type: Number,
+      min: 0,
+      default: null,
     },
     avg_rating: {
       type: Number,
@@ -150,6 +184,14 @@ const ProductVariationSchema = new Schema(
     timestamps: { createdAt: "created_at", updatedAt: "updated_at" },
   }
 );
+
+// Keep the stored stock_status derived whenever a document is saved
+// (create, import, legacy paths). Atomic updates go through services/stock,
+// which refreshes it in the same update.
+ProductVariationSchema.pre("save", function (next) {
+  this.stock_status = deriveStockStatus(this);
+  next();
+});
 
 // 🔹 Apply pagination plugin
 ProductVariationSchema.plugin(mongooseAggregatePaginate);

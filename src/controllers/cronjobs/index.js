@@ -4,3 +4,4 @@ export { updatePendingRazorpayPayments } from "./updatePendingRazorpayPayments.j
 export { generateGoogleFeed, regenerateGoogleFeed } from "./generateGoogleFeed.js";
 export { reconcileReturnRefunds } from "./reconcileReturnRefunds.js";
 export { cleanupReturnEvidence } from "./cleanupReturnEvidence.js";
+export { releaseExpiredReservations } from "./releaseExpiredReservations.js";

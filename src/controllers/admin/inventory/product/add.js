@@ -11,6 +11,8 @@ import { StatusError } from "../../../../config/index.js";
 import ProductResource from "../../../../resources/ProductResource.js";
 import { generalHelper } from "../../../../helpers/index.js";
 import { scheduleGoogleFeedRegeneration } from "../../../../services/inventory/product/googleFeedService.js";
+import { stockService } from "../../../../services/index.js";
+import { stockSettings } from "../../../../services/stock/settings.js";
 
 /**
  * Add Product with SEO, Media, Variations & Meta
@@ -50,11 +52,8 @@ export const add = async (req, res, next) => {
       sale_end_date,
       sku,
       hsn_sac,
-      stock_status,
       stock_quantity,
 
-      allow_backorders,
-      manage_stock,
       sold_individually,
 
       variations = [],
@@ -143,15 +142,20 @@ export const add = async (req, res, next) => {
       sale_end_date: product_type === "simple" ? sale_end_date : undefined,
       sku: product_type === "simple" ? sku : undefined,
       hsn_sac: hsnOrNull(hsn_sac) ?? undefined,
-      stock_status: product_type === "simple" ? stock_status : undefined,
-      stock_quantity: product_type === "simple" ? stock_quantity : undefined,
-      allow_backorders,
-      manage_stock,
+      // Created at 0; the starting quantity is booked below as an opening
+      // balance so the stock ledger accounts for every unit.
+      stock_quantity: 0,
+      ...stockSettings(req.body),
       sold_individually,
       created_by: req.auth.user_id,
     });
 
     await product.save();
+    if (product_type === "simple") {
+      await stockService.recordOpeningStock({
+        product: product._id, quantity: stock_quantity, actor: { type: "admin", id: req.auth.user_id },
+      });
+    }
 
     // 🔹 Update SEO and Media reference
     await Promise.all([
@@ -228,7 +232,8 @@ export const add = async (req, res, next) => {
           combination_key, // 👈 new field
           regular_price: v.regular_price,
           sale_price: v.sale_price || null,
-          stock_quantity: v.stock_quantity || 0,
+          stock_quantity: 0,
+          ...stockSettings(v),
           weight: v.weight || 0,
           dimensions: {
             length: v.length || 0,
@@ -248,7 +253,12 @@ export const add = async (req, res, next) => {
         });
 
         await variation.save();
+        await stockService.recordOpeningStock({
+          product: product._id, variation: variation._id, quantity: v.stock_quantity,
+          actor: { type: "admin", id: req.auth.user_id },
+        });
       }
+      await stockService.refreshParentStatus(product._id);
     }
     const specificationsDelete = await ProductSpecification.deleteMany({
       product_id: product._id,

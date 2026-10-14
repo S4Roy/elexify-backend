@@ -9,9 +9,8 @@ import Order from "../../models/Order.js";
 import OrderItem from "../../models/OrderItem.js";
 import ReturnRequest from "../../models/ReturnRequest.js";
 import Media from "../../models/Media.js";
-import Product from "../../models/Product.js";
-import ProductVariation from "../../models/ProductVariation.js";
-import StockTransaction from "../../models/StockTransaction.js";
+import { STOCK_REASON } from "../../constants/stock.js";
+import { restockLines } from "../stock/mutations.js";
 import { StatusError } from "../../config/index.js";
 import { ORDER_STATUS } from "../../constants/orderStatus.js";
 import { getOrderPolicy } from "./orderPolicy.js";
@@ -121,15 +120,12 @@ export const receiveReturnRequest = async ({ requestId, adminId }) => {
 };
 
 const restockAcceptedItems = async (request, adminId, session) => {
-  for (const item of request.items) {
-    if (item.disposition !== 'restock' || !item.accepted_quantity) continue;
-    const Model = item.variation_id ? ProductVariation : Product;
-    const updated = await Model.updateOne({ _id: item.variation_id || item.product_id }, { $inc: { stock_quantity: item.accepted_quantity } }, { session });
-    if (updated.modifiedCount !== 1) throw StatusError.conflict('Return product no longer exists');
-    await StockTransaction.create([{ reference_id: request._id, reference_type: 'return', product: item.product_id,
-      variation: item.variation_id || null, type: 'return', quantity: item.accepted_quantity,
-      selling_price: item.refundable_unit_amount, created_by: adminId }], { session });
-  }
+  const lines = request.items
+    .filter((item) => item.disposition === 'restock' && item.accepted_quantity)
+    .map((item) => ({ product: item.product_id, variation: item.variation_id || null,
+      quantity: item.accepted_quantity, selling_price: item.refundable_unit_amount }));
+  await restockLines({ lines, referenceId: request._id, referenceType: 'return', keyPrefix: `return:${request._id}:restock`,
+    reason: STOCK_REASON.CUSTOMER_RETURN, actor: { type: 'admin', id: adminId }, strict: true, session });
 };
 
 export const inspectReturnRequest = async ({ requestId, adminId, items, note }) => {

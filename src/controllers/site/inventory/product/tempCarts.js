@@ -9,6 +9,7 @@ import { inventoryService } from "../../../../services/index.js";
 import Address from "../../../../models/Address.js";
 import User from "../../../../models/User.js";
 import { shippingService } from "../../../../services/index.js";
+import { isPurchasable, toCustomerStock } from "../../../../services/stock/availability.js";
 
 export const tempCarts = async (req, res, next) => {
   try {
@@ -346,8 +347,8 @@ export const tempCarts = async (req, res, next) => {
       }).lean();
       if (address) {
         const rawCarts = await TempCart.find(matchFilter)
-          .populate({ path: "product", select: "weight shipping_class stock_quantity status cod_status prepaid_only categories brand" })
-          .populate({ path: "variation", select: "weight shipping_class stock_quantity status cod_status prepaid_only" })
+          .populate({ path: "product", select: "weight shipping_class stock_quantity reserved_quantity manage_stock allow_backorders status cod_status prepaid_only categories brand" })
+          .populate({ path: "variation", select: "weight shipping_class stock_quantity reserved_quantity manage_stock allow_backorders status cod_status prepaid_only" })
           .lean();
         const rateResult = await shippingService.calculateShippingRate({
           items: rawCarts.map((c) => {
@@ -367,7 +368,7 @@ export const tempCarts = async (req, res, next) => {
           max_delivery_days: rateResult.max_delivery_days,
           isAvailable: rawCarts.every((c) => {
             const source = c.variation || c.product;
-            return source && source.status !== "inactive" && (source.stock_quantity == null || source.stock_quantity >= c.quantity);
+            return isPurchasable(source, c.quantity);
           }),
         });
         const customer = user_id ? await User.findById(user_id).select("role").lean() : null;
@@ -380,6 +381,12 @@ export const tempCarts = async (req, res, next) => {
           exchangeRate: rate,
         });
       }
+    }
+
+    // Shoppers see sellable units (on-hand minus reserved holds).
+    for (const doc of docs) {
+      toCustomerStock(doc.product);
+      toCustomerStock(doc.variation);
     }
 
     res.status(200).json({

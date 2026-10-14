@@ -11,6 +11,7 @@ import { emailBrand } from "../../config/emailBrand.js";
 import { sendNotification } from "../notification/sendNotification.js";
 import { sendEmail } from "../email/index.js";
 import { ensureEmailTemplate } from "../emailTemplate/seedRunner.js";
+import { availableExpr, availableOf } from "../stock/availability.js";
 
 // Stock alerts, run on a cron tick:
 //  - runBackInStockCycle: one-time BACK_IN_STOCK notification to every
@@ -54,20 +55,21 @@ export const setLowStockThreshold = async (value, actorId = null) => {
  */
 export const describeItem = async (productId, variationId = null) => {
   const product = await Product.findOne({ _id: productId, deleted_at: null })
-    .select("name slug type status stock_quantity sale_price regular_price images")
+    .select("name slug type status stock_quantity reserved_quantity manage_stock sale_price regular_price images")
     .populate({ path: "images", select: "url", options: { limit: 1 } })
     .lean();
   if (!product) return null;
   let variation = null;
   if (variationId) {
     variation = await ProductVariation.findOne({ _id: variationId, product_id: product._id, deleted_at: null })
-      .select("combination_display status stock_quantity sale_price regular_price images")
+      .select("combination_display status stock_quantity reserved_quantity manage_stock sale_price regular_price images")
       .populate({ path: "images", select: "url", options: { limit: 1 } })
       .lean();
     if (!variation) return null;
   }
   const source = variation || product;
-  const stock = source.stock_quantity;
+  // Units a shopper can actually buy (on-hand minus reserved holds).
+  const stock = source.manage_stock === false ? null : availableOf(source);
   const purchasable = product.status === "active" && (!variation || variation.status === "active");
   return {
     product,
@@ -169,25 +171,32 @@ export const runBackInStockCycle = async () => {
 
 /**
  * Every active simple product and active variation (of an active variable
- * product) whose stock is below `threshold` — matches the dashboard's
- * low_stock/out_of_stock definition (stock < threshold, 0 = out).
+ * product) whose *available* stock (on-hand minus reserved) is below its
+ * own low_stock_threshold, or the site `threshold` when it has none — 0 =
+ * out. SKUs that don't track stock are never low. `stock_quantity` in the
+ * output is the available count.
  */
+const belowThreshold = (threshold) => ({
+  manage_stock: { $ne: false },
+  $expr: { $lt: [availableExpr(), { $ifNull: ["$low_stock_threshold", threshold] }] },
+});
+
 export const lowStockPipeline = (threshold) => [
-  { $match: { type: "simple", deleted_at: null, status: "active", stock_quantity: { $lt: threshold } } },
+  { $match: { type: "simple", deleted_at: null, status: "active", ...belowThreshold(threshold) } },
   { $project: {
-    product_id: "$_id", variation_id: null, name: 1, slug: 1, sku: 1, stock_quantity: 1,
+    product_id: "$_id", variation_id: null, name: 1, slug: 1, sku: 1, stock_quantity: availableExpr(),
     variation_name: null, image: { $arrayElemAt: ["$images", 0] },
   } },
   { $unionWith: {
     coll: "product_variations",
     pipeline: [
-      { $match: { deleted_at: null, status: "active", stock_quantity: { $lt: threshold } } },
+      { $match: { deleted_at: null, status: "active", ...belowThreshold(threshold) } },
       { $lookup: { from: "products", localField: "product_id", foreignField: "_id", as: "product" } },
       { $unwind: "$product" },
       { $match: { "product.deleted_at": null, "product.status": "active" } },
       { $project: {
         product_id: "$product._id", variation_id: "$_id", name: "$product.name", slug: "$product.slug",
-        sku: { $ifNull: ["$sku", "$product.sku"] }, stock_quantity: 1, variation_name: "$combination_display",
+        sku: { $ifNull: ["$sku", "$product.sku"] }, stock_quantity: availableExpr(), variation_name: "$combination_display",
         image: { $ifNull: [{ $arrayElemAt: ["$images", 0] }, { $arrayElemAt: ["$product.images", 0] }] },
       } },
     ],

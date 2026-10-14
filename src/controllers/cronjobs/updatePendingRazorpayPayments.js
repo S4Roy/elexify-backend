@@ -1,10 +1,8 @@
 import Order from "../../models/Order.js";
-import axios from "axios";
 import { orderService, notificationService, auditService } from "../../services/index.js";
-import { getRazorpayConfig } from "../../services/integrationCredentials/razorpay.js";
+import { fetchRazorpayOrderPayments, failUnpaidOrder } from "../../services/stock/expiry.js";
 
 export const updatePendingRazorpayPayments = async () => {
-  const credentials = await getRazorpayConfig();
   const pendingOrders = await Order.find({
     order_status: "pending", payment_status: "pending", payment_method: { $in: ["razorpay", "cod"] },
     "payment_meta.razorpay_order_id": { $ne: null },
@@ -14,11 +12,7 @@ export const updatePendingRazorpayPayments = async () => {
     const providerOrderId = order.payment_meta?.razorpay_order_id;
     if (!providerOrderId) continue;
     try {
-      const { data } = await axios.get(
-        `https://api.razorpay.com/v1/orders/${providerOrderId}/payments`,
-        { auth: { username: credentials.key_id, password: credentials.key_secret } },
-      );
-      const payments = data.items || [];
+      const payments = await fetchRazorpayOrderPayments(providerOrderId);
       const captured = payments.find((payment) => payment.status === "captured");
       if (captured) {
         const result = await orderService.finalizeCapturedPayment({
@@ -33,9 +27,7 @@ export const updatePendingRazorpayPayments = async () => {
         }
       } else if (payments.some((payment) => payment.status === "failed")) {
         const failedPayment = payments.find((payment) => payment.status === "failed") || {};
-        await orderService.transitionOrder({
-          orderId: order._id, paymentStatus: "failed", orderStatus: "failed",
-        });
+        await failUnpaidOrder({ orderId: order._id, reason: "payment_failed" });
         notificationService.sendOrderNotification({
           order,
           event: "PAYMENT_FAILED",
@@ -56,9 +48,7 @@ export const updatePendingRazorpayPayments = async () => {
         const createdAt = order.created_at || order._id.getTimestamp();
         const minutesElapsed = (now - createdAt) / 60000;
         if (minutesElapsed > 15) {
-          await orderService.transitionOrder({
-            orderId: order._id, paymentStatus: "failed", orderStatus: "failed",
-          });
+          await failUnpaidOrder({ orderId: order._id, reason: "payment_timed_out" });
           notificationService.sendOrderNotification({
             order,
             event: "PAYMENT_FAILED",

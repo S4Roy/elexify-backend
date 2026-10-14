@@ -1,6 +1,8 @@
 import mongoose from "mongoose";
 import mongooseAggregatePaginate from "mongoose-aggregate-paginate-v2";
 import slugify from "slugify";
+import { STOCK_STATUSES } from "../constants/stock.js";
+import { deriveStockStatus } from "../services/stock/availability.js";
 
 const { Schema, model, Types } = mongoose;
 
@@ -92,10 +94,42 @@ const ProductSchema = new Schema(
       min: 0,
       default: null,
     },
+    // On-hand units. May go negative only for allow_backorders SKUs (units
+    // owed to customers); services/stock guards every other decrement.
     stock_quantity: {
+      type: Number,
+      default: 0,
+    },
+    // On-hand = stock_quantity. Units held by unpaid prepaid orders live in
+    // reserved_quantity; available = stock_quantity - reserved_quantity.
+    // Both are only ever moved through services/stock (guarded $inc), never
+    // written directly — $inc bypasses the `min` validators.
+    reserved_quantity: {
       type: Number,
       min: 0,
       default: 0,
+    },
+    manage_stock: {
+      type: Boolean,
+      default: true,
+    },
+    allow_backorders: {
+      type: Boolean,
+      default: false,
+    },
+    // Derived from the fields above by services/stock deriveStockStatus();
+    // stored so list filters / feeds don't have to compute it.
+    stock_status: {
+      type: String,
+      enum: STOCK_STATUSES,
+      default: "out_of_stock",
+    },
+    // Per-SKU low-stock threshold; null falls back to the
+    // `low_stock_threshold` site setting.
+    low_stock_threshold: {
+      type: Number,
+      min: 0,
+      default: null,
     },
     sku: {
       type: String,
@@ -211,6 +245,16 @@ const ProductSchema = new Schema(
 );
 
 // 🔹 Automatically generate slug only when `name` changes
+// Keep the stored stock_status derived whenever a document is saved
+// (create, import, legacy paths). Atomic updates go through services/stock,
+// which refreshes it in the same update.
+ProductSchema.pre("save", function (next) {
+  // A variable product's status rolls up from its variations instead
+  // (services/stock refreshParentStatus).
+  if (this.type !== "variable") this.stock_status = deriveStockStatus(this);
+  next();
+});
+
 ProductSchema.pre("validate", function (next) {
   if (this.isModified("name") && !this.slug) {
     this.slug = slugify(this.name, { lower: true, strict: true });
@@ -232,6 +276,7 @@ ProductSchema.index(
   { unique: true, partialFilterExpression: { deleted_at: null } }
 );
 ProductSchema.index({ status: 1 });
+ProductSchema.index({ stock_status: 1 });
 ProductSchema.index({ brand: 1 });
 ProductSchema.index({ meta_title: 1 });
 ProductSchema.index({ meta_keywords: 1 });

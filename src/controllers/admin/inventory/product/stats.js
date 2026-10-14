@@ -5,6 +5,7 @@ import User from "../../../../models/User.js";
 import SiteSetting from "../../../../models/SiteSetting.js";
 import Order from "../../../../models/Order.js"; // ✅ Import order model
 import { dashboardHelper } from "../../../../helpers/index.js";
+import { availableExpr } from "../../../../services/stock/availability.js";
 
 export const stats = async (req, res, next) => {
   try {
@@ -51,13 +52,13 @@ export const stats = async (req, res, next) => {
             low_stock: [
               {
                 $match: {
-                  stock_quantity: { $gt: 0, $lt: LOW_STOCK_THRESHOLD },
+                  $expr: { $and: [{ $gt: [availableExpr(), 0] }, { $lt: [availableExpr(), LOW_STOCK_THRESHOLD] }] },
                 },
               },
               { $count: "count" },
             ],
             out_of_stock: [
-              { $match: { stock_quantity: 0 } },
+              { $match: { $expr: { $lte: [availableExpr(), 0] } } },
               { $count: "count" },
             ],
           },
@@ -82,13 +83,13 @@ export const stats = async (req, res, next) => {
             low_stock: [
               {
                 $match: {
-                  stock_quantity: { $gt: 0, $lt: LOW_STOCK_THRESHOLD },
+                  $expr: { $and: [{ $gt: [availableExpr(), 0] }, { $lt: [availableExpr(), LOW_STOCK_THRESHOLD] }] },
                 },
               },
               { $count: "count" },
             ],
             out_of_stock: [
-              { $match: { stock_quantity: 0 } },
+              { $match: { $expr: { $lte: [availableExpr(), 0] } } },
               { $count: "count" },
             ],
           },

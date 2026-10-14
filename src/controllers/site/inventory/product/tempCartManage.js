@@ -3,6 +3,7 @@ import Product from "../../../../models/Product.js";
 import ProductVariation from "../../../../models/ProductVariation.js";
 import { StatusError } from "../../../../config/index.js";
 import { inventoryService } from "../../../../services/index.js";
+import { availableOf, isPurchasable } from "../../../../services/stock/availability.js";
 
 /**
  * Add, Remove, or Update Product in TempCart (Supports Auth & Guest, Simple & Variable)
@@ -61,9 +62,9 @@ export const tempCartManage = async (req, res, next) => {
         throw StatusError.notFound(req.__("Variation not found"));
       }
 
-      if (quantity > variation.stock_quantity) {
+      if (!isPurchasable(variation, quantity)) {
         throw StatusError.badRequest(
-          req.__("Only %s item(s) available in stock", variation.stock_quantity)
+          req.__("Only %s item(s) available in stock", availableOf(variation))
         );
       }
 
@@ -76,9 +77,9 @@ export const tempCartManage = async (req, res, next) => {
       }
     } else {
       // ✅ Simple product
-      if (quantity > product.stock_quantity) {
+      if (!isPurchasable(product, quantity)) {
         throw StatusError.badRequest(
-          req.__("Only %s item(s) available in stock", product.stock_quantity)
+          req.__("Only %s item(s) available in stock", availableOf(product))
         );
       }
 

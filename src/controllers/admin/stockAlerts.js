@@ -5,6 +5,7 @@ import LowStockAlert from "../../models/LowStockAlert.js";
 import { envs, StatusError } from "../../config/index.js";
 import { auditService } from "../../services/index.js";
 import { getLowStockThreshold, getSettings, lowStockPipeline, setLowStockThreshold } from "../../services/stockAlerts/index.js";
+import { availableExpr } from "../../services/stock/availability.js";
 
 // Admin "Stock Alerts": what needs restocking (low/out of stock, with how
 // many customers are waiting) and back-in-stock demand from "Notify me".
@@ -81,7 +82,8 @@ export const requests = async (req, res, next) => {
         slug: "$product.slug",
         variation_name: "$variation.combination_display",
         sku: { $ifNull: ["$variation.sku", "$product.sku"] },
-        stock_quantity: { $cond: [{ $ifNull: ["$variation_id", false] }, "$variation.stock_quantity", "$product.stock_quantity"] },
+        // Available units (on-hand minus reserved holds).
+        stock_quantity: { $cond: [{ $ifNull: ["$variation_id", false] }, availableExpr("variation."), availableExpr("product.")] },
         image: { $ifNull: [{ $arrayElemAt: ["$variation.images", 0] }, { $arrayElemAt: ["$product.images", 0] }] },
       } },
     ];

@@ -25,6 +25,12 @@ const ProviderOrderAttemptSchema = new Schema({
 }, { versionKey: false });
 
 ProviderOrderAttemptSchema.index({ user: 1, idempotency_key: 1 }, { unique: true });
-ProviderOrderAttemptSchema.index({ provider_order_id: 1 }, { unique: true, sparse: true });
+// Unique only once a provider order id is known. A sparse index would also
+// index the `null` default, so two customers' in-flight attempts collided
+// (E11000 → 500 at checkout). fix-provider-attempt-index migrates old DBs.
+ProviderOrderAttemptSchema.index(
+  { provider_order_id: 1 },
+  { unique: true, name: "provider_order_id_unique", partialFilterExpression: { provider_order_id: { $type: "string" } } },
+);
 
 export default model("provider_order_attempts", ProviderOrderAttemptSchema);

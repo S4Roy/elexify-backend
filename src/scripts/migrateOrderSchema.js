@@ -54,7 +54,8 @@ export const runMigrateOrderSchema = async ({ logger = createLogger() } = {}) =>
     !orderIndexes.some((index) => index.key?.id === 1 && index.unique) ||
     !orderIndexes.some((index) => index.key?.user === 1 && index.key?.idempotency_key === 1 && index.unique) ||
     !couponIndexes.some((index) => index.key?.order === 1 && index.unique) ||
-    !ledgerIndexes.some((index) => index.unique && index.key?.reference_id === 1 && index.key?.product === 1) ||
+    // Ledger replay protection (see services/stock): one row per idempotency key.
+    !ledgerIndexes.some((index) => index.unique && index.key?.idempotency_key === 1) ||
     !providerIndexes.some((index) => index.key?.user === 1 && index.key?.idempotency_key === 1 && index.unique) ||
     !providerIndexes.some((index) => index.key?.provider_order_id === 1 && index.unique)
   ) {

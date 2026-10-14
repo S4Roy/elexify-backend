@@ -4,6 +4,7 @@ import User from '../../../../models/User.js';
 import Address from '../../../../models/Address.js';
 import { StatusError } from '../../../../config/index.js';
 import { add as checkout } from '../../../site/inventory/order/add.js';
+import { toCustomerStock } from '../../../../services/stock/availability.js';
 
 export async function loadAdminItems(lines) {
   const seen = new Set();
@@ -64,11 +65,12 @@ export const createOptions = async (req, res, next) => {
       pagination = { page, limit, total, has_more: page * limit < total };
     } else {
       const matchingVariants = search ? await ProductVariation.find({ ...active, sku: new RegExp(search, 'i') }).select('product_id').limit(20).lean() : [];
-      const products = await Product.find({ ...active, $or: [{ name: new RegExp(search, 'i') }, { sku: new RegExp(search, 'i') }, { _id: { $in: matchingVariants.map(v => v.product_id) } }] }).select('name sku type stock_quantity regular_price sale_price').limit(20).lean();
-      const variations = await ProductVariation.find({ ...active, product_id: { $in: products.map(p => p._id) } }).select('product_id combination_key sku stock_quantity regular_price sale_price').lean();
+      const products = await Product.find({ ...active, $or: [{ name: new RegExp(search, 'i') }, { sku: new RegExp(search, 'i') }, { _id: { $in: matchingVariants.map(v => v.product_id) } }] }).select('name sku type stock_quantity reserved_quantity manage_stock allow_backorders regular_price sale_price').limit(20).lean();
+      const variations = await ProductVariation.find({ ...active, product_id: { $in: products.map(p => p._id) } }).select('product_id combination_key sku stock_quantity reserved_quantity manage_stock allow_backorders regular_price sale_price').lean();
+      // stock_quantity here is what can still be sold (on-hand minus holds).
       data = products.flatMap(p => p.type === 'variable'
-        ? variations.filter(v => String(v.product_id) === String(p._id)).map(v => ({ ...v, product_id: p._id, variation_id: v._id, name: `${p.name} — ${v.combination_key}` }))
-        : [{ ...p, product_id: p._id, variation_id: null }]);
+        ? variations.filter(v => String(v.product_id) === String(p._id)).map(v => toCustomerStock({ ...v, product_id: p._id, variation_id: v._id, name: `${p.name} — ${v.combination_key}` }))
+        : [toCustomerStock({ ...p, product_id: p._id, variation_id: null })]);
     }
     res.json({ status: 'success', data, ...(pagination ? { pagination } : {}) });
   } catch (error) { next(error); }

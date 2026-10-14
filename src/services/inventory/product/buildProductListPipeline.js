@@ -8,6 +8,7 @@ import Brand from "../../../models/Brand.js";
 import Classification from "../../../models/Classification.js";
 import SiteSetting from "../../../models/SiteSetting.js";
 import { envs } from "../../../config/index.js";
+import { availableExpr } from "../../stock/availability.js";
 
 export const buildProductListPipeline = async (query = {}, slug = null) => {
     const {
@@ -93,6 +94,15 @@ export const buildProductListPipeline = async (query = {}, slug = null) => {
       lowStockThreshold = Number(lowStockSetting.value);
     }
 
+    // in_stock / low_stock / out_of_stock band on an available-units expression.
+    const availabilityBand = (available) => (
+      stock_status === "in_stock"
+        ? { $gt: [available, lowStockThreshold] }
+        : stock_status === "low_stock"
+        ? { $and: [{ $gt: [available, 0] }, { $lt: [available, lowStockThreshold] }] }
+        : { $lte: [available, 0] } // out_of_stock or fallback
+    );
+
     const pipeline = [
       { $match: matchFilter },
       // BEFORE variation lookups
@@ -101,26 +111,9 @@ export const buildProductListPipeline = async (query = {}, slug = null) => {
             {
               $match: {
                 $or: [
-                  // simple products: filter here using product.stock_quantity
-                  ...(stock_status === "in_stock"
-                    ? [
-                        {
-                          type: "simple",
-                          stock_quantity: { $gt: lowStockThreshold },
-                        },
-                      ]
-                    : []),
-                  ...(stock_status === "low_stock"
-                    ? [
-                        {
-                          type: "simple",
-                          stock_quantity: { $gt: 0, $lt: lowStockThreshold },
-                        },
-                      ]
-                    : []),
-                  ...(stock_status === "out_of_stock"
-                    ? [{ type: "simple", stock_quantity: 0 }]
-                    : []),
+                  // simple products: filter here on available stock
+                  // (on-hand minus units reserved for unpaid orders)
+                  { type: "simple", $expr: availabilityBand(availableExpr()) },
 
                   // variable products: pass through now; they will be narrowed after $lookup of variations
                   { type: "variable" },
@@ -262,19 +255,7 @@ export const buildProductListPipeline = async (query = {}, slug = null) => {
                   $filter: {
                     input: "$variations",
                     as: "v",
-                    cond:
-                      stock_status === "in_stock"
-                        ? { $gt: ["$$v.stock_quantity", lowStockThreshold] }
-                        : stock_status === "low_stock"
-                        ? {
-                            $and: [
-                              { $gt: ["$$v.stock_quantity", 0] },
-                              {
-                                $lt: ["$$v.stock_quantity", lowStockThreshold],
-                              },
-                            ],
-                          }
-                        : { $eq: ["$$v.stock_quantity", 0] }, // out_of_stock or fallback
+                    cond: availabilityBand(availableExpr("$v.")),
                   },
                 },
               },

@@ -83,11 +83,14 @@ export const edit = celebrate({
     sku: Joi.string().optional().allow(null),
     // GST HSN/SAC: 4, 6 or 8 digits; empty clears it.
     hsn_sac: Joi.string().trim().pattern(/^(\d{4}|\d{6}|\d{8})$/).optional().allow(null, ""),
+    // Derived server-side; accepted for older clients and ignored.
     stock_status: Joi.string()
-      .valid("in_stock", "out_of_stock")
+      .valid("in_stock", "out_of_stock", "on_backorder")
       .optional()
       .allow(null),
-    stock_quantity: Joi.number().optional().allow(null),
+    // Starting quantity on create; ignored on edit (use stock adjustments).
+    stock_quantity: Joi.number().integer().min(0).optional().allow(null),
+    low_stock_threshold: Joi.number().integer().min(0).optional().allow(null, ""),
 
     allow_backorders: Joi.boolean().optional(),
     manage_stock: Joi.boolean().optional(),
@@ -129,9 +132,13 @@ export const edit = celebrate({
           sku: Joi.string().required(),
           hsn_sac: Joi.string().trim().pattern(/^(\d{4}|\d{6}|\d{8})$/).optional().allow(null, ""),
           stock_status: Joi.string()
-            .valid("in_stock", "out_of_stock")
-            .required(),
-          stock_quantity: Joi.number().required(),
+            .valid("in_stock", "out_of_stock", "on_backorder")
+            .optional()
+            .allow(null),
+          stock_quantity: Joi.number().integer().min(0).optional().allow(null),
+          manage_stock: Joi.boolean().optional(),
+          allow_backorders: Joi.boolean().optional(),
+          low_stock_threshold: Joi.number().integer().min(0).optional().allow(null, ""),
           _id: Joi.string().optional().allow(null, ""),
 
           images: Joi.array()

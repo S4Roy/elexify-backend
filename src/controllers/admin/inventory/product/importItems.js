@@ -1,3 +1,4 @@
+import { recordOpeningStock } from "../../../../services/stock/mutations.js";
 import Product from "../../../../models/Product.js";
 import Category from "../../../../models/Category.js";
 import Media from "../../../../models/Media.js";
@@ -175,7 +176,7 @@ export const importItems = async (req, res, next) => {
       const product = new Product({
         id: ID,
         sku,
-        stock_quantity: current_stock,
+        stock_quantity: 0,
         regular_price,
         sale_price,
         name,
@@ -193,6 +194,10 @@ export const importItems = async (req, res, next) => {
       });
 
       await product.save();
+      await recordOpeningStock({
+        product: product._id, quantity: current_stock, referenceType: "import",
+        actor: { type: "admin", id: req.auth.user_id },
+      });
 
       // Update references
       await SEO.findByIdAndUpdate(seo._id, { reference_id: product._id });

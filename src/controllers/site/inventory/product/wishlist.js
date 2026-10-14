@@ -7,6 +7,7 @@ import ExchangeRate from "../../../../models/ExchangeRate.js";
 import { StatusError } from "../../../../config/index.js";
 import { envs } from "../../../../config/index.js";
 import mongoose from "mongoose";
+import { toCustomerStock } from "../../../../services/stock/availability.js";
 
 export const wishlist = async (req, res, next) => {
   try {
@@ -145,6 +146,9 @@ export const wishlist = async (req, res, next) => {
           regular_price: "$regular_price",
           sale_price: "$sale_price",
           stock_quantity: "$stock_quantity",
+          reserved_quantity: "$reserved_quantity",
+          manage_stock: "$manage_stock",
+          allow_backorders: "$allow_backorders",
           sku: "$sku",
           weight: "$weight",
           dimensions: "$dimensions",
@@ -433,6 +437,8 @@ export const wishlist = async (req, res, next) => {
       Product.aggregate([...productPipeline, ...pipeline]),
       options
     );
+
+    result.docs.forEach(toCustomerStock);
 
     res.status(200).json({
       status: "success",

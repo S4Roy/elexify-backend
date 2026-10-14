@@ -8,6 +8,7 @@ import { StatusError } from "../../../../config/index.js";
 import { envs } from "../../../../config/index.js";
 import mongoose from "mongoose";
 import { productHighlights } from "../../../../helpers/productHighlights.js";
+import { toCustomerStock } from "../../../../services/stock/availability.js";
 
 export const details = async (req, res, next) => {
   try {
@@ -386,6 +387,9 @@ export const details = async (req, res, next) => {
                     regular_price: "$regular_price",
                     sale_price: "$sale_price",
                     stock_quantity: "$stock_quantity",
+                    reserved_quantity: "$reserved_quantity",
+                    manage_stock: "$manage_stock",
+                    allow_backorders: "$allow_backorders",
                     shipping_class: "$shipping_class",
                     ask_for_price: "$ask_for_price",
                     enable_enquiry: "$enable_enquiry",
@@ -631,6 +635,7 @@ export const details = async (req, res, next) => {
       window_days: shippingSettings.return_window_days,
     };
     data[0].short_description = productHighlights(data[0].short_description);
+    toCustomerStock(data[0]);
 
     res.status(200).json({
       status: "success",

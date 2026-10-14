@@ -8,6 +8,7 @@ const OperationalEventSchema = new Schema({
       "recaptcha_verification", "illegal_order_transition", "illegal_payment_transition", "carrier_transition_rejected",
       "razorpay_webhook_failed", "webhook_dead_letter", "provider_attempt_orphaned",
       "provider_reconciliation_failed", "refund_failed", "transaction_aborted",
+      "payment_captured_out_of_stock", "payment_captured_after_cancel", "reservation_release_failed",
     ],
     required: true,
     index: true,

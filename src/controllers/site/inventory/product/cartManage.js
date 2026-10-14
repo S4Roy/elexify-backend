@@ -3,6 +3,7 @@ import Product from "../../../../models/Product.js";
 import ProductVariation from "../../../../models/ProductVariation.js";
 import { StatusError } from "../../../../config/index.js";
 import { inventoryService } from "../../../../services/index.js";
+import { availableOf, isPurchasable } from "../../../../services/stock/availability.js";
 
 export const cartManage = async (req, res, next) => {
   try {
@@ -21,7 +22,7 @@ export const cartManage = async (req, res, next) => {
 
     // 🔹 Fetch product (lightweight)
     const product = await Product.findById(product_id)
-      .select("type stock_quantity regular_price sale_price quantity_discounts")
+      .select("type stock_quantity reserved_quantity manage_stock allow_backorders status regular_price sale_price quantity_discounts")
       .lean();
 
     if (!product) {
@@ -38,7 +39,7 @@ export const cartManage = async (req, res, next) => {
     const existingCart = await Cart.findOne(searchFilter);
     const existingQty = existingCart?.quantity || 0;
 
-    let stock = 0;
+    let stockSource = null;
     let price = 0;
     let discounted_price = null;
 
@@ -54,14 +55,14 @@ export const cartManage = async (req, res, next) => {
         _id: variation_id,
         product_id,
       })
-        .select("stock_quantity regular_price sale_price")
+        .select("stock_quantity reserved_quantity manage_stock allow_backorders status regular_price sale_price")
         .lean();
 
       if (!variation) {
         throw StatusError.notFound(req.__("Variation not found"));
       }
 
-      stock = variation.stock_quantity;
+      stockSource = variation;
       price = variation.regular_price;
 
       if (
@@ -71,7 +72,7 @@ export const cartManage = async (req, res, next) => {
         discounted_price = variation.sale_price;
       }
     } else {
-      stock = product.stock_quantity;
+      stockSource = product;
       price = product.regular_price;
 
       if (product.sale_price && product.sale_price < product.regular_price) {
@@ -79,10 +80,10 @@ export const cartManage = async (req, res, next) => {
       }
     }
 
-    // 🔹 Validate stock
-    if (quantity > stock) {
+    // 🔹 Validate stock (available = on-hand minus units held for unpaid orders)
+    if (!isPurchasable(stockSource, quantity)) {
       throw StatusError.badRequest(
-        req.__("Only %s item(s) available in stock", stock),
+        req.__("Only %s item(s) available in stock", availableOf(stockSource)),
       );
     }
 

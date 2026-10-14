@@ -1,9 +1,7 @@
 import mongoose from "mongoose";
 import Order from "../../models/Order.js";
-import OrderItem from "../../models/OrderItem.js";
-import Product from "../../models/Product.js";
-import ProductVariation from "../../models/ProductVariation.js";
-import StockTransaction from "../../models/StockTransaction.js";
+import { ORDER_STOCK_STATE } from "../../constants/stock.js";
+import { commitOrder } from "../stock/mutations.js";
 import { StatusError } from "../../config/index.js";
 import { ORDER_STATUS } from "../../constants/orderStatus.js";
 
@@ -40,35 +38,25 @@ export const reopenOrder = async ({ orderId, actorId, reason }) => {
   let reopened;
   try {
     await session.withTransaction(async () => {
-      // Only re-reserve stock that was actually given back — historical
-      // orders that never reserved stock (stock_reserved: false) or a
-      // cancellation that never restored it have nothing to reverse.
-      if (order.stock_reserved && order.inventory_reverted) {
-        const items = await OrderItem.find({ order_id: order._id }).session(session);
-        for (const item of items) {
-          const Model = item.variation_id ? ProductVariation : Product;
-          const stockId = item.variation_id || item.product_id;
-          const updated = await Model.updateOne(
-            { _id: stockId, stock_quantity: { $gte: item.quantity } },
-            { $inc: { stock_quantity: -item.quantity } },
-            { session }
+      // Only re-sell stock that was actually given back — historical orders
+      // that never decremented stock, or an unpaid order whose reservation
+      // was merely released, have nothing to reverse. A fresh stock epoch
+      // keeps this cycle's ledger keys distinct from the previous sale.
+      const restocked = order.stock_state === ORDER_STOCK_STATE.RESTOCKED
+        || (order.stock_state === ORDER_STOCK_STATE.NONE && order.stock_reserved && order.inventory_reverted);
+      if (restocked) {
+        const bumped = await Order.findOneAndUpdate(
+          { _id: order._id },
+          { $inc: { stock_epoch: 1 } },
+          { new: true, session }
+        );
+        try {
+          await commitOrder({ order: bumped, actor: { type: "admin", id: actorId }, session });
+        } catch (err) {
+          if (err?.message !== "OUT_OF_STOCK") throw err;
+          throw StatusError.conflict(
+            "Not enough stock left to reopen this order — one of its items no longer has enough units available."
           );
-          if ((updated.modifiedCount ?? updated.nModified) !== 1) {
-            throw StatusError.conflict(
-              `Not enough stock left to reopen this order — one of its items no longer has ${item.quantity} unit(s) available.`
-            );
-          }
-
-          await StockTransaction.create([{
-            product: item.product_id,
-            variation: item.variation_id || null,
-            type: "sale",
-            quantity: item.quantity,
-            reference_id: order._id,
-            reference_type: "order",
-            mrp: item.regular_price || 0,
-            selling_price: item.unit_price || 0,
-          }], { session });
         }
       }
 

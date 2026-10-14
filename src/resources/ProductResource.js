@@ -1,5 +1,6 @@
 import Resource from "resources.js";
 import { productHighlights } from "../helpers/productHighlights.js";
+import { availableOf, deriveStockStatus } from "../services/stock/availability.js";
 import SEOResource from "./SEOResource.js";
 import CategoryResourceMinimal from "./CategoryResourceMinimal.js";
 import MediaResource from "./MediaResource.js";
@@ -30,10 +31,15 @@ class ProductResource extends Resource {
 
       regular_price: this.regular_price ?? 0,
       sale_price: this.sale_price ?? null,
+      // On-hand; available_quantity is what can still be sold (on-hand minus
+      // units held for unpaid orders), null when stock isn't managed.
       stock_quantity: this.stock_quantity ?? 0,
-      stock_status: this.stock_status,
-      allow_backorders: this.allow_backorders || false,
-      manage_stock: this.manage_stock || true,
+      reserved_quantity: this.reserved_quantity ?? 0,
+      available_quantity: this.manage_stock === false ? null : availableOf(this),
+      stock_status: this.stock_status ?? deriveStockStatus(this),
+      allow_backorders: this.allow_backorders === true,
+      manage_stock: this.manage_stock !== false,
+      low_stock_threshold: this.low_stock_threshold ?? null,
       sold_individually: this.sold_individually || false,
 
       weight: this.weight ?? 0,

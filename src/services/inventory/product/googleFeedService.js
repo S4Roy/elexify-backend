@@ -4,6 +4,7 @@ import { create } from "xmlbuilder2";
 import Product from "../../../models/Product.js";
 import ProductVariation from "../../../models/ProductVariation.js";
 import { envs } from "../../../config/index.js";
+import { availableOf } from "../../stock/availability.js";
 
 const imageUrl = (media) => (media?.url ? `${envs.s3.BASE_URL}${media.url}` : null);
 
@@ -113,7 +114,7 @@ export const generateGoogleFeedFile = async () => {
         item.ele("g:link").dat(productLink);
         const image = imageUrl(variation.images?.[0]) || parentImage;
         if (image) item.ele("g:image_link").txt(image);
-        item.ele("g:availability").txt(variation.stock_quantity > 0 ? "in stock" : "out of stock");
+        item.ele("g:availability").txt(availableOf(variation) > 0 ? "in stock" : "out of stock");
         item.ele("g:price").txt(price);
         if (salePrice) item.ele("g:sale_price").txt(salePrice);
         item.ele("g:condition").txt("new");
@@ -134,7 +135,7 @@ export const generateGoogleFeedFile = async () => {
     item.ele("g:description").dat(description);
     item.ele("g:link").dat(productLink);
     if (parentImage) item.ele("g:image_link").txt(parentImage);
-    item.ele("g:availability").txt(product.stock_quantity > 0 ? "in stock" : "out of stock");
+    item.ele("g:availability").txt(availableOf(product) > 0 ? "in stock" : "out of stock");
     item.ele("g:price").txt(price);
     if (salePrice) item.ele("g:sale_price").txt(salePrice);
     item.ele("g:condition").txt("new");

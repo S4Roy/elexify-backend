@@ -21,11 +21,13 @@ import * as invoiceService from "./invoiceService/index.js";
 import * as notificationService from "./notification/index.js";
 import * as auditService from "./audit/index.js";
 import * as otpService from "./otp/index.js";
+import * as stockService from "./stock/index.js";
 
 export {
   notificationService,
   auditService,
   otpService,
+  stockService,
   userService,
   userRoleService,
   emailService,

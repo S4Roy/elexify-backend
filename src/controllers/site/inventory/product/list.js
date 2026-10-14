@@ -21,6 +21,7 @@ import { StatusError } from "../../../../config/index.js";
 import { envs } from "../../../../config/index.js";
 import ExchangeRate from "../../../../models/ExchangeRate.js";
 import { inventoryService } from "../../../../services/index.js";
+import { toCustomerStock } from "../../../../services/stock/availability.js";
 
 export const list = async (req, res, next) => {
   try {
@@ -271,6 +272,9 @@ export const list = async (req, res, next) => {
           regular_price: { $first: "$regular_price" },
           sale_price: { $first: "$sale_price" },
           stock_quantity: { $first: "$stock_quantity" },
+          reserved_quantity: { $first: "$reserved_quantity" },
+          manage_stock: { $first: "$manage_stock" },
+          allow_backorders: { $first: "$allow_backorders" },
 
           combination_key: { $first: "$combination_key" },
           ask_for_price: { $first: "$ask_for_price" },
@@ -413,6 +417,9 @@ export const list = async (req, res, next) => {
           regular_price: 1,
           sale_price: 1,
           stock_quantity: 1,
+          reserved_quantity: 1,
+          manage_stock: 1,
+          allow_backorders: 1,
           weight: 1,
           dimensions: 1,
           shipping_class: 1,
@@ -806,6 +813,8 @@ export const list = async (req, res, next) => {
 
     // Admin previews reuse this handler for exact counts but are not shopper searches.
     if (!req.skipSearchRecording) recordSearch(search_key, page, result.totalDocs);
+
+    result.docs.forEach(toCustomerStock);
 
     res.status(200).json({
       status: "success",

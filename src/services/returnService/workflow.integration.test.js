@@ -103,7 +103,7 @@ suite('return workflow with real MongoDB transactions', () => {
   });
   it('rolls back QC and stock history on stock write failure', async () => {
     const request = await received();
-    const spy = vi.spyOn(Product, 'updateOne').mockRejectedValueOnce(new Error('injected stock failure'));
+    const spy = vi.spyOn(Product, 'findOneAndUpdate').mockRejectedValueOnce(new Error('injected stock failure'));
     await expect(inspect(request)).rejects.toThrow('injected stock failure'); spy.mockRestore();
     expect((await ReturnRequest.findById(request._id)).status).toBe('received');
     expect(await StockTransaction.countDocuments()).toBe(0);

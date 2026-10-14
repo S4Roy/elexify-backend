@@ -2,6 +2,7 @@ import mongoose from "mongoose";
 import Order from "../../../../models/Order.js";
 import { StatusError } from "../../../../config/index.js";
 import { getRazorpayClient, getRazorpayConfig } from "../../../../services/integrationCredentials/razorpay.js";
+import { stockService } from "../../../../services/index.js";
 
 const RETRY_WINDOW_MS = 60 * 60 * 1000;
 
@@ -35,6 +36,20 @@ export const retryPayment = async (req, res, next) => {
     if (providerOrder?.id !== providerOrderId || Number(providerOrder.amount) !== amount ||
         providerOrder.currency !== order.currency || providerOrder.status === "paid" || Number(providerOrder.amount_paid) > 0) {
       throw StatusError.conflict("Payment status has changed. Refresh this order before retrying");
+    }
+
+    // The original stock hold may have lapsed while the customer was away;
+    // hold the units again (or extend the hold) before they pay.
+    const ttlMinutes = await stockService.getReservationTtlMinutes();
+    try {
+      await stockService.withStockTransaction((session) => stockService.renewReservation({
+        order, expiresAt: new Date(Date.now() + ttlMinutes * 60_000), session,
+      }));
+    } catch (err) {
+      if (err?.message === "OUT_OF_STOCK") {
+        throw StatusError.conflict("OUT_OF_STOCK: Some items in this order sold out. Please place a new order.");
+      }
+      throw err;
     }
 
     const { key_id } = await getRazorpayConfig();

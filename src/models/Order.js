@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { ORDER_STOCK_STATES } from "../constants/stock.js";
 const { Schema, model } = mongoose;
 import mongooseAggregatePaginate from "mongoose-aggregate-paginate-v2";
 import {
@@ -178,6 +179,21 @@ const OrderSchema = new Schema(
     // placed before this field existed never decremented stock at all.
     stock_reserved: { type: Boolean, default: false },
     inventory_reverted: { type: Boolean, default: false },
+
+    // Authoritative stock lifecycle (see constants/stock.js ORDER_STOCK_STATE).
+    // stock_reserved / inventory_reverted above are still written for
+    // backwards compatibility: stock_reserved === (stock was committed),
+    // inventory_reverted === (committed stock was restocked).
+    stock_state: { type: String, enum: ORDER_STOCK_STATES, default: "none" },
+    // Prepaid reservation hold deadline; releaseExpiredReservations frees
+    // the units after this if payment hasn't been captured.
+    reservation_expires_at: { type: Date, default: null },
+    // Bumped on each reopen so ledger idempotency keys for a fresh commit
+    // don't collide with the previous cycle's.
+    stock_epoch: { type: Number, default: 0 },
+    // Staff-attention flag, e.g. "late_capture_oos" when a payment was
+    // captured after the reservation lapsed and stock had run out.
+    stock_flag: { type: String, default: null },
 
     cancellation: {
       reason: { type: String, default: null },

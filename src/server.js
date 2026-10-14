@@ -185,6 +185,15 @@ cron.schedule("*/5 * * * *", async () => {
     console.error("updatePendingRazorpayPayments Cron Failed", e);
   }
 });
+// Frees stock held by unpaid prepaid / Partial COD orders once their
+// reservation TTL lapses, so abandoned payments don't block other buyers.
+cron.schedule("* * * * *", async () => {
+  try {
+    await CronJobs.releaseExpiredReservations();
+  } catch (e) {
+    console.error("releaseExpiredReservations Cron Failed", e);
+  }
+});
 cron.schedule("*/10 * * * *", async () => {
   try {
     await CronJobs.reconcileReturnRefunds();

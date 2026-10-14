@@ -21,10 +21,13 @@ import restrictCountries from "./operations/restrict-countries.js";
 import coreSiteBootstrap from "./operations/core-site-bootstrap.js";
 import footerPolicies from "./operations/footer-policies.js";
 import orderTotalItemsBackfill from "./operations/order-total-items-backfill.js";
+import stockLedgerFoundation from "./operations/stock-ledger-foundation.js";
+import stockReconcile from "./operations/stock-reconcile.js";
 import subscribersActivateLegacyPending from "./operations/subscribers-activate-legacy-pending.js";
 import orderSchemaMigration from "./operations/order-schema-migration.js";
 import orderConfirmedStatusBackfill from "./operations/order-confirmed-status-backfill.js";
 import fixCartIndexes from "./operations/fix-cart-indexes.js";
+import fixProviderAttemptIndex from "./operations/fix-provider-attempt-index.js";
 import fixUserIndexes from "./operations/fix-user-indexes.js";
 import fixWishlistIndexes from "./operations/fix-wishlist-indexes.js";
 import fixProductContent from "./operations/fix-product-content.js";
@@ -66,10 +69,13 @@ const RAW_ENTRIES = [
   coreSiteBootstrap,
   footerPolicies,
   orderTotalItemsBackfill,
+  stockLedgerFoundation,
+  stockReconcile,
   subscribersActivateLegacyPending,
   orderSchemaMigration,
   orderConfirmedStatusBackfill,
   fixCartIndexes,
+  fixProviderAttemptIndex,
   fixUserIndexes,
   fixWishlistIndexes,
   fixProductContent,

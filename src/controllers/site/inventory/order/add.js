@@ -11,7 +11,6 @@ import Address from "../../../../models/Address.js";
 import ExchangeRate from "../../../../models/ExchangeRate.js";
 import Product from "../../../../models/Product.js";
 import ProductVariation from "../../../../models/ProductVariation.js";
-import StockTransaction from "../../../../models/StockTransaction.js";
 import Coupon from "../../../../models/Coupon.js";
 import CouponUsage from "../../../../models/CouponUsage.js";
 import ProviderOrderAttempt from "../../../../models/ProviderOrderAttempt.js";
@@ -34,7 +33,8 @@ import { recordOperationalEvent } from "../../../../services/observability/recor
 import { injectPlacementFault } from "../../../../services/orderService/injectPlacementFault.js";
 import { nextOrderNumber } from "../../../../services/orderService/generateOrderNumber.js";
 import { logCheckoutFailure } from "../../../../services/orderService/logCheckoutFailure.js";
-import { notificationService } from "../../../../services/index.js";
+import { notificationService, stockService } from "../../../../services/index.js";
+import { isPurchasable } from "../../../../services/stock/availability.js";
 
 export const add = async (req, res, next, adminContext = null) => {
   let dbSession = null;
@@ -193,6 +193,7 @@ export const add = async (req, res, next, adminContext = null) => {
           weight: stockSource.weight || 0,
           stock_quantity: stockSource.stock_quantity,
           status: stockSource.status,
+          stock_source: stockSource,
           regular_price: parseFloat((regularPrice * exchangeRate).toFixed(2)),
           sale_price: base_unit_price < regularPrice ? unit_price : null,
           discount_percent: discountPercent,
@@ -207,10 +208,14 @@ export const add = async (req, res, next, adminContext = null) => {
 
     // 🔹 Defensive re-check: bail if anything went out of stock between cart-add and checkout,
     // so we never confirm an order (or its delivery estimate) for unavailable items.
+    // Merged per SKU: the same variation on two cart lines must fit together.
+    const requestedBySku = new Map();
+    for (const item of items) {
+      const skuId = String(item.variation_id || item.product_id);
+      requestedBySku.set(skuId, (requestedBySku.get(skuId) || 0) + item.quantity);
+    }
     const unavailableItem = items.find(
-      (item) =>
-        item.status === "inactive" ||
-        (item.stock_quantity != null && item.stock_quantity < item.quantity)
+      (item) => !isPurchasable(item.stock_source, requestedBySku.get(String(item.variation_id || item.product_id)))
     );
     if (unavailableItem) {
       throw StatusError.conflict("OUT_OF_STOCK");
@@ -568,44 +573,33 @@ const address = await Address.findOne({
     await OrderItem.insertMany(orderItems, { session: dbSession });
     await injectPlacementFault(req, "order_item_creation");
 
-    // ── COD stock reservation ───────────────────────────────────────────────
-    // Only a full-COD order (no advance required, e.g. the admin has
-    // disabled Partial COD) has no separate payment-confirmation step, so
-    // stock must be decremented here or it would never reserve inventory at
-    // all. A Partial COD order behaves like prepaid — stock is reserved in
-    // finalizeCapturedPayment.js once the advance actually clears.
+    // ── Stock ────────────────────────────────────────────────────────────────
+    // Full COD has no payment step, so the sale is committed now. Prepaid and
+    // Partial COD hold the units (reserved_quantity) until the payment is
+    // captured — finalizeCapturedPayment commits the hold, and
+    // releaseExpiredReservations frees it if payment never arrives. Both
+    // are guarded on available stock, so two checkouts can't claim the
+    // same last unit.
+    const stockActor = adminContext
+      ? { type: "admin", id: adminContext.actor }
+      : { type: "customer", id: user._id };
     if (payment_method === "cod" && !advanceEnabled) {
-      for (const item of items) {
-        if (item.variation_id) {
-          const result = await ProductVariation.updateOne(
-            { _id: item.variation_id, status: { $ne: "inactive" }, stock_quantity: { $gte: item.quantity } },
-            { $inc: { stock_quantity: -item.quantity } },
-            { session: dbSession },
-          );
-          if ((result.modifiedCount ?? result.nModified) !== 1) throw StatusError.conflict("OUT_OF_STOCK");
-        } else {
-          const result = await Product.updateOne(
-            { _id: item.product_id, status: { $ne: "inactive" }, stock_quantity: { $gte: item.quantity } },
-            { $inc: { stock_quantity: -item.quantity } },
-            { session: dbSession },
-          );
-          if ((result.modifiedCount ?? result.nModified) !== 1) throw StatusError.conflict("OUT_OF_STOCK");
-        }
-        await injectPlacementFault(req, "stock_reservation");
-        await StockTransaction.create([{
-          product: item.product_id,
-          variation: item.variation_id || null,
-          type: "sale",
-          quantity: item.quantity,
-          reference_id: order._id,
-          reference_type: "order",
-          mrp: item.regular_price || 0,
-          selling_price: item.unit_price || 0,
-        }], { session: dbSession });
-        await injectPlacementFault(req, "stock_ledger_creation");
-      }
-      await Order.updateOne({ _id: order._id }, { stock_reserved: true }, { session: dbSession });
+      await stockService.commitOrder({ order, items: orderItems, actor: stockActor, session: dbSession });
+    } else {
+      const ttlMinutes = await stockService.getReservationTtlMinutes();
+      await stockService.reserveOrder({
+        order,
+        items: orderItems,
+        expiresAt: new Date(placedAt.getTime() + ttlMinutes * 60_000),
+        session: dbSession,
+      });
+    }
+    await injectPlacementFault(req, "stock_reservation");
+    await injectPlacementFault(req, "stock_ledger_creation");
+
+    if (payment_method === "cod" && !advanceEnabled) {
       order.stock_reserved = true;
+      order.stock_state = "committed";
 
       if (coupon_code && discountAmount > 0 && user.email) {
         const coupon = await Coupon.findOne({ code: coupon_code }).session(dbSession);

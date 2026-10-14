@@ -2,6 +2,7 @@ import Product from "../../../../models/Product.js";
 import ProductVariation from "../../../../models/ProductVariation.js";
 import { StatusError } from "../../../../config/index.js";
 import { shippingService } from "../../../../services/index.js";
+import { isPurchasable } from "../../../../services/stock/availability.js";
 
 /**
  * Product-page "check delivery" — no auth/saved-address required, takes a raw
@@ -19,7 +20,7 @@ export const estimate = async (req, res, next) => {
     }
 
     const product = await Product.findOne({ _id: product_id, deleted_at: null })
-      .select("type weight shipping_class stock_quantity status")
+      .select("type weight shipping_class stock_quantity reserved_quantity manage_stock allow_backorders status")
       .lean();
 
     if (!product) {
@@ -36,7 +37,7 @@ export const estimate = async (req, res, next) => {
         product_id,
         deleted_at: null,
       })
-        .select("weight shipping_class stock_quantity status")
+        .select("weight shipping_class stock_quantity reserved_quantity manage_stock allow_backorders status")
         .lean();
       if (!variation) {
         throw StatusError.notFound(req.__("Variation not found"));
@@ -44,8 +45,7 @@ export const estimate = async (req, res, next) => {
       source = variation;
     }
 
-    const isAvailable =
-      source.status !== "inactive" && (source.stock_quantity ?? 0) > 0;
+    const isAvailable = isPurchasable(source, 1);
 
     const rateResult = await shippingService.calculateShippingRate({
       items: [{ shipping_class: source.shipping_class, weight: source.weight || 0, quantity: 1 }],

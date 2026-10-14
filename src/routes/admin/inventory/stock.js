@@ -5,34 +5,31 @@ import { inventoryValidation } from "../../../validations/admin/index.js";
 
 const stockRouter = Router();
 
+// Ledger of on-hand movements.
 stockRouter.get(
   "/transactions", requirePermission("inventory.view"),
   inventoryValidation.stockValidation.list,
   inventoryController.stockController.list
 );
 
+// On-hand / reserved / available per SKU.
 stockRouter.get(
-  "/details/:slug", requirePermission("inventory.view"),
-  inventoryValidation.stockValidation.details,
-  inventoryController.stockController.list
+  "/levels", requirePermission("inventory.view"),
+  inventoryValidation.stockValidation.levels,
+  inventoryController.stockController.levels
+);
+
+// Manual adjustments with reason codes. The only way admins change stock.
+stockRouter.post(
+  "/adjust", requirePermission("inventory.adjust"),
+  inventoryValidation.stockValidation.adjust,
+  inventoryController.stockController.adjust
 );
 
 stockRouter.post(
-  "/add", requirePermission("inventory.adjust"),
-  inventoryValidation.stockValidation.add,
-  inventoryController.stockController.add
-);
-
-stockRouter.put(
-  "/edit", requirePermission("inventory.adjust"),
-  inventoryValidation.stockValidation.edit,
-  inventoryController.stockController.edit
-);
-
-stockRouter.delete(
-  "/delete", requirePermission("inventory.adjust"),
-  inventoryValidation.stockValidation.remove,
-  inventoryController.stockController.remove
+  "/adjust/bulk", requirePermission("inventory.adjust"),
+  inventoryValidation.stockValidation.bulkAdjust,
+  inventoryController.stockController.bulkAdjust
 );
 
 export { stockRouter };

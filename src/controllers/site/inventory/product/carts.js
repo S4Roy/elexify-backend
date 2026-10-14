@@ -8,6 +8,7 @@ import { StatusError } from "../../../../config/index.js";
 import { envs } from "../../../../config/index.js";
 import { inventoryService, shippingService } from "../../../../services/index.js";
 import mongoose from "mongoose";
+import { isPurchasable, toCustomerStock } from "../../../../services/stock/availability.js";
 
 export const carts = async (req, res, next) => {
   try {
@@ -322,8 +323,8 @@ export const carts = async (req, res, next) => {
 
       if (address) {
         const rawCarts = await Cart.find(matchFilter)
-          .populate({ path: "product", select: "weight shipping_class stock_quantity status cod_status prepaid_only categories brand" })
-          .populate({ path: "variation", select: "weight shipping_class stock_quantity status cod_status prepaid_only" })
+          .populate({ path: "product", select: "weight shipping_class stock_quantity reserved_quantity manage_stock allow_backorders status cod_status prepaid_only categories brand" })
+          .populate({ path: "variation", select: "weight shipping_class stock_quantity reserved_quantity manage_stock allow_backorders status cod_status prepaid_only" })
           .lean();
 
         const shippingItems = rawCarts
@@ -339,11 +340,7 @@ export const carts = async (req, res, next) => {
 
         const isAvailable = rawCarts.every((c) => {
           const source = c.variation || c.product;
-          return (
-            source &&
-            source.status !== "inactive" &&
-            (source.stock_quantity == null || source.stock_quantity >= c.quantity)
-          );
+          return isPurchasable(source, c.quantity);
         });
 
         const rateResult = await shippingService.calculateShippingRate({
@@ -372,6 +369,12 @@ export const carts = async (req, res, next) => {
           exchangeRate: rate,
         });
       }
+    }
+
+    // Shoppers see sellable units (on-hand minus reserved holds).
+    for (const doc of docs) {
+      toCustomerStock(doc.product);
+      toCustomerStock(doc.variation);
     }
 
     res.status(200).json({

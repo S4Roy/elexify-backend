@@ -1,9 +1,7 @@
 import mongoose from "mongoose";
 import Order from "../../models/Order.js";
-import OrderItem from "../../models/OrderItem.js";
-import Product from "../../models/Product.js";
-import ProductVariation from "../../models/ProductVariation.js";
-import StockTransaction from "../../models/StockTransaction.js";
+import { STOCK_REASON } from "../../constants/stock.js";
+import { revertOrderStock } from "../stock/mutations.js";
 import { StatusError } from "../../config/index.js";
 import { FORCE_CANCELLABLE_ORDER_STATUSES, ORDER_STATUS } from "../../constants/orderStatus.js";
 import { attemptRefund } from "./attemptRefund.js";
@@ -60,69 +58,45 @@ export const cancelOrder = async ({ orderId, actorType, actorId, reason, comment
     }
   }
 
-  // Claim: atomically flip to cancelled only if it's still in an eligible
-  // status. If this loses a race to a concurrent cancel request, treat it
-  // as an idempotent no-op rather than erroring.
-  const cancelled = await Order.findOneAndUpdate(
-    { _id: order._id, order_status: { $in: allowedStatuses } },
-    {
-      $set: {
-        order_status: ORDER_STATUS.CANCELLED,
-        cancellation: {
-          reason,
-          comment: comment || null,
-          requested_at: new Date(),
-          cancelled_at: new Date(),
-          cancelled_by: actorType,
-          forced: force,
+  // Claim + inventory restore in one transaction: atomically flip to
+  // cancelled only if it's still in an eligible status, and give back
+  // whatever stock the order holds (release an unpaid reservation, or
+  // restock committed units). If this loses a race to a concurrent cancel
+  // request, treat it as an idempotent no-op rather than erroring. Legacy
+  // orders placed before stock was tracked hold nothing and restore nothing.
+  const session = await mongoose.startSession();
+  try {
+    await session.withTransaction(async () => {
+      const cancelled = await Order.findOneAndUpdate(
+        { _id: order._id, order_status: { $in: allowedStatuses } },
+        {
+          $set: {
+            order_status: ORDER_STATUS.CANCELLED,
+            cancellation: {
+              reason,
+              comment: comment || null,
+              requested_at: new Date(),
+              cancelled_at: new Date(),
+              cancelled_by: actorType,
+              forced: force,
+            },
+          },
         },
-      },
-    },
-    { new: true }
-  );
-
-  order = cancelled || (await Order.findById(order._id));
-
-  // ── Inventory restore ─────────────────────────────────────────────────
-  // Gated strictly on stock_reserved — never inferred from payment_method/
-  // payment_status — since historical orders placed before this flag
-  // existed never actually decremented stock, and restoring for them would
-  // add phantom inventory.
-  if (order.stock_reserved && !order.inventory_reverted) {
-    const claimedRevert = await Order.findOneAndUpdate(
-      { _id: order._id, inventory_reverted: { $ne: true } },
-      { $set: { inventory_reverted: true } },
-      { new: true }
-    );
-
-    if (claimedRevert) {
-      const items = await OrderItem.find({ order_id: order._id });
-      for (const item of items) {
-        if (item.variation_id) {
-          await ProductVariation.updateOne(
-            { _id: item.variation_id },
-            { $inc: { stock_quantity: item.quantity } }
-          );
-        } else {
-          await Product.updateOne(
-            { _id: item.product_id },
-            { $inc: { stock_quantity: item.quantity } }
-          );
-        }
-        await StockTransaction.create({
-          product: item.product_id,
-          variation: item.variation_id || null,
-          type: "return",
-          quantity: item.quantity,
-          reference_id: order._id,
-          reference_type: "order",
-          mrp: item.regular_price || 0,
-          selling_price: item.unit_price || 0,
-        });
-      }
-      order = claimedRevert;
-    }
+        { new: true, session }
+      );
+      if (!cancelled) return;
+      await revertOrderStock({
+        order: cancelled,
+        reason: STOCK_REASON.ORDER_CANCEL,
+        actor: { type: actorType === "customer" ? "customer" : "admin", id: actorId || null },
+        session,
+      });
+    });
+  } finally {
+    await session.endSession();
   }
+
+  order = await Order.findById(order._id);
 
   // ── Refund ─────────────────────────────────────────────────────────────
   // A razorpay order whose payment actually cleared, or a Partial COD order
