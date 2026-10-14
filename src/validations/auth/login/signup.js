@@ -1,8 +1,9 @@
+import { customerName } from "../../customerName.js";
 import { celebrate, Joi, Segments } from "celebrate";
 
 export const signup = celebrate({
   [Segments.BODY]: Joi.object({
-    name: Joi.string().min(2).max(30).required().label("Name"),
+    name: customerName().min(2).max(30).required().label("Name"),
     // last_name: Joi.string().min(2).max(30).required().label("Last Name"),
     email: Joi.string().email().required().label("Email"),
     password: Joi.string().min(6).max(128).required().label("Password"),

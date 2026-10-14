@@ -1,14 +1,13 @@
+import { customerName } from "../../customerName.js";
 import { celebrate, Joi } from "celebrate";
 
 export const submit = celebrate({
   body: Joi.object({
-    name: Joi.string()
+    name: customerName()
       .trim()
-      .pattern(/^[a-zA-Z ]+$/)
       .required()
       .messages({
         "string.empty": "Name is required",
-        "string.pattern.base": "Name must contain only letters and spaces",
       }),
 
     phone: Joi.string()

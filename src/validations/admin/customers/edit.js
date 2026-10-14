@@ -1,3 +1,4 @@
+import { customerName } from "../../customerName.js";
 import { celebrate, Joi } from "celebrate";
 
 export const edit = celebrate({
@@ -7,7 +8,7 @@ export const edit = celebrate({
       "string.length": "Invalid customer ID",
     }),
 
-    name: Joi.string().min(2).max(100).optional().messages({
+    name: customerName().min(2).max(100).optional().messages({
       "string.min": "Name must be at least 2 characters",
     }),
 

@@ -1,3 +1,4 @@
+import { isEnglishCustomerName } from "../validations/customerName.js";
 import Resource from "resources.js";
 
 class UserResource extends Resource {
@@ -7,6 +8,7 @@ class UserResource extends Resource {
       _id: this._id || null,
       role: this.role || null,
       name: this.name || null,
+      requires_name_update: !isEnglishCustomerName(this.name),
       email: this.email || null,
       phone_code: this.phone_code || null,
       mobile: this.mobile || null,

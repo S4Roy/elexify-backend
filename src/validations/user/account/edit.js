@@ -1,13 +1,14 @@
+import { customerName } from "../../customerName.js";
 import { celebrate, Joi } from "celebrate";
 
 export const edit = celebrate({
   body: Joi.object({
-    first_name: Joi.string().min(2).max(100).optional().messages({
+    first_name: customerName().min(2).max(100).optional().messages({
       "string.min": "First name must be at least 2 characters",
       "string.max": "First name cannot exceed 100 characters",
     }),
 
-    last_name: Joi.string().min(1).max(100).optional().allow("").messages({
+    last_name: customerName().min(1).max(100).optional().allow("").messages({
       "string.max": "Last name cannot exceed 100 characters",
     }),
 

@@ -1,3 +1,4 @@
+import { customerName } from "../../customerName.js";
 import { CITY_MAX_LENGTH, CITY_LENGTH_MESSAGE } from "../../../services/shipping/validateAddressCity.js";
 import { englishAddressLine } from "../../englishAddressLine.js";
 import { celebrate, Joi } from 'celebrate';
@@ -9,7 +10,7 @@ export const addressParams = Joi.object({
 
 export const addressEditSchema = Joi.object({
   expected_updated_at: Joi.date().iso().allow(null).required(),
-  full_name: Joi.string().trim().min(2).max(100).required(),
+  full_name: customerName().trim().min(2).max(100).required(),
   phone_code: Joi.string().pattern(/^\d{1,4}$/).required(),
   phone: Joi.string().pattern(/^\d{6,14}$/).required(),
   email: Joi.string().trim().email().max(254).allow('').required(),

@@ -1,9 +1,10 @@
+import { customerName } from "../../customerName.js";
 import { englishAddressLine } from "../../englishAddressLine.js";
 import { celebrate, Joi } from "celebrate";
 
 export const add = celebrate({
   body: Joi.object({
-    first_name: Joi.string().min(2).max(100).required().messages({
+    first_name: customerName().min(2).max(100).required().messages({
       "string.base": "First name must be a string",
       "string.empty": "First name is required",
       "string.min": "First name must be at least 2 characters",
@@ -11,7 +12,7 @@ export const add = celebrate({
       "any.required": "First name is required",
     }),
 
-    last_name: Joi.string().min(2).max(100).required().messages({
+    last_name: customerName().min(2).max(100).required().messages({
       "string.base": "Last name must be a string",
       "string.empty": "Last name is required",
       "string.min": "Last name must be at least 2 characters",

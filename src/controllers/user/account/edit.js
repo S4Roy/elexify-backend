@@ -1,3 +1,4 @@
+import { isEnglishCustomerName, CUSTOMER_NAME_MESSAGE } from "../../../validations/customerName.js";
 import { revokeAll } from '../../../services/customerSession/index.js';
 import User from "../../../models/User.js";
 import { StatusError } from "../../../config/index.js";
@@ -30,11 +31,13 @@ export const edit = async (req, res, next) => {
 
     if (!user) throw StatusError.notFound("Profile not found");
 
-    if (first_name || last_name) {
+    if (first_name !== undefined || last_name !== undefined) {
       const [existingFirst, ...existingRest] = user.name.trim().split(" ");
       const nextFirst = first_name?.trim() || existingFirst;
       const nextLast = last_name?.trim() ?? existingRest.join(" ");
-      user.name = [nextFirst, nextLast].filter(Boolean).join(" ");
+      const nextName = [nextFirst, nextLast].filter(Boolean).join(" ");
+      if (!isEnglishCustomerName(nextName)) throw StatusError.badRequest(CUSTOMER_NAME_MESSAGE);
+      user.name = nextName;
     }
 
     if (dob !== undefined) user.dob = dob || null;

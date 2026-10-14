@@ -1,3 +1,4 @@
+import { isEnglishCustomerName } from "../../../../validations/customerName.js";
 import { validatePartialCodConsent } from "../../../../services/shipping/partialCodConsent.js";
 import mongoose from "mongoose";
 import crypto from "crypto";
@@ -218,6 +219,9 @@ export const add = async (req, res, next, adminContext = null) => {
     // ── User ─────────────────────────────────────────────────────────────────
     const user = await User.findById(user_id);
     if (!user) throw StatusError.unauthorized("Invalid user session.");
+    if (!isEnglishCustomerName(user.name)) {
+      throw StatusError.forbidden("CUSTOMER_NAME_UPDATE_REQUIRED: Please update your name in English on your profile before placing an order.");
+    }
 
     // A verified mobile number is required to place an order (e.g. for
     // delivery updates and COD/OTP-on-delivery) — Google/email sign-in never
@@ -239,6 +243,10 @@ const address = await Address.findOne({
 
     if (!address) {
       throw StatusError.notFound("Address not found. Please select a valid delivery address.");
+    }
+
+    if (!isEnglishCustomerName(address.full_name)) {
+      throw StatusError.badRequest("Please update the recipient name in English in your delivery address.");
     }
 
     // ── Coupon ───────────────────────────────────────────────────────────────

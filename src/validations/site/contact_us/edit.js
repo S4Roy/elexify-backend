@@ -1,3 +1,4 @@
+import { customerName } from "../../customerName.js";
 import { celebrate, Joi } from "celebrate";
 
 export const edit = celebrate({
@@ -10,7 +11,7 @@ export const edit = celebrate({
         "string.pattern.base": "Invalid Category ID format",
       }),
 
-    name: Joi.string().min(2).max(100).optional().allow("", null).messages({
+    name: customerName().min(2).max(100).optional().allow("", null).messages({
       "string.min": "Category name must be at least 2 characters",
       "string.max": "Category name cannot exceed 100 characters",
     }),

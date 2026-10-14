@@ -1,3 +1,4 @@
+import { customerName } from "../../customerName.js";
 import { celebrate, Joi, Segments } from "celebrate";
 
 export const verifyOtp = celebrate({
@@ -46,8 +47,8 @@ export const verifyOtp = celebrate({
       }),
 
     // ── New user fields (optional — only for signup) ───────────────────────────
-    first_name: Joi.string().trim().max(50).optional().allow(""),
-    last_name: Joi.string().trim().max(50).optional().allow(""),
+    first_name: customerName().trim().max(50).optional().allow(""),
+    last_name: customerName().trim().max(50).optional().allow(""),
 
     is_otp_login: Joi.boolean().default(false),
   })

@@ -1,3 +1,4 @@
+import { isEnglishCustomerName } from "../../../validations/customerName.js";
 import mongoose from "mongoose";
 import User from "../../../models/User.js";
 import { StatusError } from "../../../config/index.js";
@@ -29,6 +30,7 @@ export const details = async (req, res, next) => {
         email: user.email,
         first_name,
         last_name,
+        requires_name_update: !isEnglishCustomerName(user.name),
         phone_code: user.phone_code,
         mobile: user.mobile,
         dob: user.dob,

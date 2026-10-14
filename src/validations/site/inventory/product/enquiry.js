@@ -1,3 +1,4 @@
+import { customerName } from "../../../customerName.js";
 import { celebrate, Joi, Segments } from "celebrate";
 
 export const enquiry = celebrate({
@@ -24,7 +25,7 @@ export const enquiry = celebrate({
     product_sku: Joi.string().max(100).allow(null, ""),
 
     // Guest user fields (required if not logged in — your controller can decide)
-    name: Joi.string().max(200).when("user_id", {
+    name: customerName().max(200).when("user_id", {
       is: Joi.exist(),
       then: Joi.optional(),
       otherwise: Joi.required(),

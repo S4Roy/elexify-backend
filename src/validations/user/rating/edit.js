@@ -1,3 +1,4 @@
+import { customerName } from "../../customerName.js";
 import { celebrate, Joi } from "celebrate";
 
 export const edit = celebrate({
@@ -10,7 +11,7 @@ export const edit = celebrate({
         "string.pattern.base": "Invalid Address ID format",
       }),
 
-    first_name: Joi.string()
+    first_name: customerName()
       .min(2)
       .max(100)
       .optional()
@@ -21,7 +22,7 @@ export const edit = celebrate({
         "string.max": "First name cannot exceed 100 characters",
       }),
 
-    last_name: Joi.string()
+    last_name: customerName()
       .min(2)
       .max(100)
       .optional()

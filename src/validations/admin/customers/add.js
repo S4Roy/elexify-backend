@@ -1,8 +1,9 @@
+import { customerName } from "../../customerName.js";
 import { celebrate, Joi } from "celebrate";
 
 export const add = celebrate({
   body: Joi.object({
-    name: Joi.string().min(2).max(100).required().messages({
+    name: customerName().min(2).max(100).required().messages({
       "string.empty": "Name is required",
       "string.min": "Name must be at least 2 characters",
     }),
