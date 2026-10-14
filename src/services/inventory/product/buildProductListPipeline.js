@@ -1,6 +1,7 @@
 import mongoose from "mongoose";
 import { orderedMediaLookup } from "../../media/orderedMedia.js";
 import { thumbnailUrlExpr } from "../../media/mediaUrlExpr.js";
+import { hsnStatusMatch, productSearchMatch, searchRankStage } from "./productSearch.js";
 import Category from "../../../models/Category.js";
 import Tag from "../../../models/Tag.js";
 import Brand from "../../../models/Brand.js";
@@ -21,6 +22,7 @@ export const buildProductListPipeline = async (query = {}, slug = null) => {
       classifications = null,
       min_price = null,
       max_price = null,
+      hsn_status = null, // missing | present
     } = query;
     const matchFilter = { deleted_at: null };
     if (slug) matchFilter.slug = slug;
@@ -433,24 +435,11 @@ export const buildProductListPipeline = async (query = {}, slug = null) => {
         : []),
       // ======================================================================================
     ];
-    // === search_key should also match variation.sku ===
-    if (search_key) {
-      pipeline.push({
-        $match: {
-          $or: [
-            { name: { $regex: search_key, $options: "i" } },
-            { slug: { $regex: search_key, $options: "i" } },
-            { sku: { $regex: search_key, $options: "i" } },
-            // match if any variation has a sku that matches
-            {
-              variations: {
-                $elemMatch: { sku: { $regex: search_key, $options: "i" } },
-              },
-            },
-          ],
-        },
-      });
-    }
+    // Name, slug, SKU and HSN (product or variation); exact code matches rank first.
+    const searchMatch = productSearchMatch(search_key);
+    if (searchMatch) pipeline.push({ $match: searchMatch }, searchRankStage(search_key));
+    const hsnMatch = hsnStatusMatch(hsn_status);
+    if (hsnMatch) pipeline.push({ $match: hsnMatch });
 
     return { pipeline, matchFilter };
 };

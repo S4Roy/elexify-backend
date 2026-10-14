@@ -1,5 +1,6 @@
 import { buildProductListPipeline } from "../../../../services/inventory/product/buildProductListPipeline.js";
 import mongoose from "mongoose";
+import { normalizeSearchKey } from "../../../../services/inventory/product/productSearch.js";
 import ProductSpecification from "../../../../models/ProductSpecification.js";
 import Product from "../../../../models/Product.js";
 import { StatusError, envs } from "../../../../config/index.js";
@@ -17,7 +18,12 @@ export const list = async (req, res, next) => {
     const options = {
       page,
       limit,
-      sort: { [sort_by]: sort_order },
+      // Searches put exact SKU/HSN matches first, then the chosen order.
+      sort: {
+        ...(normalizeSearchKey(req.query.search_key) ? { search_rank: -1 } : {}),
+        [sort_by]: Number(sort_order) || -1,
+        _id: 1,
+      },
     };
 
     const { pipeline, matchFilter } = await buildProductListPipeline(req.query, slug);

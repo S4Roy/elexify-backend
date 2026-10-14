@@ -20,6 +20,7 @@ class ProductResource extends Resource {
       power_level: this.power_level || 0,
       rarity: this.rarity || "",
       sku: this.sku || null,
+      hsn_sac: this.hsn_sac || null,
       ask_for_price: this.ask_for_price || false,
       enable_enquiry: this.enable_enquiry || false,
       is_featured: this.is_featured || false,

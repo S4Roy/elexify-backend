@@ -15,7 +15,7 @@ export const productExportRows = product => {
     tags: (product.tags || []).map(t => t.name).join(', '),
     slug: product.slug, created_at: product.created_at,
   };
-  const row = item => ({ ...common, sku: item.sku || '', regular_price: item.regular_price,
+  const row = item => ({ ...common, sku: item.sku || '', hsn: item.hsn_sac || product.hsn_sac || '', regular_price: item.regular_price,
     sale_price: item.sale_price, stock_quantity: item.stock_quantity, weight: item.weight,
     variation_id: item === product ? '' : String(item._id),
     attributes: (item.attributes || []).filter(a => a.value).map(a => `${a.attribute?.name || ''}: ${a.value?.name || a.value?.value || ''}`).join(', '),
@@ -32,7 +32,7 @@ export const buildProductsExportWorkbook = async (query = {}) => {
   const workbook = new ExcelJS.Workbook();
   const sheet = workbook.addWorksheet('Products');
   sheet.columns = [
-    ['Product ID', 'product_id'], ['Name', 'name'], ['Type', 'type'], ['SKU', 'sku'],
+    ['Product ID', 'product_id'], ['Name', 'name'], ['Type', 'type'], ['SKU', 'sku'], ['HSN', 'hsn'],
     ['Variation ID', 'variation_id'], ['Attributes', 'attributes'], ['Status', 'status'],
     ['Brand', 'brand'], ['Categories', 'categories'], ['Subcategories', 'sub_categories'],
     ['Tags', 'tags'], ['Regular price', 'regular_price'], ['Sale price', 'sale_price'],

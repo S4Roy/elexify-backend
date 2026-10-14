@@ -5,7 +5,7 @@ import SiteSetting from '../../../models/SiteSetting.js';
 import { buildProductsExportWorkbook, PRODUCT_EXPORT_ROW_LIMIT } from './exportProducts.js';
 
 const id = '507f1f77bcf86cd799439011';
-const product = { _id: id, name: '=SUM(A1:A2)', type: 'simple', sku: '00123', regular_price: 120, stock_quantity: 0 };
+const product = { _id: id, name: '=SUM(A1:A2)', type: 'simple', sku: '00123', hsn_sac: '8515', regular_price: 120, stock_quantity: 0 };
 const mockProducts = products => {
   vi.spyOn(SiteSetting, 'findOne').mockResolvedValue(null);
   return vi.spyOn(Product, 'aggregate').mockReturnValue({ cursor: () => (async function* () { yield* products; })() });
@@ -22,8 +22,9 @@ describe('product export', () => {
     expect(count).toBe(1);
     expect(sheet.getCell('B2').value).toBe('=SUM(A1:A2)');
     expect(sheet.getCell('D2').value).toBe('00123');
-    expect(sheet.getCell('L2').value).toBe(120);
-    expect(sheet.getCell('N2').value).toBe(0);
+    expect(sheet.getCell('E2').value).toBe('8515');
+    expect(sheet.getCell('M2').value).toBe(120);
+    expect(sheet.getCell('O2').value).toBe(0);
   });
   it('includes one row per variation with its parent identity', async () => {
     mockProducts([{ ...product, type: 'variable', variations: [

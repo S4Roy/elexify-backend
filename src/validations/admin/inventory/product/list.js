@@ -8,7 +8,8 @@ export const productListQuery = Joi.object({
     brand: Joi.string().optional().allow("", null),
     tags: Joi.string().optional().allow("", null),
     classifications: Joi.string().optional().allow("", null),
-    search_key: Joi.string().optional().allow("", null),
+    search_key: Joi.string().trim().optional().allow("", null),
+    hsn_status: Joi.string().optional().allow("", null).valid("missing", "present"),
     sort_by: Joi.string()
       .optional()
       .allow("", null)
