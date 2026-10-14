@@ -2,7 +2,7 @@ import mongoose from "mongoose";
 import SearchSynonym from "../../../models/SearchSynonym.js";
 import { StatusError } from "../../../config/index.js";
 import { invalidateSynonyms, parseSynonym } from "../../../services/search/synonyms.js";
-import { suggestAlternatives } from "../../../services/search/suggest.js";
+import { suggestAlternativeGroups } from "../../../services/search/suggest.js";
 import { normalizeQuery } from "../../../services/searchInsights/actions.js";
 import { list as storefrontList } from "../../site/inventory/product/list.js";
 
@@ -64,7 +64,7 @@ export const preview = async (req, res, next) => {
 
 export const suggest = async (req, res, next) => {
   try {
-    res.status(200).json({ status: "success", data: await suggestAlternatives(req.query.term) });
+    res.status(200).json({ status: "success", data: await suggestAlternativeGroups(req.query.term) });
   } catch (error) { next(error); }
 };
 
