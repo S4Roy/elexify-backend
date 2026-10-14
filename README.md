@@ -96,3 +96,9 @@ Media is stored in S3 as relative keys; the API builds absolute URLs at read tim
 ## 📜 License
 
 This project is **MIT licensed**.
+
+## Media images
+
+Every image written to S3 goes through `src/services/media/optimizeImage.js` (called by `s3Handler.uploadToS3` and the media library upload): EXIF rotation applied, at most 1600px on the long side, JPEG q80 for photos, palette PNG when the image has transparency. GIF, SVG and video are stored untouched, and an image is kept as-is if re-encoding would not save at least 10%. Uploads get `Cache-Control: public, max-age=31536000, immutable`; the media library also stores a 400px JPEG thumbnail in `Media.thumbnail`.
+
+Images uploaded before this existed are fixed with the `optimize-media-images` data operation (admin Data Operations, or `node src/scripts/cli.js dry-run|run optimize-media-images` on the server). It backs up each original to the private `originals-backup/` prefix, rewrites the image under the same key, marks it with `x-amz-meta-optimized: 1` so re-runs skip it, and invalidates CloudFront per top-level folder. Roll back with `node src/scripts/optimizeMediaImages.js --restore <key-or-prefix>`.

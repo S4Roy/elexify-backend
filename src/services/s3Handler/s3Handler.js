@@ -8,6 +8,7 @@ import {
 import { Upload } from "@aws-sdk/lib-storage";
 import { s3Client } from "../awsService/awsConfig.js";
 import { envs } from "../../config/index.js";
+import { optimizeImage } from "../media/optimizeImage.js";
 
 const S3 = s3Client;
 
@@ -55,18 +56,23 @@ class S3Handler {
     };
   }
 
-  async uploadToS3(file, folder = "uploads") {
+  // Images are resized/compressed on the way in (see optimizeImage) unless the
+  // caller already did it; other files are stored as-is.
+  async uploadToS3(file, folder = "uploads", { optimize = true } = {}) {
     if (!file) {
       throw new Error("No file provided");
     }
 
     const key = folder;
+    const { buffer, contentType } = optimize
+      ? await optimizeImage(file.data, file.mimetype)
+      : { buffer: file.data, contentType: file.mimetype };
     await S3.send(
       new PutObjectCommand({
         Bucket: envs.s3.BUCKET_NAME,
         Key: key,
-        Body: file.data,
-        ContentType: file.mimetype,
+        Body: buffer,
+        ContentType: contentType,
         CacheControl: "public, max-age=31536000, immutable",
         ACL: "public-read",
       })

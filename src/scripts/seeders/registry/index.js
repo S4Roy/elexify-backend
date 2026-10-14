@@ -28,6 +28,7 @@ import fixCartIndexes from "./operations/fix-cart-indexes.js";
 import fixUserIndexes from "./operations/fix-user-indexes.js";
 import fixWishlistIndexes from "./operations/fix-wishlist-indexes.js";
 import fixProductContent from "./operations/fix-product-content.js";
+import optimizeMediaImages from "./operations/optimize-media-images.js";
 import backfillVerifiedEmailOrderedUsers from "./operations/backfill-verified-email-ordered-users.js";
 import backfillVerifiedEmailAdminStaff from "./operations/backfill-verified-email-admin-staff.js";
 import backfillOrderAddressSnapshots from "./operations/backfill-order-address-snapshots.js";
@@ -71,6 +72,7 @@ const RAW_ENTRIES = [
   fixUserIndexes,
   fixWishlistIndexes,
   fixProductContent,
+  optimizeMediaImages,
   backfillVerifiedEmailOrderedUsers,
   backfillVerifiedEmailAdminStaff,
   backfillOrderAddressSnapshots,
