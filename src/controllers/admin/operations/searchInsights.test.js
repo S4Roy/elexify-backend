@@ -37,3 +37,36 @@ it("uses a single top-level facet with matching filters for rows and count", asy
   expect(summary[0].$group.zero_results).toEqual({ $sum: "$zero_results" });
   expect(res.json.mock.calls[0][0].data).toMatchObject({ docs: [], totalDocs: 0, summary: { searches: 0, zero_results: 0, measured: 0 } });
 });
+
+it("sorts by whitelisted keys and falls back to search count", async () => {
+  SearchEvent.aggregate.mockResolvedValue([{ summary: [], docs: [], count: [] }]);
+  const res = { status: vi.fn().mockReturnThis(), json: vi.fn() };
+  await list({ query: { sort: "zero_rate" } }, res, vi.fn());
+  let docs = SearchEvent.aggregate.mock.calls.at(-1)[0][2].$facet.docs;
+  expect(docs.some(stage => stage.$addFields?.zero_rate)).toBe(true);
+  expect(docs).toContainEqual({ $sort: { zero_rate: -1, zero_results: -1, _id: 1 } });
+  await list({ query: { sort: "constructor" } }, res, vi.fn());
+  docs = SearchEvent.aggregate.mock.calls.at(-1)[0][2].$facet.docs;
+  expect(docs).toContainEqual({ $sort: { searches: -1, _id: 1 } });
+  expect(res.json.mock.calls.at(-1)[0].data.sort).toBe("searches");
+});
+
+it("matches normalized query text with regex characters escaped", async () => {
+  SearchEvent.aggregate.mockResolvedValue([{ summary: [], docs: [], count: [] }]);
+  const res = { status: vi.fn().mockReturnThis(), json: vi.fn() };
+  await list({ query: { q: "  LI.ion (18650)  " } }, res, vi.fn());
+  const pipeline = SearchEvent.aggregate.mock.calls.at(-1)[0];
+  expect(pipeline[0].$match.query).toEqual({ $regex: "li\\.ion \\(18650\\)" });
+  expect(new RegExp(pipeline[0].$match.query.$regex).test("li.ion (18650) cell")).toBe(true);
+  expect(new RegExp(pipeline[0].$match.query.$regex).test("lixion (18650)")).toBe(false);
+});
+
+it("summarises distinct and always-failing queries", async () => {
+  SearchEvent.aggregate.mockResolvedValue([{ summary: [], docs: [], count: [] }]);
+  const res = { status: vi.fn().mockReturnThis(), json: vi.fn() };
+  await list({ query: {} }, res, vi.fn());
+  const summary = SearchEvent.aggregate.mock.calls.at(-1)[0][2].$facet.summary[0].$group;
+  expect(summary.distinct_queries).toEqual({ $sum: 1 });
+  expect(summary.failing_queries.$sum.$cond[0].$and).toHaveLength(2);
+  expect(res.json.mock.calls[0][0].data.summary).toMatchObject({ distinct_queries: 0, failing_queries: 0 });
+});
