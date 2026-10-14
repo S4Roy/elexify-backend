@@ -1,6 +1,8 @@
 import mongoose from "mongoose";
 import SearchEvent from "../../../models/SearchEvent.js";
 import Product from "../../../models/Product.js";
+import SearchQueryIgnore from "../../../models/SearchQueryIgnore.js";
+import { StatusError } from "../../../config/index.js";
 import { STORE_TIMEZONE, addDaysYmd, istRange, istYmd } from "../../../config/storeTime.js";
 import { normalizeQuery } from "../../../services/searchInsights/actions.js";
 
@@ -109,6 +111,13 @@ export const list = async (req, res, next) => {
     const queryFilter = zero_results === "true"
       ? [{ $match: { zero_results: { $gt: 0 } } }]
       : [];
+    // Ignored queries are flagged on every row and, unless asked for, left out of the table and its count.
+    const hideIgnored = req.query.show_ignored !== "true";
+    const flagIgnored = [
+      { $lookup: { from: SearchQueryIgnore.collection.name, localField: "_id", foreignField: "query", as: "ignored" } },
+      { $addFields: { ignored: { $gt: [{ $size: "$ignored" }, 0] } } },
+    ];
+    const ignoreStages = hideIgnored ? [...flagIgnored, { $match: { ignored: false } }] : flagIgnored;
     const sortKey = Object.hasOwn(sorts, req.query.sort) ? req.query.sort : "searches";
     const [data] = await SearchEvent.aggregate([
       { $match: match },
@@ -134,21 +143,50 @@ export const list = async (req, res, next) => {
           failing_queries: { $sum: { $cond: [{ $and: [{ $gt: ["$measured", 0] }, { $eq: ["$zero_results", "$measured"] }] }, 1, 0] } },
         } }],
         docs: [
+          ...ignoreStages,
           ...queryFilter,
           ...(sortKey === "zero_rate" ? [{ $addFields: { zero_rate: zeroRate } }] : []),
           { $sort: sorts[sortKey] },
           { $skip: (page - 1) * limit },
           { $limit: limit },
         ],
-        count: [...queryFilter, { $count: "total" }],
+        count: [...ignoreStages, ...queryFilter, { $count: "total" }],
+        ...(hideIgnored ? { ignored_hidden: [...flagIgnored, ...queryFilter, { $match: { ignored: true } }, { $count: "total" }] } : {}),
       } },
     ]);
     const totalDocs = data?.count?.[0]?.total || 0;
+    const ignoredHidden = data?.ignored_hidden?.[0]?.total || 0;
     const docs = eventType === "suggestion" ? await attachSelectedProducts(data?.docs || [], match) : data?.docs || [];
     res.status(200).json({ status: "success", data: {
       docs, summary: data?.summary?.[0] || { searches: 0, zero_results: 0, measured: 0, distinct_queries: 0, failing_queries: 0 },
-      event_type: eventType, sort: sortKey, totalDocs, page, limit, totalPages: Math.ceil(totalDocs / limit),
+      event_type: eventType, sort: sortKey, ignored_hidden: ignoredHidden, totalDocs, page, limit, totalPages: Math.ceil(totalDocs / limit),
       hasNextPage: page * limit < totalDocs, hasPrevPage: page > 1,
     } });
+  } catch (error) { next(error); }
+};
+
+const ignoredQuery = value => {
+  const query = normalizeQuery(value);
+  if (!query) throw StatusError.badRequest("Query is required");
+  return query;
+};
+
+export const ignore = async (req, res, next) => {
+  try {
+    const query = ignoredQuery(req.body?.query);
+    await SearchQueryIgnore.updateOne(
+      { query },
+      { $setOnInsert: { query, created_by: req.auth?.user_id || null, created_at: new Date() } },
+      { upsert: true },
+    );
+    res.status(200).json({ status: "success", message: "Query ignored", data: { query } });
+  } catch (error) { next(error); }
+};
+
+export const unignore = async (req, res, next) => {
+  try {
+    const query = ignoredQuery(req.query.query);
+    await SearchQueryIgnore.deleteOne({ query });
+    res.status(200).json({ status: "success", message: "Query restored", data: { query } });
   } catch (error) { next(error); }
 };

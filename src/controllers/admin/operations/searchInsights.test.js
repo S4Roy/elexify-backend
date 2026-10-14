@@ -1,6 +1,8 @@
 import { expect, it, vi } from "vitest";
 import SearchEvent from "../../../models/SearchEvent.js";
-import { list, trend } from "./searchInsights.js";
+import { ignore, list, trend, unignore } from "./searchInsights.js";
+import SearchQueryIgnore from "../../../models/SearchQueryIgnore.js";
+vi.mock("../../../models/SearchQueryIgnore.js", () => ({ default: { collection: { name: "search_query_ignores" }, updateOne: vi.fn(), deleteOne: vi.fn() } }));
 vi.mock("../../../models/SearchEvent.js", () => ({ default: { aggregate: vi.fn() } }));
 vi.mock("../../../models/Product.js", () => ({ default: { find: vi.fn() } }));
 import Product from "../../../models/Product.js";
@@ -135,4 +137,34 @@ it("attaches the most-selected products to suggestion rows", async () => {
   expect(bms.products[0]).toEqual({ product_id: id, count: 3, name: "4S BMS", slug: "4s-bms", deleted: false });
   expect(bms.products[1]).toMatchObject({ product_id: "legacy-slug", name: null });
   expect(fan).toMatchObject({ distinct_products: 0, products: [] });
+});
+
+it("hides ignored queries from rows and count by default, but not from the summary", async () => {
+  SearchEvent.aggregate.mockResolvedValue([{ summary: [], docs: [], count: [{ total: 3 }], ignored_hidden: [{ total: 2 }] }]);
+  const res = { status: vi.fn().mockReturnThis(), json: vi.fn() };
+  await list({ query: { zero_results: "true" } }, res, vi.fn());
+  const { docs, count, summary, ignored_hidden } = SearchEvent.aggregate.mock.calls.at(-1)[0][2].$facet;
+  expect(docs[0].$lookup).toMatchObject({ from: "search_query_ignores", localField: "_id", foreignField: "query" });
+  expect(docs).toContainEqual({ $match: { ignored: false } });
+  expect(count).toContainEqual({ $match: { ignored: false } });
+  expect(summary.some(stage => stage.$lookup)).toBe(false);
+  expect(ignored_hidden).toContainEqual({ $match: { ignored: true } });
+  expect(res.json.mock.calls[0][0].data).toMatchObject({ totalDocs: 3, ignored_hidden: 2 });
+
+  await list({ query: { show_ignored: "true" } }, res, vi.fn());
+  const shown = SearchEvent.aggregate.mock.calls.at(-1)[0][2].$facet;
+  expect(shown.docs).not.toContainEqual({ $match: { ignored: false } });
+  expect(shown.ignored_hidden).toBeUndefined();
+});
+
+it("ignores and restores normalized queries", async () => {
+  const res = { status: vi.fn().mockReturnThis(), json: vi.fn() };
+  await ignore({ body: { query: "  CBack " }, auth: { user_id: "65f000000000000000000009" } }, res, vi.fn());
+  expect(SearchQueryIgnore.updateOne.mock.calls[0][0]).toEqual({ query: "cback" });
+  expect(SearchQueryIgnore.updateOne.mock.calls[0][2]).toEqual({ upsert: true });
+  await unignore({ query: { query: "CBACK" } }, res, vi.fn());
+  expect(SearchQueryIgnore.deleteOne).toHaveBeenCalledWith({ query: "cback" });
+  const next = vi.fn();
+  await ignore({ body: {} }, res, next);
+  expect(next.mock.calls[0][0].statusCode).toBe(400);
 });
