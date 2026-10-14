@@ -20,6 +20,8 @@ All switches default to enabled for backward-compatible rollout:
 - Mobile `EXPO_PUBLIC_SEARCH_INSIGHTS_ENABLED=false`: disable client events (requires client rebuild).
 - Backend `SEARCH_INSIGHTS_LEGACY_REQUESTS_ENABLED=false`: stop additional legacy request logging after the desired client rollout. Historical legacy records remain readable. Older mobile clients will otherwise continue appearing only in the legacy view.
 
+- Backend `SEARCH_FLEXIBLE_SEPARATORS=false`: match spaces, hyphens and underscores in product search literally again. By default they are interchangeable or optional between words ("e cycle" also finds "e-cycle" and "ecycle"); this only ever adds matches.
+
 Ingestion is rate-limited independently of product search. Clients use a separate anonymous Axios transport without customer/session headers, session interceptors or error toasts, and with cross-origin credentials disabled. They retry transient failures once using the same UUID, swallow failures, and never await analytics before navigating. There is no durable offline queue; some events can be lost when a client closes or is offline.
 
 ## Database and verification
@@ -29,3 +31,7 @@ The `search_events` model adds an event-type index and a unique sparse `event_id
 The admin defaults to action-based searches, with separate suggestion and legacy views, platform/scope filters, confirmed no-result rate and unknown counts. First-recorded date refers to the current selection, not a reconstructed historical rollout date.
 
 Run unit tests with `npm test -- src/services/searchInsights src/controllers/admin/operations/searchInsights.test.js`. Run real MongoDB coverage with `SEARCH_INSIGHTS_TEST_MONGODB_URI=mongodb://127.0.0.1:27961/elexify_search_insights_test_actions npm test -- src/services/searchInsights/searchInsights.integration.test.js`. Only use the named isolated test database prefix; the integration suite drops that database after testing.
+
+## Search synonyms
+
+Admins manage whole-query synonyms at Search Insights → Synonyms (`search_synonyms` collection, unique `term` index). When a shopper's normalized search equals a term, product search also matches each alternative. Each backend instance caches synonyms for up to 60 seconds; a failed lookup falls back to the original query. Viewing needs `operations.view`; changes need `operations.update` and are audited.

@@ -1,5 +1,6 @@
 import { recordSearch } from "../../../../services/searchInsights/recordSearch.js";
 import { searchTerms } from "../../../../services/search/synonyms.js";
+import { searchPattern } from "../../../../services/search/pattern.js";
 import mongoose from "mongoose";
 import Category from "../../../../models/Category.js";
 import Product from "../../../../models/Product.js";
@@ -748,9 +749,8 @@ export const list = async (req, res, next) => {
       // interpreted as regex syntax (e.g. unescaped "(...)" silently
       // becomes a non-matching capture group instead of literal parens).
       // Admin-defined synonyms widen the match to any of the alternatives.
-      const escapedSearchKey = (await searchTerms(search_key))
-        .map(term => term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
-        .join("|");
+      // Separators between words are flexible (see searchPattern).
+      const escapedSearchKey = searchPattern(await searchTerms(search_key));
       pipeline.push({
         $match: {
           $or: [
