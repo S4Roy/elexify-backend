@@ -11,6 +11,7 @@ operationsRouter.get("/search-insights", requirePermission("operations.view"), l
 operationsRouter.get("/search-insights/trend", requirePermission("operations.view"), searchInsightsTrend);
 operationsRouter.get("/search-synonyms", requirePermission("operations.view"), searchSynonyms.list);
 operationsRouter.get("/search-synonyms/lookup", requirePermission("operations.view"), searchSynonyms.findByTerm);
+operationsRouter.get("/search-synonyms/suggest", requirePermission("operations.view"), searchSynonyms.suggest);
 operationsRouter.post("/search-synonyms/preview", requirePermission("operations.view"), searchSynonyms.preview);
 operationsRouter.post("/search-synonyms", requirePermission("operations.update"), searchSynonyms.create);
 operationsRouter.put("/search-synonyms/:id", requirePermission("operations.update"), searchSynonyms.update);
