@@ -50,6 +50,9 @@ export async function runGenerateMediaThumbnails({
 
   let created = 0;
   const failed = [];
+  // Media records whose original is gone from S3 (replaced or deleted images).
+  // Retrying can't help, so they're reported apart from real failures.
+  const missing = [];
   let next = 0;
   await Promise.all(Array.from({ length: Math.min(CONCURRENCY, pending.length) }, async () => {
     while (next < pending.length) {
@@ -65,11 +68,18 @@ export async function runGenerateMediaThumbnails({
         created++;
         if (created % 25 === 0) logger.info(`…${created}/${pending.length} done`);
       } catch (error) {
+        if (error?.name === "NoSuchKey" || error?.Code === "NoSuchKey" || error?.$metadata?.httpStatusCode === 404) {
+          missing.push(media.url);
+          continue;
+        }
         failed.push({ url: media.url, error: error?.message || String(error) });
         logger.error(`Failed ${media.url}: ${error?.message || error}`);
       }
     }
   }));
   logger.info(`Created ${created}/${pending.length} thumbnails.${failed.length ? ` ${failed.length} failed; re-run to retry.` : ""}`);
-  return { result: { pending: pending.length, created, failed }, dryRunPreview: null };
+  if (missing.length) {
+    logger.info(`${missing.length} media records point at files no longer in S3 (skipped; re-running won't help): ${missing.slice(0, 10).join(", ")}${missing.length > 10 ? ", …" : ""}`);
+  }
+  return { result: { pending: pending.length, created, failed, missing_originals: missing }, dryRunPreview: null };
 }

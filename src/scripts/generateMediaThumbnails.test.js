@@ -33,3 +33,12 @@ it("creates thumbnails for images without one and records them", async () => {
   expect([meta.format, meta.width, meta.hasAlpha]).toEqual(["jpeg", 600, false]);
   expect(MediaModel.updateOne).toHaveBeenCalledWith({ _id: "m1" }, { $set: { thumbnail: "products/thumbs/a.jpg" } });
 });
+
+it("reports originals missing from S3 separately from failures", async () => {
+  const rows = [{ _id: "m1", url: "products/gone.jpg" }];
+  const MediaModel = { find: vi.fn(() => ({ lean: async () => rows })), updateOne: vi.fn() };
+  const s3 = { send: vi.fn(async () => { throw Object.assign(new Error("The specified key does not exist."), { name: "NoSuchKey" }); }) };
+  const { result } = await runGenerateMediaThumbnails({ apply: true, s3, bucket: "b", MediaModel, logger });
+  expect(result).toMatchObject({ created: 0, failed: [], missing_originals: ["products/gone.jpg"] });
+  expect(MediaModel.updateOne).not.toHaveBeenCalled();
+});
