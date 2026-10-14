@@ -35,3 +35,7 @@ Run unit tests with `npm test -- src/services/searchInsights src/controllers/adm
 ## Search synonyms
 
 Admins manage whole-query synonyms at Search Insights → Synonyms (`search_synonyms` collection, unique `term` index). When a shopper's normalized search equals a term, product search also matches each alternative. Each backend instance caches synonyms for up to 60 seconds; a failed lookup falls back to the original query. Viewing needs `operations.view`; changes need `operations.update` and are audited.
+
+## Spelling fallback
+
+When a product search finds nothing, the backend retries with up to three close spellings drawn from live product and category names (the same engine as the synonym editor's suggestions) and returns the first that finds products, with `corrected_query` in the response. Searches that already find products are never changed. Clients show "Showing results for …" with a "Search for … only" link that sends `exact=true` to opt out. Recorded result counts reflect what the shopper was shown. The synonym editor's counts use `exact`; Search Insights' re-check does not, so it matches the shopper experience.

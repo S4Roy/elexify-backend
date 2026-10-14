@@ -64,3 +64,12 @@ it("previews exact storefront counts without recording shopper searches", async 
   await preview({ body: { terms: Array.from({ length: 12 }, (_, i) => `t${i}`) } }, response(), next);
   expect(next.mock.calls[0][0].statusCode).toBe(400);
 });
+
+it("passes exact through so the synonym editor sees uncorrected counts", async () => {
+  storefrontList.mockReset();
+  storefrontList.mockImplementation(async (req, res) => res.status(200).json({ data: { totalDocs: 1 } }));
+  await preview({ body: { terms: ["cuter"], exact: true } }, response(), vi.fn());
+  expect(storefrontList.mock.calls[0][0].query.exact).toBe("true");
+  await preview({ body: { terms: ["cuter"] } }, response(), vi.fn());
+  expect(storefrontList.mock.calls[1][0].query.exact).toBeUndefined();
+});

@@ -1,6 +1,15 @@
 import { recordSearch } from "../../../../services/searchInsights/recordSearch.js";
 import { searchTerms } from "../../../../services/search/synonyms.js";
 import { searchPattern } from "../../../../services/search/pattern.js";
+import { suggestAlternatives } from "../../../../services/search/suggest.js";
+import { logger } from "../../../../config/logger.js";
+
+const MAX_CORRECTION_ATTEMPTS = 3;
+// Spelling corrections never break search: on any failure, no correction is offered.
+const correctionsFor = (searchKey) => suggestAlternatives(searchKey).catch(() => {
+  logger.warn({ message: "Search spelling correction failed" });
+  return [];
+});
 import mongoose from "mongoose";
 import Category from "../../../../models/Category.js";
 import Product from "../../../../models/Product.js";
@@ -742,16 +751,16 @@ export const list = async (req, res, next) => {
     ];
 
     // Add search at the very end (covers simple + variation rows)
-    if (search_key) {
-      // Escape regex metacharacters so literal punctuation in the search
-      // string (parentheses, dots, quotes, etc. — common in product names
-      // like `TS to TS 6.35mm (1/4")...`) is matched as text, not
-      // interpreted as regex syntax (e.g. unescaped "(...)" silently
-      // becomes a non-matching capture group instead of literal parens).
-      // Admin-defined synonyms widen the match to any of the alternatives.
-      // Separators between words are flexible (see searchPattern).
-      const escapedSearchKey = searchPattern(await searchTerms(search_key));
-      pipeline.push({
+    // Escape regex metacharacters so literal punctuation in the search
+    // string (parentheses, dots, quotes, etc. — common in product names
+    // like `TS to TS 6.35mm (1/4")...`) is matched as text, not
+    // interpreted as regex syntax (e.g. unescaped "(...)" silently
+    // becomes a non-matching capture group instead of literal parens).
+    // Admin-defined synonyms widen the match to any of the alternatives.
+    // Separators between words are flexible (see searchPattern).
+    const searchStage = async (key) => {
+      const escapedSearchKey = searchPattern(await searchTerms(key));
+      return {
         $match: {
           $or: [
             { name: { $regex: escapedSearchKey, $options: "i" } },
@@ -764,13 +773,28 @@ export const list = async (req, res, next) => {
             })),
           ],
         },
-      });
-    }
-
-    const result = await Product.aggregatePaginate(
-      Product.aggregate([...productPipeline, ...pipeline]),
+      };
+    };
+    const runSearch = async (key) => Product.aggregatePaginate(
+      Product.aggregate([...productPipeline, ...pipeline, ...(key ? [await searchStage(key)] : [])]),
       options
     );
+
+    let result = await runSearch(search_key);
+    let corrected_query = null;
+    // Typo fallback: only when the search found nothing, retry with the closest catalog
+    // spellings and keep the first that finds products. `exact=true` opts out (the
+    // shopper chose "search instead for" their original words).
+    if (search_key && result.totalDocs === 0 && req.query.exact !== "true") {
+      for (const candidate of (await correctionsFor(search_key)).slice(0, MAX_CORRECTION_ATTEMPTS)) {
+        const retry = await runSearch(candidate);
+        if (retry.totalDocs > 0) {
+          result = retry;
+          corrected_query = candidate;
+          break;
+        }
+      }
+    }
 
     // Admin previews reuse this handler for exact counts but are not shopper searches.
     if (!req.skipSearchRecording) recordSearch(search_key, page, result.totalDocs);
@@ -778,7 +802,7 @@ export const list = async (req, res, next) => {
     res.status(200).json({
       status: "success",
       message: req.__("List fetched successfully"),
-      data: { ...result, breadcrumbs },
+      data: { ...result, breadcrumbs, corrected_query },
     });
   } catch (error) {
     next(error);

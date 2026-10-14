@@ -8,10 +8,11 @@ import { list as storefrontList } from "../../site/inventory/product/list.js";
 
 const MAX_PREVIEW_TERMS = 11;
 
-// Counts storefront results for one search exactly as a guest shopper would see them.
-function storefrontCount(term) {
+// Counts storefront results for one search as a guest shopper would see them.
+// `exact` skips the typo fallback, for checking whether a word itself matches.
+function storefrontCount(term, exact) {
   return new Promise((resolve, reject) => {
-    const req = { query: { search_key: term, page: 1, limit: 1 }, params: {}, auth: null, __: text => text, skipSearchRecording: true };
+    const req = { query: { search_key: term, page: 1, limit: 1, ...(exact ? { exact: "true" } : {}) }, params: {}, auth: null, __: text => text, skipSearchRecording: true };
     const res = { status() { return this; }, json(body) { resolve(body?.data?.totalDocs ?? 0); } };
     storefrontList(req, res, reject).catch(reject);
   });
@@ -55,7 +56,8 @@ export const preview = async (req, res, next) => {
     const raw = Array.isArray(req.body?.terms) ? req.body.terms : [];
     const terms = [...new Set(raw.map(normalizeQuery))].filter(term => term && term.length <= 100);
     if (terms.length > MAX_PREVIEW_TERMS) throw StatusError.badRequest(`At most ${MAX_PREVIEW_TERMS} terms`);
-    const counts = await Promise.all(terms.map(async term => ({ term, count: await storefrontCount(term) })));
+    const exact = req.body?.exact === true;
+    const counts = await Promise.all(terms.map(async term => ({ term, count: await storefrontCount(term, exact) })));
     res.status(200).json({ status: "success", data: counts });
   } catch (error) { next(error); }
 };
