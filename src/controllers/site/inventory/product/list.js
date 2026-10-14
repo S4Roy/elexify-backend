@@ -2,7 +2,7 @@ import { recordSearch } from "../../../../services/searchInsights/recordSearch.j
 import { keepOrderOf, orderedMediaLookup } from "../../../../services/media/orderedMedia.js";
 import { thumbnailUrlExpr } from "../../../../services/media/mediaUrlExpr.js";
 import { searchTerms } from "../../../../services/search/synonyms.js";
-import { searchPattern } from "../../../../services/search/pattern.js";
+import { searchPattern, wordPatterns } from "../../../../services/search/pattern.js";
 import { suggestAlternatives } from "../../../../services/search/suggest.js";
 import { logger } from "../../../../config/logger.js";
 
@@ -753,25 +753,38 @@ export const list = async (req, res, next) => {
     // becomes a non-matching capture group instead of literal parens).
     // Admin-defined synonyms widen the match to any of the alternatives.
     // Separators between words are flexible (see searchPattern).
-    const searchStage = async (key) => {
-      const escapedSearchKey = searchPattern(await searchTerms(key));
-      return {
-        $match: {
-          $or: [
-            { name: { $regex: escapedSearchKey, $options: "i" } },
-            { slug: { $regex: escapedSearchKey, $options: "i" } },
-            { sku: { $regex: escapedSearchKey, $options: "i" } },
-            { "attributes.value.value": { $regex: escapedSearchKey, $options: "i" } }, // search attribute values
-            // Category names, so "speakers" or a tapped category suggestion finds the products filed under it.
-            ...["categories", "sub_categories"].map(field => ({
-              [field]: { $elemMatch: { name: { $regex: escapedSearchKey, $options: "i" }, status: "active", deleted_at: null } },
-            })),
-          ],
-        },
-      };
+    // Fields a search looks in: name, slug, SKU, attribute values and active category names.
+    const searchFields = (pattern) => [
+      { name: { $regex: pattern, $options: "i" } },
+      { slug: { $regex: pattern, $options: "i" } },
+      { sku: { $regex: pattern, $options: "i" } },
+      { "attributes.value.value": { $regex: pattern, $options: "i" } }, // search attribute values
+      // Category names, so "speakers" or a tapped category suggestion finds the products filed under it.
+      ...["categories", "sub_categories"].map(field => ({
+        [field]: { $elemMatch: { name: { $regex: pattern, $options: "i" }, status: "active", deleted_at: null } },
+      })),
+    ];
+    // A product matches the search (or a synonym) as a phrase, or when it has
+    // every word somewhere in any order: "12 0 12 transformer" finds
+    // "Transformer 12-0-12". Phrase matches rank first.
+    const searchStages = async (key) => {
+      const terms = await searchTerms(key);
+      const phrase = searchPattern(terms);
+      const allWords = terms
+        .map(wordPatterns)
+        .filter(patterns => patterns.length > 1)
+        .map(patterns => ({ $and: patterns.map(pattern => ({ $or: searchFields(pattern) })) }));
+      const phraseMatch = { $or: searchFields(phrase) };
+      if (!allWords.length) return [{ $match: phraseMatch }];
+      return [
+        { $match: { $or: [phraseMatch, ...allWords] } },
+        { $addFields: { search_phrase_match: { $regexMatch: { input: { $ifNull: ["$name", ""] }, regex: phrase, options: "i" } } } },
+        { $sort: { search_phrase_match: -1, [sort_by]: sort_order, _id: 1 } },
+        { $project: { search_phrase_match: 0 } },
+      ];
     };
     const runSearch = async (key) => Product.aggregatePaginate(
-      Product.aggregate([...productPipeline, ...pipeline, ...(key ? [await searchStage(key)] : [])]),
+      Product.aggregate([...productPipeline, ...pipeline, ...(key ? await searchStages(key) : [])]),
       options
     );
 

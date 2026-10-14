@@ -16,3 +16,22 @@ export function searchPattern(terms) {
     })
     .join("|");
 }
+
+// Words that don't narrow a product search; dropped unless they're all there is.
+const FILLER_WORDS = new Set(["a", "an", "and", "the", "for", "with", "of", "in", "to", "or"]);
+const MAX_WORDS = 8;
+
+// One regex per word, for matching every word of a search in any order:
+// numbers are whole numbers ("12" matches "12-0-12" and "12V", not "120"),
+// single letters stand alone ("v" matches "12V", not "valve"), and other words
+// match from the start of a word ("speaker" finds "speakers").
+export function wordPatterns(term) {
+  const words = String(term ?? "").toLowerCase().split(/[^a-z0-9.]+/).map(w => w.replace(/^\.+|\.+$/g, "")).filter(Boolean);
+  const meaningful = words.filter(word => !FILLER_WORDS.has(word));
+  return [...new Set(meaningful.length ? meaningful : words)].slice(0, MAX_WORDS).map(word => {
+    const escaped = escapeRegex(word);
+    if (/^[0-9.]+$/.test(word)) return `(?<![0-9.])${escaped}(?![0-9])`;
+    if (word.length === 1) return `(?<![a-z])${escaped}(?![a-z])`;
+    return `(?<![a-z0-9])${escaped}`;
+  });
+}

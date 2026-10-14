@@ -1,5 +1,5 @@
-import { afterEach, expect, it } from "vitest";
-import { searchPattern } from "./pattern.js";
+import { afterEach, describe, expect, it } from "vitest";
+import { searchPattern, wordPatterns } from "./pattern.js";
 const matches = (terms, text) => new RegExp(searchPattern(terms), "i").test(text);
 
 afterEach(() => { delete process.env.SEARCH_FLEXIBLE_SEPARATORS; });
@@ -25,4 +25,23 @@ it("joins synonym alternatives and can be switched off", () => {
   process.env.SEARCH_FLEXIBLE_SEPARATORS = "false";
   expect(searchPattern(["e cycle"])).toBe("e cycle");
   expect(matches(["e cycle"], "e-cycle")).toBe(false);
+});
+
+describe("wordPatterns", () => {
+  const matches = (term, text) => wordPatterns(term).every(p => new RegExp(p, "i").test(text));
+  it("matches every word in any order", () => {
+    expect(matches("12 0 12 transformer", "Transformer 12-0-12 2A")).toBe(true);
+    expect(matches("12 0 12 transformer", "Step Down Transformer 12V")).toBe(false);
+  });
+  it("treats numbers as whole numbers and single letters as standalone", () => {
+    expect(matches("12 transformer", "Transformer 120V")).toBe(false);
+    expect(matches("0", "Amplifier 100W")).toBe(false);
+    expect(matches("12 v", "12V Adapter")).toBe(true);
+    expect(matches("v", "Valve")).toBe(false);
+    expect(matches("6.35 jack", "TS Jack 6.35mm")).toBe(true);
+  });
+  it("matches word starts and ignores filler words", () => {
+    expect(matches("speaker for car", "Car Speakers 6 inch")).toBe(true);
+    expect(matches("ker", "Speaker")).toBe(false);
+  });
 });
