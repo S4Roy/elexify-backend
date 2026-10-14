@@ -86,6 +86,8 @@ export const list = async (req, res, next) => {
         first_tracked: { $min: "$created_at" },
         zero_results: { $sum: { $cond: [{ $eq: ["$result_count", 0] }, 1, 0] } },
         last_searched: { $max: "$created_at" },
+        web: { $sum: { $cond: [{ $eq: ["$platform", "web"] }, 1, 0] } },
+        mobile: { $sum: { $cond: [{ $eq: ["$platform", "mobile"] }, 1, 0] } },
       } },
       { $facet: {
         // Totals cover all queries in the date range, even when the table is filtered.

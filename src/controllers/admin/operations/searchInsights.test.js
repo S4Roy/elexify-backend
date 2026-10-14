@@ -102,3 +102,11 @@ it("starts an open-ended trend at the first recorded day and rejects bad ranges"
   expect(res.status).toHaveBeenCalledWith(400);
   expect(SearchEvent.aggregate).not.toHaveBeenCalled();
 });
+
+it("counts each query's searches per platform", async () => {
+  SearchEvent.aggregate.mockResolvedValue([{ summary: [], docs: [], count: [] }]);
+  await list({ query: {} }, { status: vi.fn().mockReturnThis(), json: vi.fn() }, vi.fn());
+  const group = SearchEvent.aggregate.mock.calls.at(-1)[0][1].$group;
+  expect(group.web).toEqual({ $sum: { $cond: [{ $eq: ["$platform", "web"] }, 1, 0] } });
+  expect(group.mobile).toEqual({ $sum: { $cond: [{ $eq: ["$platform", "mobile"] }, 1, 0] } });
+});
