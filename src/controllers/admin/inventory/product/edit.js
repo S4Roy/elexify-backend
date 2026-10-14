@@ -1,4 +1,5 @@
 import Product from "../../../../models/Product.js";
+import { toMetaText } from "../../../../services/seo/textUtils.js";
 import { inRequestedOrder } from "../../../../services/media/orderedMedia.js";
 import ProductAttribute from "../../../../models/ProductAttribute.js";
 import ProductVariation from "../../../../models/ProductVariation.js";
@@ -152,8 +153,9 @@ export const edit = async (req, res, next) => {
     // 🔹 Update SEO
     if (product.seo) {
       await SEO.findByIdAndUpdate(product.seo, {
-        meta_title: meta_title || name,
-        meta_description: meta_description || description,
+        // Plain text only: an empty meta description used to copy the HTML product description verbatim.
+        meta_title: toMetaText(meta_title || name, 60),
+        meta_description: toMetaText(meta_description || description, 160),
         meta_keywords: meta_keywords ? meta_keywords.split(",") : [],
         canonical_url: `/product/${slug}/`,
         updated_by: req.auth.user_id,

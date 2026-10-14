@@ -1,4 +1,5 @@
 import Product from "../../../../models/Product.js";
+import { toMetaText } from "../../../../services/seo/textUtils.js";
 import { inRequestedOrder } from "../../../../services/media/orderedMedia.js";
 import ProductAttribute from "../../../../models/ProductAttribute.js";
 import ProductVariation from "../../../../models/ProductVariation.js";
@@ -98,9 +99,9 @@ export const add = async (req, res, next) => {
 
     // 🔹 Create SEO
     const seo = new SEO({
-      meta_title: meta_title || name,
+      meta_title: toMetaText(meta_title || name, 60),
       reference_type: "products",
-      meta_description: meta_description || "",
+      meta_description: toMetaText(meta_description, 160),
       meta_keywords: meta_keywords ? meta_keywords.split(",") : [],
       canonical_url: `/product/${slug}/`,
       created_by: req.auth.user_id,
