@@ -547,6 +547,7 @@ const address = await Address.findOne({
         // never live-join product_id/variation_id for display.
         product_name: cart.product?.name || null,
         sku: cart.variation?.sku || cart.product?.sku || null,
+        hsn: cart.variation?.hsn_sac || cart.product?.hsn_sac || null,
         variation_name: cart.variation?.combination_key || null,
         base_unit_price: item.base_unit_price,
         base_line_total: item.base_total_price,

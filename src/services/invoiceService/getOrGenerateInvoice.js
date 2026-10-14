@@ -22,19 +22,21 @@ const buildItemSnapshot = async (item, gstPerItem) => {
   let productName = item.product_name;
   let sku = item.sku;
   let variationName = item.variation_name;
+  let hsn = item.hsn;
 
-  if (!productName || !sku) {
+  if (!productName || !sku || !hsn) {
     const [product, variation] = await Promise.all([
-      Product.findById(item.product_id).select("name sku"),
+      Product.findById(item.product_id).select("name sku hsn_sac"),
       item.variation_id
         ? ProductVariation.findById(item.variation_id).select(
-            "sku combination_key",
+            "sku combination_key hsn_sac",
           )
         : Promise.resolve(null),
     ]);
     productName = productName || product?.name || "Product";
     sku = sku || variation?.sku || product?.sku || null;
     variationName = variationName || variation?.combination_key || null;
+    hsn = hsn || variation?.hsn_sac || product?.hsn_sac || null;
   }
 
   const quantity = item.quantity || 0;
@@ -57,6 +59,7 @@ const buildItemSnapshot = async (item, gstPerItem) => {
   return {
     product_name: productName,
     sku,
+    hsn,
     variation_name: variationName,
     quantity,
     unit_price: unitPrice,

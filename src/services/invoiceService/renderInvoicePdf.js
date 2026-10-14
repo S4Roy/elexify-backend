@@ -235,7 +235,8 @@ export const renderInvoicePdf = (invoice) =>
       const amounts = display.items[idx];
       const productLabel = [item.product_name, item.variation_name].filter(Boolean).join("\n");
       const skuLabel = item.sku ? `SKU: ${item.sku}` : "";
-      const fullProductText = [productLabel, skuLabel].filter(Boolean).join("\n");
+      const hsnLabel = item.hsn ? `HSN: ${item.hsn}` : "";
+      const fullProductText = [productLabel, skuLabel, hsnLabel].filter(Boolean).join("\n");
       const rowHeight = Math.max(
         doc.heightOfString(fullProductText, { width: columns[1].width }),
         14

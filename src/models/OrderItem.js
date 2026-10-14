@@ -35,6 +35,7 @@ const OrderItemSchema = new Schema(
     // rewrites an already-placed order's line items.
     product_name: { type: String, default: null },
     sku: { type: String, default: null },
+    hsn: { type: String, default: null }, // GST HSN/SAC at order time (variation overrides product)
     variation_name: { type: String, default: null },
     base_unit_price: { type: Number, default: 0 },
     base_line_total: { type: Number, default: 0 },

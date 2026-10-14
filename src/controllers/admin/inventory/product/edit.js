@@ -1,6 +1,7 @@
 import Product from "../../../../models/Product.js";
 import { toMetaText } from "../../../../services/seo/textUtils.js";
 import { inRequestedOrder } from "../../../../services/media/orderedMedia.js";
+import { hsnOrNull } from "../../../../services/inventory/product/hsn.js";
 import ProductAttribute from "../../../../models/ProductAttribute.js";
 import ProductVariation from "../../../../models/ProductVariation.js";
 import ProductSpecification from "../../../../models/ProductSpecification.js";
@@ -51,6 +52,7 @@ export const edit = async (req, res, next) => {
       sale_start_date,
       sale_end_date,
       sku,
+      hsn_sac,
       stock_status,
       stock_quantity,
 
@@ -147,6 +149,8 @@ export const edit = async (req, res, next) => {
       sold_individually,
       updated_by: req.auth.user_id,
     });
+    // Only when sent, so a client without the field keeps a code set from Zoho Books settings.
+    if (hsn_sac !== undefined) product.hsn_sac = hsnOrNull(hsn_sac) ?? undefined;
 
     await product.save();
 
@@ -245,6 +249,8 @@ export const edit = async (req, res, next) => {
         const variationData = {
           product_id: product._id,
           sku: v.sku,
+          // Blank means the variation uses the product's HSN code.
+          ...(v.hsn_sac !== undefined ? { hsn_sac: hsnOrNull(v.hsn_sac) } : {}),
           power_level: v.power_level || 0,
           rarity: v.rarity || "",
           combination_key,

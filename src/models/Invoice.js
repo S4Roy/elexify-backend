@@ -41,6 +41,7 @@ const InvoiceSchema = new Schema(
         _id: false,
         product_name: { type: String, default: null },
         sku: { type: String, default: null },
+        hsn: { type: String, default: null },
         variation_name: { type: String, default: null },
         quantity: { type: Number, required: true },
         unit_price: { type: Number, required: true },

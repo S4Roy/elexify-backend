@@ -1,6 +1,7 @@
 import Product from "../../../../models/Product.js";
 import { toMetaText } from "../../../../services/seo/textUtils.js";
 import { inRequestedOrder } from "../../../../services/media/orderedMedia.js";
+import { hsnOrNull } from "../../../../services/inventory/product/hsn.js";
 import ProductAttribute from "../../../../models/ProductAttribute.js";
 import ProductVariation from "../../../../models/ProductVariation.js";
 import ProductSpecification from "../../../../models/ProductSpecification.js";
@@ -48,6 +49,7 @@ export const add = async (req, res, next) => {
       sale_start_date,
       sale_end_date,
       sku,
+      hsn_sac,
       stock_status,
       stock_quantity,
 
@@ -140,6 +142,7 @@ export const add = async (req, res, next) => {
       sale_start_date: product_type === "simple" ? sale_start_date : undefined,
       sale_end_date: product_type === "simple" ? sale_end_date : undefined,
       sku: product_type === "simple" ? sku : undefined,
+      hsn_sac: hsnOrNull(hsn_sac) ?? undefined,
       stock_status: product_type === "simple" ? stock_status : undefined,
       stock_quantity: product_type === "simple" ? stock_quantity : undefined,
       allow_backorders,
@@ -220,6 +223,8 @@ export const add = async (req, res, next) => {
         const variation = new ProductVariation({
           product_id: product._id,
           sku: v.sku,
+          // Blank means the variation uses the product's HSN code.
+          ...(v.hsn_sac !== undefined ? { hsn_sac: hsnOrNull(v.hsn_sac) } : {}),
           combination_key, // 👈 new field
           regular_price: v.regular_price,
           sale_price: v.sale_price || null,

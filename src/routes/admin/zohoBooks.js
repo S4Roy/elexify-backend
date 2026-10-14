@@ -154,7 +154,7 @@ zohoBooksRouter.get("/orders/:id", view, idParams, endpoint(async req => {
 }));
 zohoBooksRouter.put("/accounting", configure, body({
   kind: Joi.string().valid("item", "variation", "contact").required(), id: objectId,
-  hsn_sac: Joi.string().pattern(/^\d{4,8}$/), accounting_unit: Joi.string().trim().max(20), zoho_tax_id: Joi.string().pattern(/^\d+$/),
+  hsn_sac: Joi.string().pattern(/^(\d{4}|\d{6}|\d{8})$/), accounting_unit: Joi.string().trim().max(20), zoho_tax_id: Joi.string().pattern(/^\d+$/),
   gstin: Joi.string().pattern(/^[0-9]{2}[A-Z0-9]{13}$/),
   gst_treatment: Joi.string().valid("business_gst", "business_none", "overseas", "consumer"),
 }), endpoint(async req => {

@@ -217,3 +217,17 @@ describe('physical package weight', () => {
     expect(() => calculatePackageWeight([{ product: { weight }, quantity: 1 }])).toThrow('positive product weight');
   });
 });
+
+describe("Shiprocket item HSN", () => {
+  const withItem = (extra) => build({ order_items: [{ ...baseOrder.order_items[0], ...extra }] }).order_items[0].hsn;
+
+  it("sends the order-time HSN snapshot", () => {
+    expect(withItem({ hsn: "85437099", product: { hsn_sac: "8543" } })).toBe("85437099");
+  });
+
+  it("falls back to the variation, then the product, for orders placed before the snapshot", () => {
+    expect(withItem({ variation: { hsn_sac: "851511" }, product: { hsn_sac: "8515" } })).toBe("851511");
+    expect(withItem({ variation: {}, product: { hsn_sac: "8515" } })).toBe("8515");
+    expect(withItem({})).toBe("");
+  });
+});

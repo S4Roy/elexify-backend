@@ -91,7 +91,8 @@ export const buildPackagePayload = ({ order_data, shiprocketConfig, pkg, pickupL
     selling_price: Number(item.unit_price || item.selling_price || item.price || 0),
     discount: item.discount || "",
     tax: item.tax || "",
-    hsn: item.hsn || "",
+    // Order-time snapshot; orders placed before it existed fall back to the live product.
+    hsn: item.hsn || item.variation?.hsn_sac || item.product?.hsn_sac || "",
   }));
   const packageItemsTotal = round2(payload_items.reduce((sum, i) => sum + i.selling_price * i.units, 0));
   const packageCharges = packageShippingCharges + packageGiftwrapCharges + packageTransactionCharges;

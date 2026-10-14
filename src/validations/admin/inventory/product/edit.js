@@ -81,6 +81,8 @@ export const edit = celebrate({
     sale_start_date: Joi.date().optional().allow(null),
     sale_end_date: Joi.date().optional().allow(null),
     sku: Joi.string().optional().allow(null),
+    // GST HSN/SAC: 4, 6 or 8 digits; empty clears it.
+    hsn_sac: Joi.string().trim().pattern(/^(\d{4}|\d{6}|\d{8})$/).optional().allow(null, ""),
     stock_status: Joi.string()
       .valid("in_stock", "out_of_stock")
       .optional()
@@ -125,6 +127,7 @@ export const edit = celebrate({
           sale_start_date: Joi.date().optional().allow(null),
           sale_end_date: Joi.date().optional().allow(null),
           sku: Joi.string().required(),
+          hsn_sac: Joi.string().trim().pattern(/^(\d{4}|\d{6}|\d{8})$/).optional().allow(null, ""),
           stock_status: Joi.string()
             .valid("in_stock", "out_of_stock")
             .required(),
