@@ -758,6 +758,10 @@ export const list = async (req, res, next) => {
             { slug: { $regex: escapedSearchKey, $options: "i" } },
             { sku: { $regex: escapedSearchKey, $options: "i" } },
             { "attributes.value.value": { $regex: escapedSearchKey, $options: "i" } }, // search attribute values
+            // Category names, so "speakers" or a tapped category suggestion finds the products filed under it.
+            ...["categories", "sub_categories"].map(field => ({
+              [field]: { $elemMatch: { name: { $regex: escapedSearchKey, $options: "i" }, status: "active", deleted_at: null } },
+            })),
           ],
         },
       });
