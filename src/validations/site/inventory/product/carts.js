@@ -12,6 +12,7 @@ export const carts = celebrate({
       .valid("name", "created_at"),
     sort_order: Joi.number().optional().allow(null).valid(-1, 1),
     payment_method: Joi.string().valid("cod", "online").optional(),
+    postcode: Joi.string().pattern(/^[0-9]{6}$/).optional(),
     address_id: Joi.string().optional().allow("", null),
   }),
 });

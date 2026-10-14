@@ -2,7 +2,7 @@ import Cart from "../../../../models/Cart.js";
 import { keepOrderOf, orderedMediaLookup } from "../../../../services/media/orderedMedia.js";
 import { thumbnailUrlExpr } from "../../../../services/media/mediaUrlExpr.js";
 import ExchangeRate from "../../../../models/ExchangeRate.js";
-import Address from "../../../../models/Address.js";
+import { resolveCartDeliveryAddress } from "../../../../services/shipping/resolveCartDeliveryAddress.js";
 import User from "../../../../models/User.js";
 import { StatusError } from "../../../../config/index.js";
 import { envs } from "../../../../config/index.js";
@@ -24,6 +24,7 @@ export const carts = async (req, res, next) => {
       sort_order = -1,
       currency = "INR",
       address_id = null,
+      postcode = null,
     } = req.query;
 
     const ratesDoc = await ExchangeRate.findOne().sort({ updated_at: -1 });
@@ -309,66 +310,60 @@ export const carts = async (req, res, next) => {
     );
     const subtotal = pricing.net_product_amount;
 
-    // 🔹 Optional dynamic shipping + estimated delivery, once an address is selected (checkout)
+    // Resolve a saved checkout address or a public pincode-only cart estimate.
     let shipping = null;
     let estimated_delivery = null;
     let cod = null;
 
-    if (address_id) {
-      const address = await Address.findOne({
-        _id: address_id,
-        deleted_at: null,
-        ...(user_id ? { user: user_id } : {}),
-      }).lean();
+    const address = await resolveCartDeliveryAddress({ user_id, address_id, postcode });
 
-      if (address) {
-        const rawCarts = await Cart.find(matchFilter)
-          .populate({ path: "product", select: "weight shipping_class stock_quantity reserved_quantity manage_stock allow_backorders status cod_status prepaid_only categories brand" })
-          .populate({ path: "variation", select: "weight shipping_class stock_quantity reserved_quantity manage_stock allow_backorders status cod_status prepaid_only" })
-          .lean();
+    if (address) {
+      const rawCarts = await Cart.find(matchFilter)
+        .populate({ path: "product", select: "weight shipping_class stock_quantity reserved_quantity manage_stock allow_backorders status cod_status prepaid_only categories brand" })
+        .populate({ path: "variation", select: "weight shipping_class stock_quantity reserved_quantity manage_stock allow_backorders status cod_status prepaid_only" })
+        .lean();
 
-        const shippingItems = rawCarts
-          .filter((c) => c.product)
-          .map((c) => {
-            const source = c.variation || c.product;
-            return {
-              shipping_class: source.shipping_class || null,
-              weight: source.weight || 0,
-              quantity: c.quantity,
-            };
-          });
-
-        const isAvailable = rawCarts.every((c) => {
+      const shippingItems = rawCarts
+        .filter((c) => c.product)
+        .map((c) => {
           const source = c.variation || c.product;
-          return isPurchasable(source, c.quantity);
+          return {
+            shipping_class: source.shipping_class || null,
+            weight: source.weight || 0,
+            quantity: c.quantity,
+          };
         });
 
-        const rateResult = await shippingService.calculateShippingRate({
-          items: shippingItems,
-          address: { country: address.country, state: address.state, postcode: address.postcode },
-          orderSubtotal: subtotal,
-        });
+      const isAvailable = rawCarts.every((c) => {
+        const source = c.variation || c.product;
+        return isPurchasable(source, c.quantity);
+      });
 
-        shipping = { amount: rateResult.amount, zone: rateResult.zone?.name ?? null };
-        estimated_delivery = await shippingService.calculateDeliveryEstimate({
-          postcode: address.postcode,
-          country: address.country,
-          cod: req.query.payment_method === "cod",
-          weight: rawCarts.reduce((sum, c) => sum + Number((c.variation || c.product)?.weight || 0) * c.quantity, 0),
-          min_delivery_days: rateResult.min_delivery_days,
-          max_delivery_days: rateResult.max_delivery_days,
-          isAvailable,
-        });
-        const customer = user_id ? await User.findById(user_id).select("role").lean() : null;
-        cod = await shippingService.calculateCodEligibility({
-          items: rawCarts,
-          address,
-          orderAmount: subtotal + rateResult.amount,
-          user: customer,
-          zone: rateResult.zone,
-          exchangeRate: rate,
-        });
-      }
+      const rateResult = await shippingService.calculateShippingRate({
+        items: shippingItems,
+        address: { country: address.country, state: address.state, postcode: address.postcode },
+        orderSubtotal: subtotal,
+      });
+
+      shipping = { amount: rateResult.amount, zone: rateResult.zone?.name ?? null };
+      estimated_delivery = await shippingService.calculateDeliveryEstimate({
+        postcode: address.postcode,
+        country: address.country,
+        cod: req.query.payment_method === "cod",
+        weight: rawCarts.reduce((sum, c) => sum + Number((c.variation || c.product)?.weight || 0) * c.quantity, 0),
+        min_delivery_days: rateResult.min_delivery_days,
+        max_delivery_days: rateResult.max_delivery_days,
+        isAvailable,
+      });
+      const customer = user_id ? await User.findById(user_id).select("role").lean() : null;
+      cod = await shippingService.calculateCodEligibility({
+        items: rawCarts,
+        address,
+        orderAmount: subtotal + rateResult.amount,
+        user: customer,
+        zone: rateResult.zone,
+        exchangeRate: rate,
+      });
     }
 
     // Shoppers see sellable units (on-hand minus reserved holds).
