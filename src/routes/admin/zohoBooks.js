@@ -16,7 +16,7 @@ import User from "../../models/User.js";
 import { beginAuthorization, completeAuthorization, disconnect } from "../../services/zoho/ZohoAuthService.js";
 import { booksClient, REGIONS, ZohoError } from "../../services/zoho/ZohoBooksClient.js";
 import { enqueueSync } from "../../services/zoho/ZohoSyncQueue.js";
-import { applyProductHsn, compareProductHsn } from "../../services/zoho/ZohoHsnSync.js";
+import { applyProduct, compareProduct, FIELD_KEYS } from "../../services/zoho/ZohoProductSync.js";
 import { getIntegrationConfig } from "../../services/integrationCredentials/index.js";
 import Invoice from "../../models/Invoice.js";
 
@@ -153,16 +153,21 @@ zohoBooksRouter.get("/orders/:id", view, idParams, endpoint(async req => {
   }
   return { zoho: order.zoho, job, customer, enabled: Boolean(connection?.connected && connection?.enabled) };
 }));
-// Product page "Sync with Zoho": compare HSN per item, then push or pull chosen rows.
-zohoBooksRouter.get("/products/:id/hsn", view, idParams, endpoint(async req => compareProductHsn(await current(), req.params.id)));
-zohoBooksRouter.post("/products/:id/hsn", manage, idParams, body({
-  actions: Joi.array().items(Joi.object({ entity_id: objectId, direction: Joi.string().valid("push", "pull").required() }))
-    .min(1).max(100).unique("entity_id").required(),
+// Product page "Sync with Zoho": compare each item field by field, then pull,
+// push or create per the admin's choices.
+const fieldDirections = Joi.object(Object.fromEntries(FIELD_KEYS.map(key => [key, Joi.string().valid("push", "pull")])));
+zohoBooksRouter.get("/products/:id", view, idParams, endpoint(async req => compareProduct(await current(), req.params.id)));
+zohoBooksRouter.post("/products/:id", manage, idParams, body({
+  actions: Joi.array().items(Joi.object({
+    entity_id: objectId,
+    create: Joi.boolean().valid(true),
+    fields: fieldDirections.min(1),
+  }).xor("create", "fields")).min(1).max(100).unique("entity_id").required(),
 }), endpoint(async req => {
   const connection = await current();
-  const outcome = await applyProductHsn(connection, req.params.id, req.body.actions);
-  await audit(req, "product_hsn_synced", { organization_id: connection.organization_id, kind: "item", entity_id: req.params.id,
-    detail: { results: outcome.results.map(({ entity_id, ok, direction, hsn, error }) => ({ entity_id, ok, direction, hsn, error })) } });
+  const outcome = await applyProduct(connection, req.params.id, req.body.actions);
+  await audit(req, "product_synced", { organization_id: connection.organization_id, kind: "item", entity_id: req.params.id,
+    detail: { actions: req.body.actions, results: outcome.results } });
   return outcome;
 }));
 zohoBooksRouter.put("/accounting", configure, body({
