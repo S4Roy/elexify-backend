@@ -1,3 +1,5 @@
+import { buyAgainPreview, buyAgainAdd } from "../../../controllers/site/inventory/order/buyAgain.js";
+import * as buyAgainValidation from "../../../validations/site/inventory/order/buyAgain.js";
 import { requireRecaptcha } from "../../../middleware/recaptcha.js";
 import { validateAccessToken } from "../../../middleware/accessToken.js";
 import { Router } from "express";
@@ -6,6 +8,9 @@ import { inventoryController } from "../../../controllers/site/index.js";
 import { inventoryValidation } from "../../../validations/site/index.js";
 
 const orderRouter = Router();
+
+orderRouter.get("/buy-again", validateAccessToken, buyAgainValidation.buyAgainPreview, buyAgainPreview);
+orderRouter.post("/buy-again", validateAccessToken, buyAgainValidation.buyAgainAdd, buyAgainAdd);
 
 orderRouter.get(
   "/list",
