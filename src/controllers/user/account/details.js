@@ -36,6 +36,7 @@ export const details = async (req, res, next) => {
         dob: user.dob,
         gender: user.gender,
         profile_image: user.profile_image,
+        created_at: user.created_at,
         email_verified: !!user.email_verified_at,
         mobile_verified: !!user.mobile_verified_at,
         pending_email: user.pending_email

@@ -8,6 +8,7 @@ import OrderResource from "../../../../resources/OrderResource.js";
 import { orderItemPreviews } from "../../../../services/orderService/itemPreviews.js";
 import { getCustomerOrderCapabilities, getOrderPolicy } from "../../../../services/orderService/orderPolicy.js";
 import ReturnRequest from "../../../../models/ReturnRequest.js";
+import { STORE_TIMEZONE, istRange } from "../../../../config/storeTime.js";
 
 export const list = async (req, res, next) => {
   try {
@@ -20,6 +21,7 @@ export const list = async (req, res, next) => {
       limit = envs.pagination.limit,
       order_status = "",
       search_key = "",
+      year = "",
       sort_by = "created_at",
       sort_order = -1,
       _id = null,
@@ -48,6 +50,9 @@ export const list = async (req, res, next) => {
     // if (slug) matchFilter.slug = slug;
     if (_id) matchFilter._id = new mongoose.Types.ObjectId(_id);
     if (order_status) matchFilter.order_status = order_status;
+    // Calendar year in store time (IST), so a 31 Dec 11pm order isn't filed
+    // under the next year.
+    if (year) matchFilter.created_at = istRange(`${year}-01-01`, `${year}-12-31`);
     if (search_key) {
       matchFilter.$or = [
         { id: { $regex: search_key, $options: "i" } },
@@ -713,12 +718,22 @@ export const list = async (req, res, next) => {
         { $unset: "item_count_rows" },
       );
       const agg = Order.aggregate(pipeline);
-      const result = await Order.aggregatePaginate(agg, options);
+      const [result, yearRows] = await Promise.all([
+        Order.aggregatePaginate(agg, options),
+        // Years this customer has orders in (newest first) for the year
+        // filter — independent of the active filters so options don't vanish.
+        Order.aggregate([
+          { $match: { user: matchFilter.user, deleted_at: null } },
+          { $group: { _id: { $year: { date: "$created_at", timezone: STORE_TIMEZONE } } } },
+          { $sort: { _id: -1 } },
+        ]),
+      ]);
       const previews = await orderItemPreviews(result.docs.map((doc) => doc._id));
       result.docs = await OrderResource.collection(result.docs);
       for (const doc of result.docs) doc.item_previews = previews.get(String(doc._id)) || [];
 
       data = result;
+      data.years = yearRows.map((row) => row._id).filter(Boolean);
     }
 
     res.status(200).json({
