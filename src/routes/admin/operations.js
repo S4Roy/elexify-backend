@@ -1,4 +1,4 @@
-import { list as listSearchInsights } from "../../controllers/admin/operations/searchInsights.js";
+import { list as listSearchInsights, trend as searchInsightsTrend } from "../../controllers/admin/operations/searchInsights.js";
 import * as searchSynonyms from "../../controllers/admin/operations/searchSynonyms.js";
 import { requirePermission } from "../../middleware/requirePermission.js";
 import { Router } from "express";
@@ -8,6 +8,7 @@ import { list as listWebhookLogs, details as webhookLogDetails } from "../../con
 
 const operationsRouter = Router();
 operationsRouter.get("/search-insights", requirePermission("operations.view"), listSearchInsights);
+operationsRouter.get("/search-insights/trend", requirePermission("operations.view"), searchInsightsTrend);
 operationsRouter.get("/search-synonyms", requirePermission("operations.view"), searchSynonyms.list);
 operationsRouter.get("/search-synonyms/lookup", requirePermission("operations.view"), searchSynonyms.findByTerm);
 operationsRouter.post("/search-synonyms", requirePermission("operations.update"), searchSynonyms.create);

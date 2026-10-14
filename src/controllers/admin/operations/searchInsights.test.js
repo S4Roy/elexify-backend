@@ -1,6 +1,6 @@
 import { expect, it, vi } from "vitest";
 import SearchEvent from "../../../models/SearchEvent.js";
-import { list } from "./searchInsights.js";
+import { list, trend } from "./searchInsights.js";
 vi.mock("../../../models/SearchEvent.js", () => ({ default: { aggregate: vi.fn() } }));
 it("returns grouped pagination and applies IST dates and no-result filtering", async () => {
   SearchEvent.aggregate.mockResolvedValue([{ summary: [{ searches: 8, zero_results: 3 }], docs: [{ _id: "cable", searches: 4, zero_results: 2 }], count: [{ total: 1 }] }]);
@@ -69,4 +69,36 @@ it("summarises distinct and always-failing queries", async () => {
   expect(summary.distinct_queries).toEqual({ $sum: 1 });
   expect(summary.failing_queries.$sum.$cond[0].$and).toHaveLength(2);
   expect(res.json.mock.calls[0][0].data.summary).toMatchObject({ distinct_queries: 0, failing_queries: 0 });
+});
+
+it("groups the trend by IST day and fills empty days in the requested range", async () => {
+  SearchEvent.aggregate.mockResolvedValue([
+    { _id: "2026-10-12", searches: 3, measured: 2, zero_results: 1 },
+    { _id: "2026-10-14", searches: 5, measured: 5, zero_results: 0 },
+  ]);
+  const res = { status: vi.fn().mockReturnThis(), json: vi.fn() };
+  await trend({ query: { from: "2026-10-11", to: "2026-10-14", platform: "web", q: "cell" } }, res, vi.fn());
+  const pipeline = SearchEvent.aggregate.mock.calls.at(-1)[0];
+  expect(pipeline[0].$match).toMatchObject({ event_type: "search", platform: "web", query: { $regex: "cell" } });
+  expect(pipeline[1].$group._id.$dateToString.timezone).toBe("Asia/Kolkata");
+  expect(res.json.mock.calls[0][0].data.days).toEqual([
+    { date: "2026-10-11", searches: 0, measured: 0, zero_results: 0 },
+    { date: "2026-10-12", searches: 3, measured: 2, zero_results: 1 },
+    { date: "2026-10-13", searches: 0, measured: 0, zero_results: 0 },
+    { date: "2026-10-14", searches: 5, measured: 5, zero_results: 0 },
+  ]);
+});
+
+it("starts an open-ended trend at the first recorded day and rejects bad ranges", async () => {
+  vi.useFakeTimers({ now: new Date("2026-10-14T06:00:00.000Z"), toFake: ["Date"] });
+  SearchEvent.aggregate.mockResolvedValue([{ _id: "2026-10-13", searches: 1, measured: 1, zero_results: 1 }]);
+  let res = { status: vi.fn().mockReturnThis(), json: vi.fn() };
+  await trend({ query: {} }, res, vi.fn());
+  expect(res.json.mock.calls[0][0].data.days.map(day => day.date)).toEqual(["2026-10-13", "2026-10-14"]);
+  vi.useRealTimers();
+  SearchEvent.aggregate.mockClear();
+  res = { status: vi.fn().mockReturnThis(), json: vi.fn() };
+  await trend({ query: { from: "2026-10-14", to: "2026-10-12" } }, res, vi.fn());
+  expect(res.status).toHaveBeenCalledWith(400);
+  expect(SearchEvent.aggregate).not.toHaveBeenCalled();
 });
