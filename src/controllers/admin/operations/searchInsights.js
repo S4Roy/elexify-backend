@@ -1,4 +1,6 @@
+import mongoose from "mongoose";
 import SearchEvent from "../../../models/SearchEvent.js";
+import Product from "../../../models/Product.js";
 import { STORE_TIMEZONE, addDaysYmd, istRange, istYmd } from "../../../config/storeTime.js";
 import { normalizeQuery } from "../../../services/searchInsights/actions.js";
 
@@ -31,6 +33,37 @@ function buildMatch(query) {
 }
 
 const RETENTION_DAYS = 90;
+const TOP_PRODUCTS = 3;
+
+// Adds the most-selected products to each suggestion row on the current page.
+// Product names are looked up live; deleted or unknown products keep their id with a null name.
+async function attachSelectedProducts(docs, match) {
+  if (!docs.length) return docs;
+  const rows = await SearchEvent.aggregate([
+    { $match: { ...match, query: { $in: docs.map(doc => doc._id) } } },
+    { $group: { _id: { query: "$query", product_id: "$product_id" }, count: { $sum: 1 } } },
+    { $sort: { count: -1, "_id.product_id": 1 } },
+  ]);
+  const byQuery = new Map();
+  for (const { _id, count } of rows) {
+    if (!byQuery.has(_id.query)) byQuery.set(_id.query, []);
+    byQuery.get(_id.query).push({ product_id: _id.product_id, count });
+  }
+  const ids = [...new Set(rows.map(row => row._id.product_id))].filter(id => mongoose.isValidObjectId(id));
+  const products = ids.length ? await Product.find({ _id: { $in: ids } }, { name: 1, slug: 1, deleted_at: 1 }).lean() : [];
+  const byId = new Map(products.map(product => [String(product._id), product]));
+  return docs.map(doc => {
+    const selected = byQuery.get(doc._id) || [];
+    return {
+      ...doc,
+      distinct_products: selected.length,
+      products: selected.slice(0, TOP_PRODUCTS).map(({ product_id, count }) => {
+        const product = byId.get(String(product_id));
+        return { product_id, count, name: product?.name ?? null, slug: product?.slug ?? null, deleted: Boolean(product?.deleted_at) };
+      }),
+    };
+  });
+}
 
 export const trend = async (req, res, next) => {
   try {
@@ -111,8 +144,9 @@ export const list = async (req, res, next) => {
       } },
     ]);
     const totalDocs = data?.count?.[0]?.total || 0;
+    const docs = eventType === "suggestion" ? await attachSelectedProducts(data?.docs || [], match) : data?.docs || [];
     res.status(200).json({ status: "success", data: {
-      docs: data?.docs || [], summary: data?.summary?.[0] || { searches: 0, zero_results: 0, measured: 0, distinct_queries: 0, failing_queries: 0 },
+      docs, summary: data?.summary?.[0] || { searches: 0, zero_results: 0, measured: 0, distinct_queries: 0, failing_queries: 0 },
       event_type: eventType, sort: sortKey, totalDocs, page, limit, totalPages: Math.ceil(totalDocs / limit),
       hasNextPage: page * limit < totalDocs, hasPrevPage: page > 1,
     } });

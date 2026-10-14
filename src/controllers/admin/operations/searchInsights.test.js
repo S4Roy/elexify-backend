@@ -2,6 +2,8 @@ import { expect, it, vi } from "vitest";
 import SearchEvent from "../../../models/SearchEvent.js";
 import { list, trend } from "./searchInsights.js";
 vi.mock("../../../models/SearchEvent.js", () => ({ default: { aggregate: vi.fn() } }));
+vi.mock("../../../models/Product.js", () => ({ default: { find: vi.fn() } }));
+import Product from "../../../models/Product.js";
 it("returns grouped pagination and applies IST dates and no-result filtering", async () => {
   SearchEvent.aggregate.mockResolvedValue([{ summary: [{ searches: 8, zero_results: 3 }], docs: [{ _id: "cable", searches: 4, zero_results: 2 }], count: [{ total: 1 }] }]);
   const res = { status: vi.fn().mockReturnThis(), json: vi.fn() };
@@ -109,4 +111,28 @@ it("counts each query's searches per platform", async () => {
   const group = SearchEvent.aggregate.mock.calls.at(-1)[0][1].$group;
   expect(group.web).toEqual({ $sum: { $cond: [{ $eq: ["$platform", "web"] }, 1, 0] } });
   expect(group.mobile).toEqual({ $sum: { $cond: [{ $eq: ["$platform", "mobile"] }, 1, 0] } });
+});
+
+it("attaches the most-selected products to suggestion rows", async () => {
+  const id = "65f000000000000000000001";
+  SearchEvent.aggregate
+    .mockResolvedValueOnce([{ summary: [], docs: [{ _id: "bms", searches: 5 }, { _id: "fan", searches: 1 }], count: [{ total: 2 }] }])
+    .mockResolvedValueOnce([
+      { _id: { query: "bms", product_id: id }, count: 3 },
+      { _id: { query: "bms", product_id: "legacy-slug" }, count: 1 },
+      { _id: { query: "bms", product_id: "65f000000000000000000002" }, count: 1 },
+      { _id: { query: "bms", product_id: "65f000000000000000000003" }, count: 1 },
+    ]);
+  Product.find.mockReturnValue({ lean: () => Promise.resolve([{ _id: id, name: "4S BMS", slug: "4s-bms", deleted_at: null }]) });
+  const res = { status: vi.fn().mockReturnThis(), json: vi.fn() };
+  await list({ query: { event_type: "suggestion", platform: "mobile" } }, res, vi.fn());
+  const productPipeline = SearchEvent.aggregate.mock.calls.at(-1)[0];
+  expect(productPipeline[0].$match).toMatchObject({ event_type: "suggestion", platform: "mobile", query: { $in: ["bms", "fan"] } });
+  expect(Product.find.mock.calls[0][0]._id.$in).not.toContain("legacy-slug");
+  const [bms, fan] = res.json.mock.calls[0][0].data.docs;
+  expect(bms.distinct_products).toBe(4);
+  expect(bms.products).toHaveLength(3);
+  expect(bms.products[0]).toEqual({ product_id: id, count: 3, name: "4S BMS", slug: "4s-bms", deleted: false });
+  expect(bms.products[1]).toMatchObject({ product_id: "legacy-slug", name: null });
+  expect(fan).toMatchObject({ distinct_products: 0, products: [] });
 });
