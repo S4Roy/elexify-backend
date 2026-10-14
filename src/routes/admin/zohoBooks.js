@@ -16,6 +16,7 @@ import User from "../../models/User.js";
 import { beginAuthorization, completeAuthorization, disconnect } from "../../services/zoho/ZohoAuthService.js";
 import { booksClient, REGIONS, ZohoError } from "../../services/zoho/ZohoBooksClient.js";
 import { enqueueSync } from "../../services/zoho/ZohoSyncQueue.js";
+import { applyProductHsn, compareProductHsn } from "../../services/zoho/ZohoHsnSync.js";
 import { getIntegrationConfig } from "../../services/integrationCredentials/index.js";
 import Invoice from "../../models/Invoice.js";
 
@@ -151,6 +152,18 @@ zohoBooksRouter.get("/orders/:id", view, idParams, endpoint(async req => {
     };
   }
   return { zoho: order.zoho, job, customer, enabled: Boolean(connection?.connected && connection?.enabled) };
+}));
+// Product page "Sync with Zoho": compare HSN per item, then push or pull chosen rows.
+zohoBooksRouter.get("/products/:id/hsn", view, idParams, endpoint(async req => compareProductHsn(await current(), req.params.id)));
+zohoBooksRouter.post("/products/:id/hsn", manage, idParams, body({
+  actions: Joi.array().items(Joi.object({ entity_id: objectId, direction: Joi.string().valid("push", "pull").required() }))
+    .min(1).max(100).unique("entity_id").required(),
+}), endpoint(async req => {
+  const connection = await current();
+  const outcome = await applyProductHsn(connection, req.params.id, req.body.actions);
+  await audit(req, "product_hsn_synced", { organization_id: connection.organization_id, kind: "item", entity_id: req.params.id,
+    detail: { results: outcome.results.map(({ entity_id, ok, direction, hsn, error }) => ({ entity_id, ok, direction, hsn, error })) } });
+  return outcome;
 }));
 zohoBooksRouter.put("/accounting", configure, body({
   kind: Joi.string().valid("item", "variation", "contact").required(), id: objectId,
