@@ -9,7 +9,7 @@ const handler = async (context) => {
 export default {
   key: "generate-media-thumbnails",
   name: "Generate Media Thumbnails",
-  description: "Creates 400px JPEG thumbnails for media-library images that don't have one, so product grids load small previews.",
+  description: "Creates 600px JPEG thumbnails for media-library images that don't have one, so product grids load small previews.",
   type: "BACKFILL",
   category: "content",
   version: 1,

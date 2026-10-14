@@ -35,7 +35,7 @@ export async function optimizeImage(buffer, mimetype) {
 }
 
 // Small JPEG preview for lists and grids (stored on Media.thumbnail).
-export async function makeThumbnail(buffer, width = 400) {
+export async function makeThumbnail(buffer, width = 600) {
   return sharp(buffer, { failOn: "none" })
     .rotate()
     .flatten({ background: "#ffffff" })

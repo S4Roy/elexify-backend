@@ -1,4 +1,4 @@
-// Creates the 400px JPEG thumbnail (Media.thumbnail) for images uploaded before the
+// Creates the 600px JPEG thumbnail (Media.thumbnail) for images uploaded before the
 // media library generated them, so product grids and lists can load a ~30 KB
 // preview instead of the full image. New uploads already get one (media/add.js).
 //

@@ -30,6 +30,6 @@ it("creates thumbnails for images without one and records them", async () => {
   expect(result).toMatchObject({ pending: 1, created: 1, failed: [] });
   expect(puts[0]).toMatchObject({ Key: "products/thumbs/a.jpg", ContentType: "image/jpeg", ACL: "public-read" });
   const meta = await sharp(puts[0].Body).metadata();
-  expect([meta.format, meta.width, meta.hasAlpha]).toEqual(["jpeg", 400, false]);
+  expect([meta.format, meta.width, meta.hasAlpha]).toEqual(["jpeg", 600, false]);
   expect(MediaModel.updateOne).toHaveBeenCalledWith({ _id: "m1" }, { $set: { thumbnail: "products/thumbs/a.jpg" } });
 });

@@ -51,9 +51,9 @@ it("applies EXIF orientation", async () => {
   expect([meta.width, meta.height]).toEqual([1067, 1600]);
 });
 
-it("makes a 400px JPEG thumbnail and maps extensions", async () => {
+it("makes a 600px JPEG thumbnail and maps extensions", async () => {
   const thumb = await makeThumbnail(await noisy(2000, 1000, 4).png().toBuffer());
   const meta = await sharp(thumb).metadata();
-  expect([meta.format, meta.width, meta.hasAlpha]).toEqual(["jpeg", 400, false]);
+  expect([meta.format, meta.width, meta.hasAlpha]).toEqual(["jpeg", 600, false]);
   expect([extensionFor("image/jpeg"), extensionFor("image/png"), extensionFor("image/gif")]).toEqual([".jpg", ".png", null]);
 });
