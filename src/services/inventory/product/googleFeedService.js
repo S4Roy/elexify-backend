@@ -46,7 +46,13 @@ const cleanDescription = (product) =>
     : product.name
   ).substring(0, 5000);
 
-export const generateGoogleFeedFile = async () => {
+let pendingFeed;
+export const generateGoogleFeedFile = () => {
+  if (!pendingFeed) pendingFeed = buildGoogleFeedFile().finally(() => { pendingFeed = undefined; });
+  return pendingFeed;
+};
+
+const buildGoogleFeedFile = async () => {
   const products = await Product.find({
     deleted_at: null,
     status: "active",

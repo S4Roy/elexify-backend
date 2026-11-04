@@ -1,5 +1,17 @@
 import rateLimit from "express-rate-limit";
 
+// Separate budget for expensive catalog reads. Writes and CORS preflights keep
+// their existing policies. No exemption based on a client-supplied API key.
+export const catalogReadRateLimiter = rateLimit({
+  windowMs: 60_000,
+  limit: 600,
+  skip: req => !["GET", "HEAD"].includes(req.method) ||
+    !/^\/(inventory\/(category|product)|navigation)(\/|$)/.test(req.path),
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { status: "error", message: "Too many catalog requests. Please retry shortly." },
+});
+
 /**
  * Limits brute-force attempts against login, OTP, and password-reset endpoints.
  */

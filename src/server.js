@@ -10,7 +10,8 @@ import basicAuth from "express-basic-auth";
 import bearerToken from "express-bearer-token";
 import swaggerUi from "swagger-ui-express";
 import { handleError, morganConf, StatusSuccess } from "./config/index.js";
-import fileUpload from "express-fileupload";
+import { boundedUploads } from "./middleware/boundedUploads.js";
+import { catalogReadRateLimiter } from "./middleware/rateLimiter.js";
 import Pusher from "pusher";
 import mongoose, { mongooseConnection } from "./config/mongoose.js";
 import { ensureOwnerAccess } from "./services/rbac/owner.js";
@@ -21,15 +22,15 @@ import { STORE_TIMEZONE } from "./config/storeTime.js";
 
 // Every scheduled job runs on IST (e.g. "30 2 * * *" = 2:30 am IST),
 // whatever the server's own timezone.
-const cron = { schedule: (expression, task) => nodeCron.schedule(expression, task, { timezone: STORE_TIMEZONE }) };
+const cron = { schedule: (expression, task) => nodeCron.schedule(expression, task, { timezone: STORE_TIMEZONE, noOverlap: true }) };
 import { processZohoQueue } from "./services/zoho/ZohoSyncQueue.js";
 
-cron.schedule("* * * * *", () => { processEmailCampaigns().catch(() => console.error("Email campaign worker failed; pending work retained.")); });
+cron.schedule("* * * * *", () => processEmailCampaigns().catch(() => console.error("Email campaign worker failed; pending work retained.")));
 
-cron.schedule("0 * * * *", () => { cleanupSessions().catch(() => console.error("Customer session cleanup failed")); });
+cron.schedule("0 * * * *", () => cleanupSessions().catch(() => console.error("Customer session cleanup failed")));
 
 cron.schedule("* * * * *", () => {
-  processZohoQueue().catch(() => console.error("Zoho worker failed; durable jobs retained for retry"));
+  return processZohoQueue().catch(() => console.error("Zoho worker failed; durable jobs retained for retry"));
 });
 
 // import rules from "./config/rules.js";
@@ -143,19 +144,11 @@ app.use(
     // the bytes Razorpay actually signed (a re-serialized JSON.stringify of
     // req.body would not reliably match).
     verify: (req, res, buf) => {
-      req.rawBody = buf;
+      if (req.originalUrl.split("?")[0].startsWith(`${envs.basePath}/api/v1/payments/razorpay/`)) req.rawBody = buf;
     },
   }),
 );
 app.use(express.urlencoded({ limit: "5mb", extended: true }));
-app.use(
-  fileUpload({
-    limits: { fileSize: 50 * 1024 * 1024 },
-    abortOnLimit: true,
-    safeFileNames: true,
-    preserveExtension: 5,
-  }),
-);
 app.use(express.static("public"));
 app.use(bearerToken());
 app.use(StatusSuccess);
@@ -169,8 +162,7 @@ app.get(`${envs.basePath}/api/v1/mobile/update-policy`, getMobileUpdatePolicy);
 // `order-total-items-backfill` data-operations registry entries (see
 // scripts/seeders/registry/operations/), run via the admin panel's Data
 // Operations screen or `npm run data:run <key>`.
-app.get(`${envs.basePath}/debug/currency`, CronJobs.exchangeRate);
-app.get(`${envs.basePath}/debug/google-feed`, CronJobs.generateGoogleFeed);
+// Scheduled jobs call these operations internally; no public mutation triggers.
 cron.schedule("0 */12 * * *", async () => {
   try {
     await CronJobs.fetchAndUpdateExchangeRate(); // ✅ invoke the function
@@ -309,16 +301,19 @@ app.use(
   middleware.validateApiKey,
   middleware.validateAccessToken,
   middleware.userAdminAccessControl,
+  boundedUploads,
   v1AdminRouter,
 );
 app.use(
   `${envs.basePath}/api/v1/user`,
   middleware.validateApiKey,
   middleware.validateAccessToken,
+  boundedUploads,
   v1UserRouter,
 );
 app.use(
   `${envs.basePath}/api/v1/site`,
+  catalogReadRateLimiter,
   middleware.accessTokenIfAny,
   middleware.validateApiKey,
   v1SiteRouter,

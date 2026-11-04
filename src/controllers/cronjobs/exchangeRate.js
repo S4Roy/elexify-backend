@@ -5,7 +5,7 @@ import axios from "axios";
 
 // Core logic (reusable)
 export const fetchAndUpdateExchangeRate = async () => {
-  const { data } = await axios.get("https://open.er-api.com/v6/latest/INR");
+  const { data } = await axios.get("https://open.er-api.com/v6/latest/INR", { timeout: 10_000 });
 
   if (!data || !data.rates) {
     throw new Error("Invalid response from exchange rate provider");

@@ -52,9 +52,10 @@ export const list = async (req, res, next) => {
 
     // Search filter
     if (search_key) {
+      const literalSearch = search_key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
       matchFilter.$or = [
-        { name: { $regex: search_key, $options: "i" } },
-        { slug: { $regex: search_key, $options: "i" } },
+        { name: { $regex: literalSearch, $options: "i" } },
+        { slug: { $regex: literalSearch, $options: "i" } },
       ];
     }
 
@@ -312,7 +313,7 @@ export const list = async (req, res, next) => {
         { $unwind: { path: "$seo", preserveNullAndEmptyArrays: true } }
       );
 
-      const aggData = await Category.aggregate(pipeline);
+      const aggData = await Category.aggregate(pipeline).option({ maxTimeMS: 5000 });
       if (!aggData.length) {
         throw StatusError.notFound(req.__("Category not found"));
       }
@@ -325,7 +326,7 @@ export const list = async (req, res, next) => {
       );
     } else {
       // list view
-      data = await Category.aggregatePaginate(Category.aggregate(pipeline), {
+      data = await Category.aggregatePaginate(Category.aggregate(pipeline).option({ maxTimeMS: 5000 }), {
         ...options,
         collation: { locale: "en", numericOrdering: true },
       });
