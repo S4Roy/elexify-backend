@@ -37,6 +37,9 @@ export const BANNERS = [
   { name: "promo-resistor", category: "resistor", kind: "promo", count: 2, extraCategory: "capacitors-polar" },
   { name: "promo-transistors-mosfets", category: "transistors-mosfets", kind: "promo", count: 2, extraCategory: "ic-integrated-circuit" },
   { name: "promo-tools", category: "tools", kind: "promo", count: 2 },
+  { name: "promo-speakers", category: "speakers", kind: "promo", count: 2 },
+  { name: "promo-smps-boards", category: "smps-boards", kind: "promo", count: 2, extraCategory: "voltage-regulator-ic" },
+  { name: "promo-connectors", category: "connectors", kind: "promo", count: 2, extraCategory: "wires-cables" },
 ];
 
 // Art-only images for the storefront's "split" banner style: the storefront

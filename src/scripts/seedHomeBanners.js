@@ -78,7 +78,7 @@ const HERO_SLIDES = [
   },
 ];
 
-// Promo row — everyday parts, three equal tiles under the hero.
+// Promo row — everyday parts, a carousel (5 visible on desktop) under the hero.
 const PROMO_ITEMS = [
   {
     category: "resistor",
@@ -100,6 +100,27 @@ const PROMO_ITEMS = [
     subheading: "Soldering irons, screwdriver sets and testers",
     cta_label: "Shop now",
     link: "/category/tools/",
+  },
+  {
+    category: "speakers",
+    heading: "Speakers & home audio",
+    subheading: "Woofers, tweeters and ready audio systems",
+    cta_label: "Shop now",
+    link: "/category/speakers/",
+  },
+  {
+    category: "smps-boards",
+    heading: "SMPS & regulators",
+    subheading: "Power supply boards and voltage regulator ICs",
+    cta_label: "Shop now",
+    link: "/category/smps-boards/",
+  },
+  {
+    category: "connectors",
+    heading: "Connectors & cables",
+    subheading: "Audio leads, wires and board connectors",
+    cta_label: "Shop now",
+    link: "/category/connectors/",
   },
 ];
 
@@ -205,7 +226,7 @@ export const runSeedHomeBanners = async () => {
     log(`promo row "${PROMO_TITLE}": added after ${trustIdx > heroIdx ? "trust badges" : "hero"}`);
   }
   promo.config = {
-    layout: "grid_3",
+    layout: "carousel",
     items: PROMO_ITEMS.flatMap((p, i) => {
       const cat = catBySlug.get(p.category);
       const genImg = gen(`promo-${p.category}`, "desktop");

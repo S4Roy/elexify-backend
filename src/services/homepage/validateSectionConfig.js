@@ -64,7 +64,7 @@ const promoBannerSchema = Joi.object({
   schedule: scheduleSchema.optional(),
 });
 
-export const PROMO_BANNER_LAYOUTS = ["strip", "grid_2", "grid_3", "grid_4", "feature_left"];
+export const PROMO_BANNER_LAYOUTS = ["strip", "grid_2", "grid_3", "grid_4", "feature_left", "carousel"];
 
 const CONFIG_SCHEMAS = {
   hero: Joi.object({
