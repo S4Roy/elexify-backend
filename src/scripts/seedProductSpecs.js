@@ -84,6 +84,10 @@ export const SPECS = [
   {
     key: "voltage", label: "Voltage", unit: "V", type: "number", group: "Electrical",
     extract: (n) => {
+      // Not the product's own rating: a tester's measuring range ("90~1000V"),
+      // or the capacitor voltage printed in a power-supply board's name.
+      if (/tester|test pen|\d\s*~\s*\d/i.test(n)) return null;
+      if (/\d\s*uF/i.test(n) && /board|supply|starter/i.test(n)) return null;
       const clean = n.replace(/\d+\s*V\s*[\u2010-\u2015-]\s*\d+\s*V/gi, " ").replace(TAP_RE, " ");
       const m = clean.match(/(?<![\d.\/-])(\d+(?:\.\d+)?)\s*V(?:DC|AC)?\b(?!A)/i);
       return m ? { string: `${fmt(num(m[1]))} V`, number: num(m[1]) } : null;
@@ -165,12 +169,14 @@ export const runSeedProductSpecs = async ({ apply = true, logger = createLogger(
   const existingBy = new Map(existing.map((r) => [`${r.product_id}:${r.key}`, r]));
 
   const distinct = new Map(SPECS.map((s) => [s.key, new Map()]));
+  const extracted = new Set(); // "productId:key" pairs the rules still produce
   const ops = [];
   const backup = [];
   for (const p of products) {
     for (const s of SPECS) {
       const v = s.extract(p.name);
       if (!v) continue;
+      extracted.add(`${p._id}:${s.key}`);
       const counts = distinct.get(s.key);
       counts.set(v.string, (counts.get(v.string) ?? 0) + 1);
 
@@ -197,6 +203,15 @@ export const runSeedProductSpecs = async ({ apply = true, logger = createLogger(
         },
       });
     }
+  }
+
+  // Seeder-written rows the (improved) rules no longer produce — e.g. a wrong
+  // value from an older rule — are soft-deleted. Hand-entered rows stay.
+  const stale = existing.filter((r) => !r.created_by && !extracted.has(`${r.product_id}:${r.key}`));
+  for (const r of stale) {
+    backup.push(r);
+    ops.push({ updateOne: { filter: { _id: r._id }, update: { $set: { deleted_at: new Date(), status: "inactive" } } } });
+    logger.info(`remove stale: ${r.key} = ${r.value_string} (product ${r.product_id})`);
   }
 
   for (const [key, counts] of distinct) {

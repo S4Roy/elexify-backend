@@ -48,6 +48,9 @@ export const CATEGORY_RULES = [
   [/\bBMS\b|battery management|lifepo4|li-?ion|battery holder|nickel strip|insulation ring|charger|battery cell|\b(18650|32140|32700)\b/i, ["lithium-battery"]],
 ];
 
+// Category display-name fixes (slug → name).
+export const CATEGORY_NAME_FIXES = { tools: "Tools" };
+
 const pickRule = (name) => CATEGORY_RULES.find(([re]) => re.test(name))?.[1] ?? null;
 
 export const runFixProductCategories = async ({ apply = true, logger = createLogger() } = {}) => {
@@ -59,6 +62,13 @@ export const runFixProductCategories = async ({ apply = true, logger = createLog
 
   const missing = [...new Set(CATEGORY_RULES.flatMap(([, s]) => s))].filter((s) => !idBySlug.has(s));
   if (missing.length) throw new Error(`Unknown category slug(s): ${missing.join(", ")}`);
+
+  for (const [slug, name] of Object.entries(CATEGORY_NAME_FIXES)) {
+    const cat = await Category.findOne({ slug, deleted_at: null }).select("name").lean();
+    if (!cat || cat.name === name) continue;
+    logger.info(`${apply ? "rename" : "would rename"} category ${slug}: "${cat.name}" → "${name}"`);
+    if (apply) await Category.updateOne({ _id: cat._id }, { $set: { name } });
+  }
 
   const products = await Product.find({ deleted_at: null }).select("_id name categories").lean();
   const changes = [];
