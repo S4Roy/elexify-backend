@@ -27,5 +27,10 @@ export const list = celebrate({
     exclude: Joi.string().optional().allow("", null),
     is_featured: Joi.string().optional().allow("", null).valid("true", "false"),
     is_bestseller: Joi.string().optional().allow("", null).valid("true", "false"),
-  }),
+    in_stock: Joi.string().optional().allow("", null).valid("true", "false"),
+    min_rating: Joi.number().min(0).max(5).optional().allow("", null),
+    min_discount: Joi.number().min(0).max(100).optional().allow("", null),
+  })
+    // Parametric spec filters: spec_<key>=value,value
+    .pattern(/^spec_[a-z0-9_]{1,40}$/, Joi.string().max(500).allow("")),
 });

@@ -69,6 +69,10 @@ productRouter.get(
   inventoryController.productController.currencyList
 );
 productRouter.get(
+  "/facets",
+  inventoryController.productController.facets
+);
+productRouter.get(
   "/price-range",
   inventoryController.productController.priceRange
 );

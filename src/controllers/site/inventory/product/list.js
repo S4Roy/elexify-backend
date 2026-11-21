@@ -14,6 +14,7 @@ const correctionsFor = (searchKey) => suggestAlternatives(searchKey).catch(() =>
 });
 import mongoose from "mongoose";
 import Category from "../../../../models/Category.js";
+import ProductSpecification from "../../../../models/ProductSpecification.js";
 import Product from "../../../../models/Product.js";
 import Classification from "../../../../models/Classification.js";
 import Tag from "../../../../models/Tag.js";
@@ -43,6 +44,10 @@ export const list = async (req, res, next) => {
       exclude = null,
       is_featured = null,
       is_bestseller = null,
+      // Listing filters: in_stock=true, min_rating=4, min_discount=25
+      in_stock = null,
+      min_rating = null,
+      min_discount = null,
     } = req.query;
     const { slug = null } = req.params;
     const rate = rates?.rates?.get(currency) ?? 1;
@@ -105,6 +110,22 @@ export const list = async (req, res, next) => {
           slugs[0]
         );
       }
+    }
+
+    // 🔹 Parametric spec filters: spec_<key>=value,value (values are the
+    // display strings, e.g. spec_secondary_voltage=35-0-35 V). OR within a
+    // key, AND across keys.
+    const specFilters = Object.entries(req.query)
+      .filter(([k, v]) => /^spec_[a-z0-9_]+$/.test(k) && typeof v === "string" && v.trim())
+      .map(([k, v]) => [k.slice(5), v.split(",").map((s) => s.trim()).filter(Boolean)]);
+    for (const [key, values] of specFilters) {
+      const productIds = await ProductSpecification.distinct("product_id", {
+        key,
+        value_string: { $in: values },
+        deleted_at: null,
+        status: "active",
+      });
+      matchFilter.$and = [...(matchFilter.$and ?? []), { _id: { $in: productIds } }];
     }
 
     // 🔹 Explicit id list (homepage "manual" product sections)
@@ -530,6 +551,25 @@ export const list = async (req, res, next) => {
           as: "classifications",
         },
       },
+      // Headline specs for the product-card badges.
+      {
+        $lookup: {
+          from: "product_specifications",
+          let: { pid: "$_id" },
+          pipeline: [
+            {
+              $match: {
+                $expr: { $eq: ["$product_id", "$$pid"] },
+                deleted_at: null,
+                status: "active",
+                key: { $in: ["secondary_voltage", "va_rating", "power_rating", "current_rating", "capacity", "capacitance", "resistance", "pack_qty"] },
+              },
+            },
+            { $project: { _id: 0, key: 1, value_string: 1 } },
+          ],
+          as: "key_specs",
+        },
+      },
 
       // Resolve media ids to URLs
       orderedMediaLookup({ localField: "images", as: "images" }),
@@ -748,6 +788,11 @@ export const list = async (req, res, next) => {
             },
           ]
         : []),
+
+      // Availability / rating / discount filters (same rules as /facets)
+      ...(in_stock === "true" ? [{ $match: { stock_quantity: { $gt: 0 } } }] : []),
+      ...(Number(min_rating) > 0 ? [{ $match: { avg_rating: { $gte: Number(min_rating) } } }] : []),
+      ...(Number(min_discount) > 0 ? [{ $match: { discount_percent: { $gte: Number(min_discount) } } }] : []),
 
       { $sort: { [sort_by]: sort_order } },
     ];

@@ -20,6 +20,7 @@ const { Schema, model, Types } = mongoose;
 //                          text_theme, overlay_opacity, order, enabled, schedule}] }
 //   cta_banner       -> { heading, description, button_label, button_link, show_newsletter_panel }
 //   content_section  -> { heading, body }
+//   reviews          -> { min_rating, limit }  (latest approved ratings)
 const HomeSectionSchema = new Schema(
   {
     type: {
@@ -33,6 +34,7 @@ const HomeSectionSchema = new Schema(
         "promo_banners",
         "cta_banner",
         "content_section",
+        "reviews",
       ],
     },
     title: { type: String, default: null },

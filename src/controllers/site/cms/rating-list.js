@@ -113,6 +113,7 @@ export const ratingList = async (req, res, next) => {
 
           "product._id": 1,
           "product.name": 1,
+          "product.slug": 1,
           product_images: 1, // ✅ now product images are included
 
           "variation._id": 1,

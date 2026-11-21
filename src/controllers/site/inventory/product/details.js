@@ -43,7 +43,10 @@ export const details = async (req, res, next) => {
                 },
               },
             },
-            { $sort: { sort_order: 1, name: 1 } },
+            // Keep the product's own order — the first entry is its primary
+            // category (used for the storefront breadcrumb).
+            { $addFields: { _idx: { $indexOfArray: ["$$catIds", "$_id"] } } },
+            { $sort: { _idx: 1 } },
             { $project: { _id: 1, name: 1, slug: 1, sort_order: 1 } },
           ],
           as: "categories",

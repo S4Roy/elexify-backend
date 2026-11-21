@@ -10,6 +10,7 @@ import { filterOption } from "./filterOption.js";
 import { currencyList } from "./currencyList.js";
 import { exchangeRate } from "./exchangeRate.js";
 import { priceRange } from "./priceRange.js";
+import { facets } from "./facets.js";
 import { tempCartManage } from "./tempCartManage.js";
 import { tempCarts } from "./tempCarts.js";
 import { specifications } from "./specifications.js";
@@ -35,6 +36,7 @@ export {
   exchangeRate,
   currencyList,
   priceRange,
+  facets,
   tempCartManage,
   tempCarts,
   specifications,

@@ -8,6 +8,7 @@ const SECTION_TYPES = [
   "promo_banners",
   "cta_banner",
   "content_section",
+  "reviews",
 ];
 
 export const addSection = celebrate({

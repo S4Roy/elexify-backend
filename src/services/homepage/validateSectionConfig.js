@@ -118,6 +118,11 @@ const CONFIG_SCHEMAS = {
     button_link: safeLink.allow("", null),
     show_newsletter_panel: Joi.boolean().default(false),
   }),
+  // Customer reviews strip: latest approved ratings at or above min_rating.
+  reviews: Joi.object({
+    min_rating: Joi.number().integer().min(1).max(5).default(4),
+    limit: Joi.number().integer().min(1).max(20).default(8),
+  }),
   content_section: Joi.object({
     heading: Joi.string().max(150).allow("", null),
     body: Joi.string().max(20000).allow("", null),
