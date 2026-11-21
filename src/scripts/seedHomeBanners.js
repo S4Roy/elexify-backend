@@ -142,7 +142,9 @@ export const runSeedHomeBanners = async () => {
   );
   const gen = (name, suffix) => generated.get(`${name}-${suffix}`) || null;
   const look = (isGenerated) =>
-    isGenerated ? { text_theme: "dark", overlay_opacity: 0 } : { text_theme: "light", overlay_opacity: 0.45 };
+    isGenerated
+      ? { display: "split", text_theme: "dark", overlay_opacity: 0 }
+      : { display: "overlay", text_theme: "light", overlay_opacity: 0.45 };
 
   let hero = draft.find((s) => s.type === "hero");
   if (!hero) throw new Error("No hero section on the homepage — add one in the admin first.");

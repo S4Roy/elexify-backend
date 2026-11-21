@@ -39,56 +39,32 @@ export const BANNERS = [
   { name: "promo-tools", category: "tools", kind: "promo", count: 2 },
 ];
 
+// Art-only images for the storefront's "split" banner style: the storefront
+// draws the text column and background itself and fades this art in on the
+// right (hero) or top (promo tile), so nothing here needs to leave text room.
+// Hero desktop/mobile share one 3:2 art; promo tiles use a 2:1 art strip.
 const SIZES = {
-  hero: [{ suffix: "desktop", w: 1600, h: 600 }, { suffix: "mobile", w: 800, h: 800 }],
-  promo: [{ suffix: "desktop", w: 800, h: 600 }],
+  hero: [{ suffix: "desktop", w: 1200, h: 800 }, { suffix: "mobile", w: 1200, h: 800 }],
+  promo: [{ suffix: "desktop", w: 1000, h: 500 }],
 };
 
 const BRAND = "#00796A";
 
-const background = (w, h) => {
-  const wide = w > h;
-  // Brand panel: a large curved teal shape behind the product group, with a
-  // lighter inner arc for depth; dot-grid texture on the open (text) side.
-  const px = wide ? w * 0.46 : 0;
-  const py = wide ? 0 : h * 0.42;
-  const panel = wide
-    ? `M${px} 0 H${w} V${h} H${px + w * 0.06} C${px - w * 0.05} ${h * 0.7} ${px + w * 0.02} ${h * 0.3} ${px} 0 Z`
-    : `M0 ${py} C${w * 0.3} ${py - h * 0.08} ${w * 0.7} ${py + h * 0.06} ${w} ${py - h * 0.04} V${h} H0 Z`;
-  const arc = wide
-    ? `M${px + w * 0.10} 0 C${px + w * 0.02} ${h * 0.35} ${px + w * 0.05} ${h * 0.75} ${px + w * 0.14} ${h}`
-    : `M0 ${py + h * 0.08} C${w * 0.35} ${py} ${w * 0.65} ${py + h * 0.12} ${w} ${py + h * 0.04}`;
-  const dots = [];
-  const step = Math.round(Math.min(w, h) / 22);
-  const maxX = wide ? w * 0.42 : w;
-  const maxY = wide ? h : h * 0.38;
-  for (let y = step; y < maxY; y += step) {
-    for (let x = step; x < maxX; x += step) {
-      const fade = wide ? 1 - x / maxX : 1 - y / maxY;
-      if (fade > 0.12) dots.push(`<circle cx="${x}" cy="${y}" r="1.6" fill-opacity="${(0.05 + fade * 0.12).toFixed(2)}"/>`);
-    }
-  }
-  return Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}">
+const background = (w, h) => Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}">
     <defs>
       <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-        <stop offset="0" stop-color="#F7FBFA"/><stop offset="1" stop-color="#E8F3F1"/>
+        <stop offset="0" stop-color="#E4F3F0"/><stop offset="1" stop-color="#C9E8E1"/>
       </linearGradient>
-      <linearGradient id="panel" x1="0" y1="0" x2="1" y2="1">
-        <stop offset="0" stop-color="#D2ECE7"/><stop offset="1" stop-color="#B5DED6"/>
-      </linearGradient>
-      <radialGradient id="glow" cx="${wide ? 0.72 : 0.5}" cy="${wide ? 0.48 : 0.66}" r="${wide ? 0.42 : 0.5}">
-        <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.9"/>
+      <radialGradient id="glow" cx="0.5" cy="0.46" r="0.55">
+        <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.85"/>
         <stop offset="1" stop-color="#FFFFFF" stop-opacity="0"/>
       </radialGradient>
     </defs>
     <rect width="100%" height="100%" fill="url(#bg)"/>
-    <g fill="${BRAND}">${dots.join("")}</g>
-    <path d="${panel}" fill="url(#panel)"/>
-    <path d="${arc}" fill="none" stroke="#FFFFFF" stroke-opacity="0.55" stroke-width="${Math.round(Math.min(w, h) * 0.012)}"/>
+    <circle cx="${w * 0.5}" cy="${h * 0.5}" r="${Math.min(w, h) * 0.46}" fill="none" stroke="#FFFFFF" stroke-opacity="0.5" stroke-width="${Math.round(Math.min(w, h) * 0.012)}"/>
     <rect width="100%" height="100%" fill="url(#glow)"/>
-    <rect x="0" y="${h - 6}" width="${w}" height="6" fill="${BRAND}"/>
   </svg>`);
-};
+
 
 const fetchImage = async (url) => {
   const res = await fetch(url);
@@ -188,28 +164,17 @@ const pickProducts = async (slugs, count) => {
 const compose = async (products, { w, h }) => {
   const wide = w > h;
   // Product slots: a fanned group on the right (wide) or lower half (square).
-  // Two products (promo tiles): side by side with only a slight overlap.
-  const pairSlots = [
-    { x: 0.76, y: 0.36, s: 0.50 },
-    { x: 0.50, y: 0.40, s: 0.38 },
-  ];
-  const slots = wide && products.length === 2
-    ? pairSlots
-    : wide
-    ? [
-        { x: 0.77, y: 0.47, s: 0.78 },
-        { x: 0.63, y: 0.60, s: 0.52 },
-        { x: 0.91, y: 0.62, s: 0.48 },
-      ]
-    : w / h > 1.2
+  // Centred groups: lead product in the middle, supporting ones either side.
+  const slots =
+    products.length === 2
       ? [
-          { x: 0.73, y: 0.50, s: 0.60 },
-          { x: 0.40, y: 0.68, s: 0.50 },
+          { x: 0.60, y: 0.50, s: wide ? 0.80 : 0.62 },
+          { x: 0.33, y: 0.56, s: wide ? 0.62 : 0.46 },
         ]
       : [
-          { x: 0.50, y: 0.66, s: 0.52 },
-          { x: 0.24, y: 0.74, s: 0.34 },
-          { x: 0.78, y: 0.74, s: 0.34 },
+          { x: 0.50, y: 0.48, s: 0.74 },
+          { x: 0.24, y: 0.58, s: 0.50 },
+          { x: 0.77, y: 0.60, s: 0.48 },
         ];
   const layers = [];
   // Smaller side products first so the hero product sits on top.

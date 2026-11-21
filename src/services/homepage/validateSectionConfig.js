@@ -31,6 +31,9 @@ const bannerPresentation = {
   text_position: Joi.string().valid("left", "center", "right").optional(),
   text_theme: Joi.string().valid("light", "dark").optional(),
   overlay_opacity: Joi.number().min(0).max(1).optional(),
+  // overlay: text on top of a full-bleed photo (default). split: text in its
+  // own column, product art beside it — for product-cutout creatives.
+  display: Joi.string().valid("overlay", "split").optional(),
 };
 
 const slideSchema = Joi.object({
