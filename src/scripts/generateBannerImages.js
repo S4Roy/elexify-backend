@@ -45,7 +45,7 @@ export const BANNERS = [
 // Hero desktop/mobile share one 3:2 art; promo tiles use a 2:1 art strip.
 const SIZES = {
   hero: [{ suffix: "desktop", w: 1200, h: 800 }, { suffix: "mobile", w: 1200, h: 800 }],
-  promo: [{ suffix: "desktop", w: 1000, h: 500 }],
+  promo: [{ suffix: "desktop", w: 1000, h: 500, transparent: true }],
 };
 
 const BRAND = "#00796A";
@@ -161,7 +161,7 @@ const pickProducts = async (slugs, count) => {
   return out;
 };
 
-const compose = async (products, { w, h }) => {
+const compose = async (products, { w, h, transparent = false }) => {
   const wide = w > h;
   // Product slots: a fanned group on the right (wide) or lower half (square).
   // Centred groups: lead product in the middle, supporting ones either side.
@@ -199,13 +199,19 @@ const compose = async (products, { w, h }) => {
     layers.push({ input: shadow, left: sLeft, top: sTop, blend: "multiply" });
     layers.push({ input: img, left, top });
   }
+  // Promo tiles: products only, on a transparent canvas — the storefront tile
+  // draws its own background, so no baked-in panel edges show.
+  if (transparent) {
+    return sharp({ create: { width: w, height: h, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } } })
+      .composite(layers).png({ compressionLevel: 9 }).toBuffer();
+  }
   return sharp(background(w, h)).composite(layers).jpeg({ quality: 86, mozjpeg: true }).toBuffer();
 };
 
-const upsertMedia = async (key, altText) => {
+const upsertMedia = async (key, altText, mime = "image/jpeg") => {
   const existing = await Media.findOne({ url: key, deleted_at: null });
   if (existing) return existing;
-  return Media.create({ url: key, type: "image", alt_text: altText, mime_type: "image/jpeg", reference_type: "banners", status: "active" });
+  return Media.create({ url: key, type: "image", alt_text: altText, mime_type: mime, reference_type: "banners", status: "active" });
 };
 
 export const runGenerateBannerImages = async () => {
@@ -224,18 +230,20 @@ export const runGenerateBannerImages = async () => {
     result[b.name] = {};
     for (const size of SIZES[b.kind]) {
       const jpg = await compose(products, size);
-      const file = `${b.name}-${size.suffix}.jpg`;
+      const ext = size.transparent ? "png" : "jpg";
+      const mime = size.transparent ? "image/png" : "image/jpeg";
+      const file = `${b.name}-${size.suffix}.${ext}`;
       if (PREVIEW) {
         fs.writeFileSync(path.join(PREVIEW_DIR, file), jpg);
         log(`  wrote ${path.join(PREVIEW_DIR, file)} (${Math.round(jpg.length / 1024)} KB)`);
         continue;
       }
       const key = `banners/generated/${file}`;
-      await s3Handler.uploadToS3({ data: jpg, mimetype: "image/jpeg" }, key, { optimize: false });
+      await s3Handler.uploadToS3({ data: jpg, mimetype: mime }, key, { optimize: false });
       const thumbKey = `banners/generated/thumbs/${file}`;
       const thumb = await sharp(jpg).resize({ width: 600 }).jpeg({ quality: 80 }).toBuffer();
       await s3Handler.uploadToS3({ data: thumb, mimetype: "image/jpeg" }, thumbKey, { optimize: false });
-      const media = await upsertMedia(key, b.name.replace(/-/g, " "));
+      const media = await upsertMedia(key, b.name.replace(/-/g, " "), mime);
       if (!media.thumbnail) await Media.updateOne({ _id: media._id }, { $set: { thumbnail: thumbKey } });
       result[b.name][size.suffix] = String(media._id);
       log(`  uploaded ${key} → media ${media._id}`);

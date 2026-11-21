@@ -138,7 +138,9 @@ export const runSeedHomeBanners = async () => {
   // light, so their text is dark with no overlay.
   const generated = new Map(
     (await Media.find({ url: /^banners\/generated\//, deleted_at: null }).select("url").lean())
-      .map((m) => [m.url.replace(/^banners\/generated\//, "").replace(/\.jpg$/, ""), String(m._id)]),
+      // .png (transparent promo art) sorts after .jpg, so it wins over an older .jpg.
+      .sort((a, b) => a.url.localeCompare(b.url))
+      .map((m) => [m.url.replace(/^banners\/generated\//, "").replace(/\.(jpg|png)$/, ""), String(m._id)]),
   );
   const gen = (name, suffix) => generated.get(`${name}-${suffix}`) || null;
   const look = (isGenerated) =>
