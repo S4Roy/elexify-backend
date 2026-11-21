@@ -1,11 +1,19 @@
 import rateLimit from "express-rate-limit";
 
+// Our own servers (the Next.js storefront rendering pages server-side) share a
+// single IP, so they'd exhaust one budget for every visitor. Opt-in allowlist
+// of exact server IPs, e.g. CATALOG_RATE_LIMIT_ALLOW_IPS=13.234.1.2,127.0.0.1
+const CATALOG_ALLOW_IPS = new Set(
+  (process.env.CATALOG_RATE_LIMIT_ALLOW_IPS || "").split(",").map(s => s.trim()).filter(Boolean),
+);
+
 // Separate budget for expensive catalog reads. Writes and CORS preflights keep
 // their existing policies. No exemption based on a client-supplied API key.
 export const catalogReadRateLimiter = rateLimit({
   windowMs: 60_000,
   limit: 600,
-  skip: req => !["GET", "HEAD"].includes(req.method) ||
+  skip: req => CATALOG_ALLOW_IPS.has(req.ip) ||
+    !["GET", "HEAD"].includes(req.method) ||
     !/^\/(inventory\/(category|product)|navigation)(\/|$)/.test(req.path),
   standardHeaders: true,
   legacyHeaders: false,
