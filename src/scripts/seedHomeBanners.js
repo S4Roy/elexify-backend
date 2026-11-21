@@ -24,6 +24,7 @@ import path from "path";
 import mongoose, { mongooseConnection } from "../config/mongoose.js";
 import HomePage from "../models/HomePage.js";
 import Category from "../models/Category.js";
+import Media from "../models/Media.js";
 import { validateSectionConfig } from "../services/homepage/validateSectionConfig.js";
 
 const DRY_RUN = process.argv.includes("--dry-run");
@@ -133,6 +134,16 @@ export const runSeedHomeBanners = async () => {
   const cats = await Category.find({ slug: { $in: slugs }, deleted_at: null }).select("slug banner image").lean();
   const catBySlug = new Map(cats.map((c) => [c.slug, c]));
 
+  // Generated banners (generateBannerImages.js) win when present: they are
+  // light, so their text is dark with no overlay.
+  const generated = new Map(
+    (await Media.find({ url: /^banners\/generated\//, deleted_at: null }).select("url").lean())
+      .map((m) => [m.url.replace(/^banners\/generated\//, "").replace(/\.jpg$/, ""), String(m._id)]),
+  );
+  const gen = (name, suffix) => generated.get(`${name}-${suffix}`) || null;
+  const look = (isGenerated) =>
+    isGenerated ? { text_theme: "dark", overlay_opacity: 0 } : { text_theme: "light", overlay_opacity: 0.45 };
+
   let hero = draft.find((s) => s.type === "hero");
   if (!hero) throw new Error("No hero section on the homepage — add one in the admin first.");
   const oldSlides = hero.config?.slides ?? [];
@@ -145,8 +156,9 @@ export const runSeedHomeBanners = async () => {
     const oldIndex = old ? oldSlides.indexOf(old) : -1;
     if (oldIndex >= 0) used.add(oldIndex);
     const cat = catBySlug.get(s.category);
-    const desktop = idOf(old?.desktop_image) || idOf(cat?.banner) || idOf(cat?.image);
-    const mobile = idOf(old?.mobile_image) || desktop;
+    const genDesktop = gen(`hero-${s.category}`, "desktop");
+    const desktop = genDesktop || idOf(old?.desktop_image) || idOf(cat?.banner) || idOf(cat?.image);
+    const mobile = gen(`hero-${s.category}`, "mobile") || (genDesktop ? desktop : idOf(old?.mobile_image)) || desktop;
     if (!desktop) {
       log(`hero slide "${s.heading}": no image found, skipped`);
       continue;
@@ -162,13 +174,12 @@ export const runSeedHomeBanners = async () => {
       link: s.primary_cta.link,
       alt_text: s.alt_text,
       text_position: "left",
-      text_theme: "light",
-      overlay_opacity: 0.45,
+      ...look(!!genDesktop),
       order: i,
       enabled: true,
       schedule: { startAt: null, endAt: null },
     });
-    log(`hero ${i + 1}: ${s.heading} — image from ${old ? "existing slide" : "category"}`);
+    log(`hero ${i + 1}: ${s.heading} — image from ${genDesktop ? "generated banner" : old ? "existing slide" : "category"}`);
   }
   hero.config = { ...hero.config, slides };
 
@@ -193,12 +204,13 @@ export const runSeedHomeBanners = async () => {
     layout: "grid_3",
     items: PROMO_ITEMS.flatMap((p, i) => {
       const cat = catBySlug.get(p.category);
-      const img = idOf(cat?.banner) || idOf(cat?.image);
+      const genImg = gen(`promo-${p.category}`, "desktop");
+      const img = genImg || idOf(cat?.banner) || idOf(cat?.image);
       if (!img) {
         log(`promo "${p.heading}": no category image, skipped`);
         return [];
       }
-      log(`promo ${i + 1}: ${p.heading}`);
+      log(`promo ${i + 1}: ${p.heading} — image from ${genImg ? "generated banner" : "category"}`);
       return [{
         desktop_image: img,
         mobile_image: img,
@@ -208,8 +220,7 @@ export const runSeedHomeBanners = async () => {
         link: p.link,
         alt_text: p.heading,
         text_position: "left",
-        text_theme: "light",
-        overlay_opacity: 0.45,
+        ...look(!!genImg),
         order: i,
         enabled: true,
       }];
