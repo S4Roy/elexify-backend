@@ -190,16 +190,16 @@ const compose = async (products, { w, h }) => {
   // Product slots: a fanned group on the right (wide) or lower half (square).
   // Two products (promo tiles): side by side with only a slight overlap.
   const pairSlots = [
-    { x: 0.73, y: 0.47, s: 0.62 },
-    { x: 0.40, y: 0.67, s: 0.46 },
+    { x: 0.76, y: 0.36, s: 0.50 },
+    { x: 0.50, y: 0.40, s: 0.38 },
   ];
   const slots = wide && products.length === 2
     ? pairSlots
     : wide
     ? [
-        { x: 0.71, y: 0.47, s: 0.84 },
-        { x: 0.55, y: 0.58, s: 0.58 },
-        { x: 0.87, y: 0.60, s: 0.54 },
+        { x: 0.77, y: 0.47, s: 0.78 },
+        { x: 0.63, y: 0.60, s: 0.52 },
+        { x: 0.91, y: 0.62, s: 0.48 },
       ]
     : w / h > 1.2
       ? [
